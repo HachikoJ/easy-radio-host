@@ -1,6 +1,6 @@
 # AI 电台主持人 v2 · 后端 (FastAPI 单文件)
 # 主题化节目 / 生动口播 / 点歌互动 / 栏目包装 / 防重复
-# 曲库来自 NAS list.php; DeepSeek 编排; MiniMax TTS (v2, audio 为 hex 字符串)
+# 曲库来自在线音乐代理; DeepSeek 编排; MiniMax TTS (v2, audio 为 hex 字符串)
 import asyncio
 import json
 import os
@@ -24,10 +24,10 @@ MINIMAX_GROUP = os.getenv("MINIMAX_GROUP", "").strip()
 MINIMAX_BASE = os.getenv("MINIMAX_BASE", "https://api.minimaxi.com").rstrip("/")
 MINIMAX_MODEL = os.getenv("MINIMAX_MODEL", "speech-02-turbo")
 MINIMAX_VOICE = os.getenv("MINIMAX_VOICE", "female-chengshu")
-NAS_LIST_URL = os.getenv("NAS_LIST_URL", "http://192.168.1.88:8080/list.php")
-NAS_BASE_URL = os.getenv("NAS_BASE_URL", "http://192.168.1.88:8080")
+NAS_LIST_URL = os.getenv("NAS_LIST_URL", "http://127.0.0.1:8001/songs.txt")
+NAS_BASE_URL = os.getenv("NAS_BASE_URL", "http://127.0.0.1:8001")
 HOST_NAME = os.getenv("HOST_NAME", "小蓝")
-RADIO_BASE = os.getenv("RADIO_BASE", "http://192.168.1.88:8100").rstrip("/")
+RADIO_BASE = os.getenv("RADIO_BASE", "http://127.0.0.1:8100").rstrip("/")
 
 DATA_DIR = Path(os.getenv("DATA_DIR", "/data"))
 VOICE_DIR = DATA_DIR / "voice"
@@ -81,7 +81,7 @@ def fetch_library():
         with urllib.request.urlopen(NAS_LIST_URL, timeout=8) as r:
             text = r.read().decode("utf-8")
     except Exception as e:
-        raise HTTPException(502, f"无法读取 NAS 曲库: {e}")
+        raise HTTPException(502, f"无法读取在线曲库: {e}")
     out = []
     for line in text.splitlines():
         line = line.strip()

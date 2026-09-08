@@ -9,8 +9,8 @@ services:
       DEEPSEEK_KEY: ""            # 填入 DeepSeek key 后重启生效
       DEEPSEEK_BASE: "https://api.deepseek.com"
       DEEPSEEK_MODEL: "deepseek-chat"
-      NAS_LIST_URL: "http://192.168.1.88:8080/list.php"
-      NAS_BASE_URL: "http://192.168.1.88:8080"
+      NAS_LIST_URL: "http://<SERVER_IP>:8001/songs.txt"
+      NAS_BASE_URL: "http://<SERVER_IP>:8001"
       HOST_NAME: "小蓝"
     volumes:
       - ./backend:/srv          # 代码热挂载, 改代码重启即生效

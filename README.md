@@ -2,7 +2,7 @@
 
 用 **DeepSeek 大模型**当电台主持人 + **MiniMax TTS** 口播 + **在线音乐多音源曲库**，在浏览器里生成并连续播放一期"电台节目"（主持人口播与歌曲交替）。适合部署到**云服务器**，无需自己准备/下载任何 mp3。
 
-> ⚠️ 在线曲库涉及第三方歌曲版权，本改造仅用于**个人学习/体验**低成本跑通"主持人+语音+放歌"，请勿用于商业或侵权场景，播放版权歌曲请遵守相关平台规则。
+> ⚠️ 在线曲库涉及第三方歌曲版权。本项目仅用于**个人学习与体验**，请遵守相关平台规则，不要用于商业或侵权场景。
 
 ## 效果
 - 点一下"生成一期节目" → **约 4~6 秒**出整期
@@ -24,19 +24,15 @@
    │                                        + /s/<source>/<id>.mp3 动态取可播直链
 ```
 
-## 与传统(群晖/NAS)版的差异
-原项目设计为**群晖 NAS + 本地 mp3 曲库(list.php)**；本改造将其改为**通用云服务器 + 在线多音源曲库**：
-- 曲库不再依赖 NAS 上的 mp3 文件，改为读取 `musiclib/playlist.tsv`（歌名/歌手/音源/id）
-- 新增 `musiclib/proxy_server.py`（8001）：把歌单暴露成 app 需要的 `/songs.txt`，并把 `/s/<source>/<id>.mp3` 通过在线 API 取真实可播直链后 302
-- 新增 `musiclib/resolve_multi.py`：多渠道(joox/netease)裁决，锁定每首歌的**原唱原版**（简繁归一匹配、排除翻唱/Remix/Live/伴奏、验证可播）
-- 用 **Python venv 裸跑**替代 Docker（规避国内拉不到基础镜像）；也可自行套 Docker
+## 在线曲库
+曲库由 `musiclib/playlist.tsv` 管理，每行保存歌名、歌手、音源和歌曲 ID。播放时由 `musiclib/proxy_server.py` 调用在线音乐 API 获取可播直链，服务本身不保存音频文件。
 
-在线音乐 API：**多音源搜索/取链**（搜索 `types=search`、播放取链 `types=url`）
+在线音乐 API 提供多音源搜索与取链能力（搜索 `types=search`、播放取链 `types=url`）。
 
 ## 部署（云服务器 / Linux）
 完整可执行手册见 **[DEPLOY-HANDOFF.md](DEPLOY-HANDOFF.md)**（给 codex / 新服务器一键对照）。要点：
 1. `python3 -m venv .venv && pip install -r backend/requirements.txt zhconv`
-2. 填 `radio.env`：`DEEPSEEK_KEY`、`MINIMAX_KEY`、`NAS_LIST_URL=http://127.0.0.1:8001/songs.txt`、`NAS_BASE_URL=http://<公网IP>:8001`
+2. 填 `radio.env`：`DEEPSEEK_KEY`、`MINIMAX_KEY`，并将曲库地址配置为 `http://127.0.0.1:8001/songs.txt` 和 `http://<公网IP>:8001`
 3. 两个 systemd 服务：主应用 8100 + 曲库代理 8001（单元文件见 DEPLOY-HANDOFF.md）
 4. 云安全组放行 8100、8001
 5. 浏览器打开 `http://<公网IP>:8100`
@@ -54,7 +50,7 @@
   | GET | /songs.txt | 曲库列表(供 app) |
   | GET | /s/<source>/<id>.mp3 | 在线取直链 → 302 |
 
-## 曲库维护
+## 歌单维护
 编辑 `musiclib/playlist-source.tsv`（歌名<TAB>歌手），删掉旧 `musiclib/playlist.tsv`，运行：
 ```bash
 /opt/easy-radio-host/.venv/bin/python3 musiclib/resolve_multi.py
@@ -64,16 +60,16 @@
 ---
 
 ## 致谢 / Credits（避免侵权）
-本项目是在他人基础上改造的**二次开发学习项目**，对以下原始资源表达感谢与版权归属：
+本项目使用以下第三方资源，并保留相应版权归属：
 
-- **原项目 easy-radio-host**：基于开头与整体改造的母本
+- **easy-radio-host 原始项目**（作者 `weak0001`）
   - 原仓库：https://gitee.com/weak0001/easy-radio-host
   - 原作的全部署名与版权归原作者 `weak0001` 所有
-- **在线音乐 API**（music-api.gdstudio.xyz）：本改造使用其**搜索/取链**接口作为多音源数据源
+- **在线音乐 API**（music-api.gdstudio.xyz）：提供**搜索/取链**接口
   - API 地址：https://music-api.gdstudio.xyz/api.php
   - 其版权归平台方，详见其站内声明；**歌词/歌曲版权属于相应权利人**
 - **DeepSeek**：主持人大脑（`deepseek-chat`），版权归 DeepSeek
 - **MiniMax TTS（海螺）**：口播语音合成，版权归 MiniMax
 - 其余第三方依赖见各项目 LICENSE
 
-**免责声明**：本项目不存储、不提供任何音频文件；在线曲库仅作 API 转发。请仅用于学习/测试合法内容，商用或再发布请自行确认对应平台与版权方授权，侵权风险自负。
+**免责声明**：本项目不存储、不提供任何音频文件；在线曲库仅作 API 转发。请仅用于学习和测试合法内容，商用或再发布请自行确认授权。

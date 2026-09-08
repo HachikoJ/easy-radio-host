@@ -4,7 +4,7 @@
 # 用法：放好歌曲后运行  bash /opt/easy-radio-host/musiclib/scan.sh
 #
 # 产物：/opt/easy-radio-host/musiclib/songs.txt
-#       直接作为该应用的 NAS_LIST_URL 输入（见部署 README）
+#       可通过 HTTP 提供给主应用的 NAS_LIST_URL（在线 API 部署无需使用）
 
 set -euo pipefail
 MP="/opt/easy-radio-host/musiclib"

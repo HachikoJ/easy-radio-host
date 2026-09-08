@@ -1,7 +1,7 @@
-# easy-radio-host 全新服务器部署手册（给 codex / 目标机）
+# easy-radio-host 服务器部署手册
 
 > 目标：在一台**全新的阿里云 Linux（64位，公网有 IP）**服务器上，部署这个「AI 电台」，供浏览器访问生成口播+在线音乐的电台节目。
-> 本文由源机实测推导，步骤贴近目标机可复现。源机 public IP 示例用 `<SERVER_IP>` 占位，部署时替换成你自己的。
+> 公网 IP 示例用 `<SERVER_IP>` 占位，部署时替换成你自己的。
 
 ---
 
@@ -23,38 +23,37 @@ musiclib Proxy  FastAPI ──(8001)── musiclib/proxy_server.py
    ▼
 music-api.gdstudio.xyz  (多音源 search/url)
 ```
-- 主应用只依赖 `NAS_LIST_URL`(指向 8001/songs.txt) 与 `NAS_BASE_URL`(歌曲可播公网基址)。
+- 主应用通过曲库代理读取 `/songs.txt`，并使用代理提供的歌曲地址播放。
 - 音乐**不落盘**，全部来自在线 API；歌单只存「歌名、歌手、source、source_id」。
 
 ---
 
-## 1. 前置：装 Docker 会踩坑（建议直接用 Python 裸跑）
+## 1. 运行方式：Python venv
 
-本方案最终没有用 Docker 跑主应用，原因是**国内服务器拉 Docker Hub 的 `python:3.12-slim` 基础镜像大概率失败**（被墙，需配 mirror 且不稳）。直接 **Python venv 裸跑**最省事、最可靠：
+推荐使用 **Python venv 裸跑**：
 - 依赖仅 3 行 requirements：`fastapi / uvicorn[standard] / edge-tts`(+ 解析脚本用 `zhconv`)。
 - PyPI 用清华源很快。
 
-> 若坚持 Docker：需在 `/etc/docker/daemon.json` 加 registry-mirrors（如 `https://docker.1ms.run`、`https://docker.m.daocloud.io`），重启 docker 再 build，**仍可能超时，不推荐**。
 
 ---
 
 ## 2. 克隆代码并放好
 
 ```bash
-# 从 GitHub(你推好的仓库)或直接 rsync 源机 /opt/easy-radio-host
+# 将仓库部署到 /opt/easy-radio-host
 git clone <你的仓库URL> /opt/easy-radio-host
 cd /opt/easy-radio-host
 ```
 
 需要具备的文件（GitHub 仓库里应有）：
 ```
-backend/app.py            # 含 fetch_library 的 TAB 扩展补丁
+backend/app.py            # 主应用
 backend/requirements.txt
 backend/static/index.html
 musiclib/proxy_server.py  # 8001 在线曲库代理(多音源取播)
 musiclib/resolve_multi.py # 解析歌单→多渠道裁决锁定(joox/netease)
-musiclib/resolve_ids.py   # (旧单源版, 可忽略)
-musiclib/scan.sh          # (本地文件曲库用, 在线方案可忽略)
+musiclib/resolve_ids.py   # 单源解析工具
+musiclib/scan.sh          # 本地文件导入工具（在线曲库无需使用）
 musiclib/playlist-source.tsv  # 源歌单样例(歌名<TAB>歌手)
 musiclib/playlist.tsv     # 已裁决锁定的歌单(73首样例)
 ```
@@ -63,12 +62,12 @@ musiclib/playlist.tsv     # 已裁决锁定的歌单(73首样例)
 
 ---
 
-## 3. 代码上尽量不手改的部分（说明）
+## 3. 配置说明
 
-- `backend/app.py` 已打了 1 处补丁：`fetch_library()` 支持“行含 `\t`”的在线格式 `标题<TAB>rel`；原位文件曲库格式仍兼容。**新机直接用仓库里这份 app.py 即可，无需再手改。**
+- `backend/app.py` 的 `fetch_library()` 支持在线格式 `标题<TAB>rel`。
 - 关键 env（app 读的）：
-  - `NAS_LIST_URL` = `http://127.0.0.1:8001/songs.txt`（app 向 8001 拉歌单）
-  - `NAS_BASE_URL` = `http://<SERVER_IP>:8001`（生歌曲 URL 供浏览器播放）
+  - `NAS_LIST_URL` = `http://127.0.0.1:8001/songs.txt`（兼容变量名，指向在线曲库列表）
+  - `NAS_BASE_URL` = `http://<SERVER_IP>:8001`（兼容变量名，指向在线歌曲代理）
   - `RADIO_BASE` = `http://<SERVER_IP>:8100`（串场/口播完整 URL 用）
   - `DEEPSEEK_KEY`、`DEEPSEEK_MODEL=deepseek-chat`
   - `MINIMAX_KEY`、`MINIMAX_VOICE`（如 `Chinese_huolishaonv` / `female-chengshu`）
@@ -236,9 +235,8 @@ ls /opt/easy-radio-host/data/voice/       # TTS 产物
 
 ---
 
-### 附：致谢 / Credits（二次改造，请避免侵权）
-本项目基于他人作品改造，部署/再分发请保留如下归属：
-- 原项目 easy-radio-host：https://gitee.com/weak0001/easy-radio-host （原作者 weak0001）
+### 附：致谢 / Credits
+- easy-radio-host 原始项目：https://gitee.com/weak0001/easy-radio-host （作者 weak0001）
 - 在线音乐 API：https://music-api.gdstudio.xyz/api.php（搜索/取链为多音源数据源，版权归平台方与相应**唱片权利人**）
 - DeepSeek / MiniMax 语音：版权归各自公司
 - 本项目不落盘音乐，仅作 API 转发；仅供学习/合法内容体验，商用或再发布请自行确认授权，侵权风险自负。
