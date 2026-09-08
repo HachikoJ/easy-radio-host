@@ -1,237 +1,77 @@
-<!DOCTYPE html>
-<html lang="zh">
+<!doctype html>
+<html lang="zh-CN">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>小蓝电台 · AI 音乐电台</title>
-<link rel="icon" type="image/svg+xml" href="xiaolan-radio-logo.svg">
-<style>
-  body{font-family:system-ui,sans-serif;background:radial-gradient(circle at 30% 20%,#12263a,#0a1420 70%);
-       color:#e6f1ff;margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:20px}
-  .wrap{max-width:640px;width:100%}
-  .top{display:flex;justify-content:space-between;align-items:center;gap:12px}
-  h1{font-size:20px;margin:0;display:flex;align-items:center;gap:8px}
-  .brand-logo{display:block;width:36px;height:36px;flex:none}
-  .sub{color:#7fa8d0;font-size:12px;margin:2px 0 14px}
-  button{background:#1f6feb;border:0;color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;cursor:pointer}
-  button:disabled{opacity:.5}
-  .btnbar button{background:#2c4a6e;margin-right:6px}
-  .meta{color:#5f82a8;font-size:12px}
-  .tag{display:inline-block;background:#1f6feb22;border:1px solid #1f6feb66;color:#9fd0ff;
-       padding:2px 10px;border-radius:20px;font-size:12px;margin:2px 4px 2px 0}
-  .card{background:#132a42;border:1px solid #24445f;border-radius:14px;padding:14px;margin:12px 0}
-  .host{color:#9fd0ff}.song{color:#9be8c0}
-  .now{color:#ffd479;font-weight:600}
-  .text{color:#c6dcf2;font-size:14px;line-height:1.6;white-space:pre-wrap}
-  .bubble{background:#0e2036;border-radius:12px;padding:12px;font-size:14px;line-height:1.7;white-space:pre-wrap;margin-top:6px}
-  .chatline{display:flex;gap:8px;margin:10px 0}
-  input{flex:1;background:#0e2036;border:1px solid #24445f;border-radius:10px;color:#fff;padding:10px}
-  .chatlog{max-height:150px;overflow:auto;font-size:13px;color:#9fc2e8}
-  .chatlog div{margin:3px 0}
-  .auto{display:flex;align-items:center;gap:8px;font-size:13px;color:#7fa8d0}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f7f9">
+  <meta name="description" content="听间：小蓝主持的在线 AI 音乐电台，主题节目、点歌互动与连续播放。">
+  <meta property="og:title" content="听间 Tingjian · AI 音乐电台">
+  <meta property="og:description" content="选一个主题，把接下来的时间交给音乐。">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="https://raw.githubusercontent.com/HachikoJ/easy-radio-host/main/docs/radio-desktop.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <title>听间 Tingjian · 你的 AI 音乐电台</title>
+  <link rel="icon" href="assets/brand.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="listening.css">
+  <script src="listening.js" defer></script>
+  <script src="app.js" defer></script>
 </head>
-<body>
-<div class="wrap">
-  <div class="top"><h1><img class="brand-logo" src="xiaolan-radio-logo.svg" alt="" width="36" height="36">小蓝电台</h1>
-    <div class="auto"><input type="checkbox" id="auto" checked>自动广播</div>
-  </div>
-  <div class="sub">DeepSeek 主持 · MiniMax 女声 · 在线音乐曲库 · 点歌即插播</div>
-  <div><button id="gen">生成一期节目</button></div>
-  <div class="btnbar" style="margin-top:8px">
-    <button id="b_prev">⏮ 上段</button>
-    <button id="b_play">⏸ 暂停</button>
-    <button id="b_next">⏭ 下段</button>
-  </div>
+<body id="top">
+  <a class="skip-link" href="#listening">跳到播放器</a>
+  <aside class="sidebar">
+    <a class="brand" href="#listening" aria-label="听间首页"><img src="assets/brand.svg" alt="" width="40" height="40"><span><strong>听间</strong><small>TINGJIAN RADIO</small></span></a>
+    <nav aria-label="主导航">
+      <a class="nav-link active" href="#listening"><span class="icon" style="--icon:url(assets/Radio.svg)"></span><span>正在收听</span></a>
+      <a class="nav-link" href="#themes"><span class="icon" style="--icon:url(assets/Compass.svg)"></span><span>主题电台</span></a>
+      <a class="nav-link" href="#queue-section"><span class="icon" style="--icon:url(assets/ListMusic.svg)"></span><span>本期节目</span></a>
+      <a class="nav-link" href="#conversation"><span class="icon" style="--icon:url(assets/MessageCircle.svg)"></span><span>点歌互动</span></a>
+    </nav>
+    <div class="sidebar-bottom"><span class="sidebar-line"></span><span class="host-avatar">蓝</span><div><strong>小蓝</strong><small>你的 AI 主持人</small></div></div>
+  </aside>
 
-  <div class="card">
-    <div id="meta"></div>
-    <div id="nowcard" class="meta">点上方按钮开播</div>
-    <div id="bubble" class="bubble" style="display:none"></div>
-  </div>
-  <audio id="au" style="display:none"></audio>
+  <main>
+    <header class="page-header"><div class="page-greeting"><p class="eyebrow" id="today"></p><h1>留一点时间，给音乐。</h1></div><a class="focus-brand" href="#listening"><img src="assets/brand.svg" alt="" width="36" height="36"><strong>听间</strong></a><span class="demo-badge" id="demo-badge" hidden>演示节目</span><div class="view-actions"><button class="icon-button" id="appearance" aria-label="切换深色模式" data-tip="切换深色模式"><span class="icon" id="appearance-icon" style="--icon:url(assets/Moon.svg)"></span></button><button class="icon-button" id="focus-toggle" aria-label="进入沉浸模式" aria-pressed="false" data-tip="进入沉浸模式"><span class="icon" id="focus-icon" style="--icon:url(assets/Maximize.svg)"></span></button><a class="icon-button" href="https://github.com/HachikoJ/easy-radio-host" target="_blank" rel="noopener noreferrer" aria-label="GitHub 项目" data-tip="GitHub 项目"><span class="icon" style="--icon:url(assets/ArrowUpRight.svg)"></span></a></div></header>
+    <section class="focus-stage" id="focus-stage" aria-label="沉浸收听" hidden>
+      <figure class="focus-art"><img id="focus-cover" src="assets/coffee.jpg" alt="午后咖啡主题封面" width="600" height="600"><figcaption id="focus-caption">午后咖啡 · 主题封面</figcaption></figure>
+      <div class="focus-copy"><p class="eyebrow" id="focus-status">准备就绪</p><h1 id="focus-title" tabindex="-1">午后咖啡</h1><p class="focus-subtitle" id="focus-subtitle">小蓝 · 主题电台</p><button class="icon-button favorite-action" id="focus-favorite" aria-label="收藏当前歌曲" aria-pressed="false" data-tip="收藏当前歌曲" disabled><span class="icon" style="--icon:url(assets/Heart.svg)"></span></button><div class="focus-note" id="focus-note" hidden><p class="tiny-label">小蓝 · 此刻口播</p><p id="focus-text"></p></div><div class="up-next"><span>接下来</span><p id="focus-next">节目单尚未生成</p></div></div>
+    </section>
+    <div class="workspace">
+      <div class="listen-column">
+        <section class="listening" id="listening" aria-label="正在收听">
+          <div class="cover-wrap"><img id="cover" src="assets/coffee.jpg" alt="午后咖啡主题封面" width="480" height="480"><span class="cover-caption"><span class="icon" style="--icon:url(assets/Headphones.svg)"></span>听间主题电台</span></div>
+          <div class="show-summary">
+            <p class="show-status"><span class="status-dot" id="status-dot"></span><span id="show-status" aria-live="polite">准备就绪</span></p>
+            <p class="selected-theme" id="show-theme">午后咖啡</p>
+            <div class="now-heading"><h2 id="now-title">午后咖啡</h2><button class="icon-button favorite-action" id="favorite" aria-label="收藏当前歌曲" aria-pressed="false" data-tip="收藏当前歌曲" disabled><span class="icon" style="--icon:url(assets/Heart.svg)"></span></button></div>
+            <p class="show-slogan" id="show-slogan">忙里偷闲的一杯歌</p>
+            <p class="host-byline">小蓝主持 <span>·</span> 音乐与片刻陪伴</p>
+            <div class="show-actions"><button class="primary-button" id="generate"><span class="icon" style="--icon:url(assets/Play.svg)"></span><span id="generate-label">开始收听</span></button><button class="icon-button" id="cancel-generate" aria-label="取消生成" data-tip="取消生成" hidden><span class="icon" style="--icon:url(assets/X.svg)"></span></button></div>
+            <label class="toggle-label"><input id="auto" type="checkbox" role="switch" checked><span class="switch" aria-hidden="true"></span><span>连续播放下一期</span></label>
+          </div>
+        </section>
+        <div class="notice" id="notice" role="status" hidden><span id="notice-text"></span><button class="text-button" id="retry" hidden>重试</button><button class="icon-button" id="dismiss-notice" aria-label="关闭提示" data-tip="关闭提示"><span class="icon" style="--icon:url(assets/X.svg)"></span></button></div>
+        <section class="theme-section" id="themes"><div class="section-heading"><h2>换一种心情</h2><span>主题电台</span></div><div class="theme-grid" id="theme-list" aria-label="选择节目主题"></div></section>
+        <section class="queue-section" id="queue-section"><div class="library-tabs" role="tablist" aria-label="收听记录"><button id="tab-queue" role="tab" aria-selected="true" aria-controls="panel-queue">本期节目</button><button id="tab-favorites" role="tab" aria-selected="false" aria-controls="panel-favorites" tabindex="-1">我的收藏</button><button id="tab-history" role="tab" aria-selected="false" aria-controls="panel-history" tabindex="-1">最近听过</button></div><div id="panel-queue" role="tabpanel" aria-labelledby="tab-queue"><div class="section-heading"><span id="queue-count">尚未开播</span></div><div class="queue-empty" id="queue-empty"><span class="icon" style="--icon:url(assets/ListMusic.svg)"></span><p>节目单尚未生成</p></div><ol class="queue" id="queue" aria-label="节目片段"></ol></div><div id="panel-favorites" role="tabpanel" aria-labelledby="tab-favorites" hidden><p class="library-meta">此浏览器 · 收藏</p><p class="library-empty" id="favorites-empty">还没有收藏的歌曲</p><ol class="library-list" id="favorites-list" aria-label="收藏的歌曲"></ol></div><div id="panel-history" role="tabpanel" aria-labelledby="tab-history" hidden><p class="library-meta">此浏览器 · 最近 50 首</p><p class="library-empty" id="history-empty">还没有收听记录</p><ol class="library-list" id="history-list" aria-label="最近听过的歌曲"></ol></div><p class="library-status" id="library-status" role="status"></p></section>
+      </div>
+      <aside class="conversation" id="conversation" aria-labelledby="chat-heading">
+        <div class="section-heading"><h2 id="chat-heading">和小蓝聊聊</h2><span class="host-avatar small">蓝</span></div>
+        <div class="host-intro"><span class="tiny-label">小蓝 · 主持人</span><p>今天想听什么？<br>一首歌，或者一种心情，都可以。</p></div>
+        <div class="chat-log" id="chat-log" role="log" aria-live="polite" aria-label="与主持人的对话"></div>
+        <p class="chat-status" id="chat-status" aria-live="polite"></p>
+        <form class="chat-form" id="chat-form"><label class="sr-only" for="message">点歌或与主持人聊天</label><textarea id="message" placeholder="想听什么，说给小蓝…" rows="2" maxlength="1000"></textarea><div class="composer-footer"><span id="message-count">0 / 1000</span><button class="send-button" id="send" type="submit" aria-label="发送给小蓝" data-tip="发送给小蓝"><span class="icon" style="--icon:url(assets/Send.svg)"></span></button></div></form>
+        <p class="chat-error" id="chat-error" role="alert" hidden></p>
+        <div class="transcript" id="transcript" hidden><span class="tiny-label">此刻口播</span><p id="transcript-text"></p></div>
+      </aside>
+    </div>
+    <footer class="page-footer"><span>TINGJIAN / 听间</span><a href="credits.html">开源致谢</a><a href="mailto:946106011@qq.com">联系作者 <span aria-hidden="true">↗</span></a><a class="icon-button" href="#top" aria-label="返回顶部" data-tip="返回顶部"><span class="icon" style="--icon:url(assets/ChevronDown.svg);transform:rotate(180deg)"></span></a></footer>
+  </main>
 
-  <div class="chatline">
-    <input id="msg" placeholder="点歌或聊两句：比如「来首安静的」" />
-    <button id="send">说给主持人</button>
-  </div>
-  <div class="chatlog" id="chatlog"></div>
-</div>
-
-<script>
-const au=document.getElementById('au');
-let seq=[], idx=-1, recent=[];
-let auto=document.getElementById('auto').checked;
-// 插播: 中断当前段, 播完插播后回到原段位置
-let resume=null, irqItems=[], irqIdx=0;
-let _guard=false;
-
-function fmt(s){return s.length>46?s.slice(0,46)+'…':s}
-function chatLog(html){const el=document.getElementById('chatlog');el.insertAdjacentHTML('afterbegin','<div>'+html+'</div>');}
-function showCard(it){
-  const c=document.getElementById('nowcard');
-  if(it.kind==='talk' || it.kind==='text'){
-    c.innerHTML='<div class="host now">🎙 '+fmt(it.title)+'</div>';
-    const b=document.getElementById('bubble'); b.style.display='block';
-    b.innerHTML='<div class="host">'+it.title+'</div><div class="text">'+it.text+'</div>';
-  } else {
-    c.innerHTML='<div class="song now">♪ '+fmt(it.title)+'</div>';
-    document.getElementById('bubble').style.display='none';
-  }
-}
-function card(meta){
-  document.getElementById('meta').innerHTML =
-    meta? '<span class="tag">'+meta.theme+'</span><span class="tag">'+meta.time+'</span>'
-         +'<div class="meta">“'+meta.slogan+'”</div>' : '';
-}
-function setPauseLabel(){
-  document.getElementById('b_play').textContent = au.paused ? '▶ 播放' : '⏸ 暂停';
-}
-// 加载并播放一段 (立即切换)
-function playRaw(it){
-  showCard(it);
-  if(it.kind==='text' || !it.url){          // 纯文稿: 停留可读时长后继续
-    const secs=Math.max(4,Math.min(12,Math.ceil((it.text||'').length/10)));
-    setTimeout(()=>beginNext(false), secs*1000);
-    return;
-  }
-  if(it.kind==='song'){ recent.push(it.title); if(recent.length>10)recent.shift(); }
-  au.src=it.url;
-  const p=au.play();
-  if(p){ p.then(()=>setPauseLabel()).catch(()=>{   // 被浏览器拦: 口播看文稿, 歌曲短停后继续
-      if(it.kind==='talk') talkFallback(it); else beginNext(false);
-  }); } else setPauseLabel();
-}
-function talkFallback(it){
-  const secs=Math.max(4,Math.min(12,Math.ceil(it.text.length/10)));
-  showCard({kind:'talk',title:it.title+'(语音未就绪)',text:it.text});
-  setTimeout(()=>beginNext(false), secs*1000);
-}
-// 统一"一段播完/切下"入口
-let _deferred=null;   // guard 释放后执行(避免意图动作被锁吞)
-function beginNext(fromUser){
-  if(_guard) return; _guard=true;
-  try{
-    if(resume){                       // 正在插播: 播完处理意图动作或回到被打断位置
-      irqIdx++;
-      if(irqIdx < irqItems.length){ playRaw(irqItems[irqIdx]); return; }
-      const r=resume; resume=null; irqItems=[]; irqIdx=0;
-      const pe=pendingEndAct; pendingEndAct=null;
-      if(pe){ _deferred=pe; return; }  // 意图动作(切/停/换台): guard 释放后再执行, 不回原段
-      const it=seq[idx];
-      if(it){ showCard(it); au.src=r.src; au.currentTime=r.pos;
-              const p=au.play(); if(p)p.then(()=>setPauseLabel()).catch(()=>{}); }
-      return;
-    }
-    idx++;
-    if(idx < seq.length){ playRaw(seq[idx]); return; }
-    seq=[]; idx=-1;
-    document.getElementById('nowcard').innerHTML='<div class="meta">本期播完。</div>';
-    document.getElementById('bubble').style.display='none';
-    if(auto) nextShow();
-  } finally {
-    setTimeout(()=>{ _guard=false; const f=_deferred; _deferred=null; if(f){ try{f();}catch(e){console.log(e);} } }, 750);
-  }
-}
-au.addEventListener('ended',()=>beginNext(false));
-au.addEventListener('error',()=>{
-  const it = resume? irqItems[irqIdx] : seq[idx];
-  if(it && it.kind==='talk') talkFallback(it); else beginNext(false);
-});
-// 看门狗: 接近片尾确保推进
-au.addEventListener('timeupdate',()=>{
-  if(!au.paused && au.duration>0 && (au.duration-au.currentTime)<0.25) beginNext(false);
-});
-// 控制
-document.getElementById('b_prev').onclick=doPrev;
-document.getElementById('b_play').onclick=()=>{
-  if(au.paused){ const p=au.play(); if(p)p.then(()=>setPauseLabel()).catch(()=>{}); }
-  else au.pause();
-  setPauseLabel();
-};
-document.getElementById('b_next').onclick=doNext;
-au.addEventListener('pause',setPauseLabel);
-au.addEventListener('play',setPauseLabel);
-
-async function startShow(items, theme){
-  resume=null; irqItems=[]; irqIdx=0; pendingEndAct=null;  // 整期替换
-  window._curTheme = theme || window._curTheme || '';
-  seq=items; idx=0;
-  playRaw(seq[0]);
-}
-async function nextShow(theme){
-  try{
-    const r=await fetch('/api/show',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({exclude:recent, theme: theme||''})});
-    const d=await r.json();
-    card(d.meta);
-    await startShow(d.items, d.meta.theme);
-  }catch(e){ console.log(e); }
-}
-document.getElementById('gen').onclick=()=>nextShow();
-
-let pendingEndAct=null;   // 插播结束后执行一次的动作(意图控制/换台)
-function doNext(){ beginNext(true); }
-function doPrev(){
-  if(seq.length===0) return;
-  if(resume){ resume=null; irqItems=[]; irqIdx=0; }
-  if(idx>0){ idx--; playRaw(seq[idx]); }
-  else { au.currentTime=0; if(au.paused){ const p=au.play(); if(p)p.catch(()=>{});} }
-}
-function doStop(){ resume=null; irqItems=[]; irqIdx=0; seq=[]; idx=-1; au.pause();
-  document.getElementById('nowcard').innerHTML='<div class="meta">已停止。</div>';
-  document.getElementById('bubble').style.display='none';
-}
-function doInsert(items){
-  if(!items.length) return;
-  const idle = (seq.length===0);
-  if(idle){ seq=items; idx=0; playRaw(items[0]); return; }
-  if(resume){ irqItems.push(...items); return; }
-  resume={src:au.src, pos:au.currentTime};
-  irqItems=items; irqIdx=0;
-  playRaw(irqItems[0]);
-}
-async function sendChat(){
-  const msg=document.getElementById('msg').value.trim();
-  if(!msg) return;
-  document.getElementById('msg').value='';
-  chatLog('<b style="color:#8fc7ff">你：</b>'+msg);
-  const cur=seq[idx];
-  try{
-    const r=await fetch('/api/intent',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({message:msg, exclude:recent,
-        state:{playing:!au.paused && seq.length>0, paused:au.paused,
-               current: cur?cur.title:'', theme:(window._curTheme||''), auto:auto}})});
-    const d=await r.json();
-    const items=d.items||[], acts=d.actions||[];
-    for(const it of items){
-      if(it.kind==='talk'||it.kind==='text') chatLog('<b class="host">🎙 小蓝：</b>'+(it.text||''));
-      else chatLog('<b class="song">♪ 播放：</b>'+it.title);
-    }
-    const actFn={ pause:()=>au.pause(),
-                  resume:()=>{const p=au.play();if(p)p.catch(()=>{});},
-                  next:()=>doNext(), prev:()=>doPrev(), stop:()=>doStop() };
-    acts.filter(a=>a.type==='set_auto').forEach(a=>{ auto=a.on; document.getElementById('auto').checked=a.on; });
-    const playTheme=acts.find(a=>a.type==='play_theme');
-    const controls=acts.filter(a=>['pause','resume','next','prev','stop'].includes(a.type));
-    if(playTheme){
-      // 换台: 先播回复口播(若有), 播完自动开新主题一期
-      if(items.length){ pendingEndAct=()=>nextShow(playTheme.theme); doInsert(items); }
-      else nextShow(playTheme.theme);
-      return;
-    }
-    if(items.length && controls.length){
-      pendingEndAct=()=>{ controls.forEach(a=>actFn[a.type]&&actFn[a.type]()); };
-      doInsert(items);
-    } else {
-      controls.forEach(a=>actFn[a.type]&&actFn[a.type]());
-      if(items.length) doInsert(items);
-    }
-  }catch(e){ console.log(e); }
-}
-document.getElementById('send').onclick=sendChat;
-document.getElementById('msg').addEventListener('keydown',e=>{ if(e.key==='Enter')sendChat(); });
-document.getElementById('auto').onchange=e=>{ auto=e.target.checked; if(auto && seq.length===0) nextShow(); };
-</script>
+  <footer class="player-bar" aria-label="播放控制">
+    <div class="track-summary"><img id="mini-cover" src="assets/coffee.jpg" alt="" width="48" height="48"><div><strong id="track-title">还没有开始播放</strong><span id="track-kind">午后咖啡 · 小蓝</span></div></div>
+    <div class="transport"><div class="transport-buttons"><button class="icon-button" id="previous" aria-label="上一段" data-tip="上一段" disabled><span class="icon" style="--icon:url(assets/SkipBack.svg)"></span></button><button class="play-button" id="play" aria-label="开始收听" data-tip="开始收听"><span class="icon" id="play-icon" style="--icon:url(assets/Play.svg)"></span></button><button class="icon-button" id="next" aria-label="下一段" data-tip="下一段" disabled><span class="icon" style="--icon:url(assets/SkipForward.svg)"></span></button><button class="icon-button stop-button" id="stop" aria-label="停止播放" data-tip="停止播放" disabled><span class="icon" style="--icon:url(assets/Square.svg)"></span></button></div><div class="progress"><time id="elapsed">0:00</time><input id="seek" type="range" min="0" max="1000" value="0" aria-label="播放进度" disabled><time id="duration">0:00</time></div></div>
+    <div class="volume"><button class="icon-button" id="mute" aria-label="静音" data-tip="静音"><span class="icon" id="volume-icon" style="--icon:url(assets/Volume2.svg)"></span></button><input id="volume" type="range" min="0" max="100" value="75" aria-label="音量"><span id="volume-value">75%</span></div>
+  </footer>
+  <audio id="audio" preload="metadata"></audio>
 </body>
 </html>

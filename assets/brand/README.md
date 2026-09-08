@@ -1,10 +1,12 @@
-# Xiaolan Radio Identity
+# Tingjian Identity / 听间品牌
 
-- Master: `xiaolan-radio-logo.svg`, custom vector geometry created for this project.
-- README asset: `xiaolan-radio-logo.png`, 1024 x 1024 transparent PNG exported from the SVG.
-- App asset: `../../backend/static/xiaolan-radio-logo.svg`, an identical copy of the master for the page header and browser favicon; keep both SVG files in sync.
+- Product: Tingjian / 听间, an AI music radio. The presenter remains Xiaolan / 小蓝; the GitHub repository keeps the name `easy-radio-host`.
+- Master: `tingjian-logo.svg`, custom vector geometry created for this project.
+- README asset: `tingjian-logo.png`, 1024 x 1024 transparent PNG exported from the SVG.
+- App asset: `../../backend/static/assets/brand.svg`, an identical copy of the master for the page header and browser favicon; keep the SVG files in sync.
 - Meaning: a speech bubble connects host conversation with a three-bar sound wave; the coral signal represents broadcasting.
 - Colors: blue `#1677E8`, coral `#F46658`, white waveform.
 - Use: display at 144 px in both READMEs; keep the built-in transparent margin and original aspect ratio. Minimum recommended mark size is 32 px.
 - Layout: follow the Feynman Reader README hierarchy, with Chinese as the default and a separate matching English file. Keep screenshots truthful and contact/payment QR codes unchanged.
-- Provenance: the image-generation attempt did not produce an image; the delivered mark is hand-authored SVG. No third-party icon or font asset is embedded.
+- Provenance: the mark is hand-authored SVG. No third-party icon or font asset is embedded, and no Claudio branding is used.
+- Compatibility: `xiaolan-radio-logo.svg`, `xiaolan-radio-logo.png`, and `../../backend/static/xiaolan-radio-logo.svg` retain the same mark under their historical filenames for existing references.

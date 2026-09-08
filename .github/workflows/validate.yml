@@ -14,4 +14,16 @@ jobs:
           python-version: "3.12"
       - run: pip install -r backend/requirements.txt
       - run: python -m py_compile backend/app.py musiclib/proxy_server.py musiclib/resolve_multi.py
+      - run: python -m unittest discover -s tests -p 'test_*.py' -v
 
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: node --check backend/static/app.js
+      - run: node --check backend/static/listening.js
+      - run: node --check backend/static/demo.js
+      - run: node --test tests/static-server.test.mjs

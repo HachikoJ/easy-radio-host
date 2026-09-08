@@ -1,9 +1,9 @@
 <a id="top"></a>
 
-# 小蓝电台 · Xiaolan Radio
+# 听间 · Tingjian
 
 <p align="center">
-  <img src="assets/brand/xiaolan-radio-logo.png" alt="小蓝电台 Logo：蓝色对话声波与珊瑚红播出信号" width="144">
+  <img src="assets/brand/tingjian-logo.png" alt="听间 Logo：蓝色对话声波与珊瑚红播出信号" width="144">
 </p>
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB)
@@ -15,7 +15,7 @@
 
 **选一个主题，把接下来的时间交给音乐。**
 
-小蓝电台是一个面向喜欢主题听歌、愿意自行部署的听众的 AI 音乐电台。主持人选歌、串联话题并合成口播，浏览器连续播放「口播 → 歌曲 → 口播」。歌曲来自在线音乐 API，无需准备本地音乐文件。
+听间是一个面向喜欢主题听歌、愿意自行部署的听众的 AI 音乐电台。主持人「小蓝」选歌、串联话题并合成口播，浏览器连续播放「口播 → 歌曲 → 口播」。歌曲来自在线音乐 API，无需准备本地音乐文件。
 
 **项目地址：** [HachikoJ/easy-radio-host](https://github.com/HachikoJ/easy-radio-host)
 
@@ -23,10 +23,12 @@
 
 ## 核心体验
 
-- **主题节目**：DeepSeek 根据主题和歌单编排节目，串联歌曲与话题。
+- **六个主题**：午后咖啡、城市漫游、深夜安眠、怀旧金曲、元气早班、心情小站；DeepSeek 根据主题和歌单编排节目。
 - **主持人口播**：MiniMax 合成主持人声音，支持 edge-tts 降级。
-- **连续播放**：网页依次播放口播与歌曲，支持暂停和切换片段。
-- **点歌互动**：输入想听的内容，与主持人聊天或点歌。
+- **连续播放**：节目单、上一段与下一段、进度和音量控制，支持自动续播与停止。
+- **专注收听**：桌面与手机适配，明暗配色和沉浸模式，支持键盘及兼容浏览器的系统媒体控制。
+- **收藏与历史**：浏览器本地保存最多 100 首收藏、50 条按标题去重的收听历史；歌曲实际开始播放后才记入历史。
+- **点歌互动**：与小蓝聊天、点歌或控制播放；支持生成取消、失败重试和失败时保留输入草稿。
 - **在线曲库**：歌单保存歌名、歌手、音源和 ID，播放时动态获取歌曲直链。
 
 ## 产品预览
@@ -34,16 +36,22 @@
 ### 桌面端
 
 <p>
-  <img src="docs/radio-desktop.png" alt="小蓝电台桌面端待播放页面：生成节目、片段切换和点歌输入" width="100%">
+  <img src="docs/radio-desktop.png" alt="听间桌面端演示页面：主题选择、节目单、点歌互动和底部播放器" width="100%">
 </p>
 
 ### 移动端
 
 <p>
-  <img src="docs/radio-mobile.png" alt="小蓝电台移动端待播放页面：播放控制与点歌输入" width="375">
+  <img src="docs/radio-mobile.png" alt="听间移动端演示页面：主题封面、节目和播放控制" width="375">
 </p>
 
-截图为当前页面的本地待播放状态，裁去了下方空白区域。生成节目和播放音乐需要配置相应服务。
+### 沉浸模式
+
+<p>
+  <img src="docs/radio-focus.png" alt="听间沉浸模式演示页面：当前片段、主题封面和播放控制" width="100%">
+</p>
+
+截图来自当前前端的本地演示模式，页面标有「演示节目」。演示使用本项目合成的音频与固定回复；主题摄影不是歌曲的真实唱片封面。真实节目生成和在线歌曲播放需要配置相应服务。
 
 ## 工作原理
 
@@ -75,6 +83,16 @@ python -m pip install -r backend/requirements.txt zhconv
 2. 启动主应用（8100）与在线曲库代理（8001）。
 3. 确认浏览器可以访问两个端口，打开主应用页面并生成一期节目。
 
+### 无密钥体验界面
+
+已安装 Node.js 22+ 时，可直接启动不依赖第三方服务的本地演示：
+
+```bash
+node scripts/serve-demo.mjs
+```
+
+打开 [本地演示](http://127.0.0.1:8131/?demo=1)。只有显式添加 `?demo=1` 才启用固定演示节目；演示不会调用 AI 或音乐 API，也不代表在线服务可用性。正式使用仍按上述步骤部署主应用。
+
 ### 主要配置
 
 | 变量 | 用途 |
@@ -93,7 +111,8 @@ python -m pip install -r backend/requirements.txt zhconv
 | 服务 | 方法 | 路径 | 说明 |
 | --- | --- | --- | --- |
 | 主应用 :8100 | POST | `/api/show` | 生成节目播放清单 |
-| 主应用 :8100 | POST | `/api/chat` | 对话与点歌 |
+| 主应用 :8100 | POST | `/api/intent` | 前端对话、点歌与播放控制 |
+| 主应用 :8100 | POST | `/api/chat` | 保留的对话与点歌兼容接口 |
 | 主应用 :8100 | GET | `/voice/*.mp3` | 主持人口播 |
 | 曲库代理 :8001 | GET | `/songs.txt` | 在线歌单元数据 |
 | 曲库代理 :8001 | GET | `/s/<source>/<id>.mp3` | 获取直链并跳转 |
@@ -112,6 +131,8 @@ python -m pip install -r backend/requirements.txt zhconv
 
 - API Key、Cookie 和 `radio.env` 不得提交到 GitHub。
 - 节目主题、对话和曲目元数据会发送至相关 AI 或音乐服务；口播音频与运行数据保存在服务端。
+- 收藏与历史仅在当前浏览器保存标题、主题和时间，不跨设备同步；演示与正式记录隔离。清除浏览器站点数据会丢失这些记录，禁用本地存储时仅在当前页面保留。
+- 再次点播会按标题重新请求匹配与播放地址；收藏不保存精确歌曲 ID 或永久音频链接，可能匹配到不同版本。
 - DeepSeek、MiniMax 等服务可能产生费用，价格与额度以各服务商为准。
 - AI 生成的口播不保证事实准确；歌曲可用性、版本匹配和响应时间依赖第三方服务。
 - 本项目用于个人学习与体验，歌曲版权归相应权利人，使用时须遵守平台规则。
@@ -123,11 +144,14 @@ python -m pip install -r backend/requirements.txt zhconv
 - [贡献指南](CONTRIBUTING.md)：验证命令与 Pull Request 规范。
 - [行为准则](CODE_OF_CONDUCT.md) · [安全政策](SECURITY.md)。
 - [更新记录](CHANGELOG.md) · [协作约定](AGENTS.md)。
-- [持续集成](https://github.com/HachikoJ/easy-radio-host/actions)：Python 语法检查。
+- [设计约定](DESIGN.md) · [Claudio 能力适配与后续路线](docs/CLAUDIO-ADAPTATION.md)。
+- [持续集成](https://github.com/HachikoJ/easy-radio-host/actions)：Python 语法、接口契约及前端静态服务检查。
 
 ## 致谢
 
 - [easy-radio-host 原始项目](https://gitee.com/weak0001/easy-radio-host)，作者 `weak0001`；保留原作者署名与版权归属。
+- [Claudio](https://github.com/hllqkb/Claudio)，作者 `hllqkb`，MIT；听间前端参考其沉浸播放、明暗主题、收藏/历史和系统媒体控制交互，采用独立实现。详见[第三方来源与授权](THIRD_PARTY_NOTICES.md)，含来源版本与完整许可文本。
+- [Lucide](https://lucide.dev) 提供 ISC 授权的界面图标；[Unsplash](https://unsplash.com) 提供主题摄影，逐图来源见[资产来源](backend/static/assets/SOURCES.md)。
 - [在线音乐 API](https://music-api.gdstudio.xyz/api.php)，提供多音源搜索与取链。
 - DeepSeek、MiniMax、edge-tts 及其他第三方依赖；其权利和使用条款归各自权利人。
 
@@ -143,7 +167,7 @@ python -m pip install -r backend/requirements.txt zhconv
 
 - 个人官网：[www.deline.top](https://www.deline.top)
 - GitHub：[HachikoJ](https://github.com/HachikoJ) · [提交问题](https://github.com/HachikoJ/easy-radio-host/issues)
-- 微信：`hostrow`，添加时请备注「小蓝电台」
+- 微信：`hostrow`，添加时请备注「听间」
 - 邮箱：[946106011@qq.com](mailto:946106011@qq.com)
 
 <table>

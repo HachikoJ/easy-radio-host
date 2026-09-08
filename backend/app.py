@@ -53,7 +53,7 @@ def profile_hint(profile):
             "选歌与口播请尽量贴近听众口味；歌单内没有强匹配时，选风格接近的并自然过渡。")
 
 
-app = FastAPI(title="AI 电台主持人")
+app = FastAPI(title="听间 Tingjian · AI 音乐电台")
 
 # ---------------- 主题与包装 ----------------
 THEMES = [

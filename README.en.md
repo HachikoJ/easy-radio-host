@@ -1,9 +1,9 @@
 <a id="top"></a>
 
-# Xiaolan Radio · 小蓝电台
+# Tingjian · 听间
 
 <p align="center">
-  <img src="assets/brand/xiaolan-radio-logo.png" alt="Xiaolan Radio logo: a blue sound-wave speech bubble with a coral on-air signal" width="144">
+  <img src="assets/brand/tingjian-logo.png" alt="Tingjian logo: a blue sound-wave speech bubble with a coral on-air signal" width="144">
 </p>
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB)
@@ -15,7 +15,7 @@
 
 **Choose a theme. Let music take it from here.**
 
-Xiaolan Radio is an AI music radio for listeners who enjoy themed listening and are comfortable hosting their own service. The host selects tracks, connects them with commentary, and synthesizes narration. Your browser plays narration and songs in sequence. Tracks come from an online music API, so no local music collection is required.
+Tingjian is an AI music radio for listeners who enjoy themed listening and are comfortable hosting their own service. The host, Xiaolan, selects tracks, connects them with commentary, and synthesizes narration. Your browser plays narration and songs in sequence. Tracks come from an online music API, so no local music collection is required.
 
 **Repository:** [HachikoJ/easy-radio-host](https://github.com/HachikoJ/easy-radio-host)
 
@@ -23,10 +23,12 @@ Xiaolan Radio is an AI music radio for listeners who enjoy themed listening and 
 
 ## Features
 
-- **Themed shows:** DeepSeek arranges songs and commentary around a theme and playlist.
+- **Six themes:** Afternoon Coffee, City Walk, Sleep at Night, Nostalgic Hits, Morning Energy, and Mood Station; DeepSeek arranges shows around the theme and playlist.
 - **Host narration:** MiniMax synthesizes the voice, with edge-tts fallback support.
-- **Continuous playback:** Play narration and songs in sequence, pause, and switch segments.
-- **Song requests:** Type a request or chat with the host.
+- **Continuous playback:** A show queue, previous/next segments, seeking and volume, automatic continuation, and stop controls.
+- **Focused listening:** Desktop and mobile layouts, light/dark appearance, immersive mode, keyboard controls, and system media controls in supported browsers.
+- **Favorites and history:** Store up to 100 favorites and 50 recent tracks locally in your browser, deduplicated by title; history records songs only once playback actually starts.
+- **Song requests:** Chat with Xiaolan, request tracks, or control playback; cancel generation, retry failures, and keep your draft when a request fails.
 - **Online library:** Store track names, artists, sources, and IDs; resolve playback URLs on demand.
 
 ## Product preview
@@ -34,16 +36,22 @@ Xiaolan Radio is an AI music radio for listeners who enjoy themed listening and 
 ### Desktop
 
 <p>
-  <img src="docs/radio-desktop.png" alt="Xiaolan Radio desktop idle screen: show generation, segment controls, and song-request input" width="100%">
+  <img src="docs/radio-desktop.png" alt="Tingjian desktop demo: theme selection, show queue, chat, and bottom player" width="100%">
 </p>
 
 ### Mobile
 
 <p>
-  <img src="docs/radio-mobile.png" alt="Xiaolan Radio mobile idle screen: playback controls and song-request input" width="375">
+  <img src="docs/radio-mobile.png" alt="Tingjian mobile demo: theme artwork, show, and playback controls" width="375">
 </p>
 
-These local screenshots show the current page before playback; unused space below the controls has been cropped. Generating shows and playing music require configured services.
+### Immersive mode
+
+<p>
+  <img src="docs/radio-focus.png" alt="Tingjian immersive demo: current segment, theme artwork, and playback controls" width="100%">
+</p>
+
+Screenshots show the current frontend in local demo mode, labeled “演示节目” (demo show). The demo uses audio synthesized for this project and fixed replies; theme photos are not actual album artwork. Real show generation and online music playback require configured services.
 
 ## How it works
 
@@ -75,6 +83,16 @@ python -m pip install -r backend/requirements.txt zhconv
 2. Start the main app (8100) and online library proxy (8001).
 3. Make both ports accessible from your browser, open the main app, and generate a show.
 
+### Try the interface without API keys
+
+With Node.js 22+ already installed, start the local demo without third-party services:
+
+```bash
+node scripts/serve-demo.mjs
+```
+
+Open the [local demo](http://127.0.0.1:8131/?demo=1). Fixed demo shows are enabled only with an explicit `?demo=1`; the demo does not call AI or music APIs and does not establish online service availability. Follow the deployment steps above for real listening.
+
 ### Key configuration
 
 | Variable | Purpose |
@@ -93,7 +111,8 @@ The `NAS_*` names are retained for compatibility and point to the online library
 | Service | Method | Path | Description |
 | --- | --- | --- | --- |
 | Main app :8100 | POST | `/api/show` | Generate a show playback queue |
-| Main app :8100 | POST | `/api/chat` | Chat and request songs |
+| Main app :8100 | POST | `/api/intent` | Frontend chat, song requests, and playback controls |
+| Main app :8100 | POST | `/api/chat` | Retained compatibility endpoint for chat and song requests |
 | Main app :8100 | GET | `/voice/*.mp3` | Host narration |
 | Library proxy :8001 | GET | `/songs.txt` | Online playlist metadata |
 | Library proxy :8001 | GET | `/s/<source>/<id>.mp3` | Resolve a track URL and redirect |
@@ -112,6 +131,8 @@ The script rewrites the resolved playlist, searches multiple sources, filters ve
 
 - Never commit API keys, cookies, or `radio.env` to GitHub.
 - Show themes, conversations, and track metadata are sent to the relevant AI or music services; narration and runtime data are stored on the server.
+- Favorites and history store only titles, themes, and timestamps in the current browser, without cross-device sync; demo and real listening records are separate. Clearing site data removes these records. If local storage is unavailable, records last only for the current page.
+- Replaying a saved title requests a fresh match and playback URL. Favorites do not retain exact track IDs or permanent audio links, so a different version may be selected.
 - DeepSeek, MiniMax, and other services may incur charges. Pricing and quotas are set by each provider.
 - AI narration is not guaranteed to be factual. Track availability, version matching, and response times depend on third-party services.
 - The project is for personal learning and experimentation. Song rights belong to their respective owners; follow platform rules.
@@ -123,11 +144,14 @@ The script rewrites the resolved playlist, searches multiple sources, filters ve
 - [Contributing](CONTRIBUTING.md): validation commands and Pull Request guidelines.
 - [Code of Conduct](CODE_OF_CONDUCT.md) · [Security Policy](SECURITY.md).
 - [Changelog](CHANGELOG.md) · [Collaboration guidelines](AGENTS.md).
-- [Continuous integration](https://github.com/HachikoJ/easy-radio-host/actions): Python syntax checks.
+- [Design guidelines](DESIGN.md) · [Claudio adaptation and roadmap](docs/CLAUDIO-ADAPTATION.md).
+- [Continuous integration](https://github.com/HachikoJ/easy-radio-host/actions): Python syntax, API contracts, and frontend static-server checks.
 
 ## Credits
 
 - [Original easy-radio-host project](https://gitee.com/weak0001/easy-radio-host) by `weak0001`; original attribution and copyright ownership are retained.
+- [Claudio](https://github.com/hllqkb/Claudio) by `hllqkb`, MIT; the Tingjian frontend independently implements interaction ideas from its immersive playback, light/dark themes, favorites/history, and system media controls. See [third-party sources and licenses](THIRD_PARTY_NOTICES.md), including the source revision and complete license text.
+- [Lucide](https://lucide.dev) provides UI icons under ISC; [Unsplash](https://unsplash.com) provides theme photography. See [individual asset sources](backend/static/assets/SOURCES.md).
 - [Online music API](https://music-api.gdstudio.xyz/api.php) for multi-source search and URL resolution.
 - DeepSeek, MiniMax, edge-tts, and other dependencies; their rights and terms remain with their respective owners.
 
@@ -143,7 +167,7 @@ Get in touch to discuss AI music products, share feedback, or support the projec
 
 - Personal site: [www.deline.top](https://www.deline.top)
 - GitHub: [HachikoJ](https://github.com/HachikoJ) · [Report an issue](https://github.com/HachikoJ/easy-radio-host/issues)
-- WeChat: `hostrow`; please mention “Xiaolan Radio”
+- WeChat: `hostrow`; please mention “Tingjian”
 - Email: [946106011@qq.com](mailto:946106011@qq.com)
 
 <table>
