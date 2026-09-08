@@ -1,0 +1,19 @@
+name: Bug report
+description: 报告可复现的问题
+title: "[Bug] "
+body:
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 复现步骤
+      description: 请提供最小复现步骤和实际结果。
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: 环境信息
+      description: Python、操作系统、部署方式和相关配置（不要包含密钥）。
+    validations:
+      required: true
+

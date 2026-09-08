@@ -2,6 +2,8 @@
 
 项目维护与 GitHub 协作规则见 [AGENTS.md](AGENTS.md)。
 
+项目地址：[github.com/HachikoJ/easy-radio-host](https://github.com/HachikoJ/easy-radio-host) · 问题反馈：[Issues](https://github.com/HachikoJ/easy-radio-host/issues) · 当前状态：实验性公开项目
+
 用 **DeepSeek 大模型**当电台主持人 + **MiniMax TTS** 口播 + **在线音乐多音源曲库**，在浏览器里生成并连续播放一期"电台节目"（主持人口播与歌曲交替）。适合部署到**云服务器**，无需自己准备/下载任何 mp3。
 
 > ⚠️ 在线曲库涉及第三方歌曲版权。本项目仅用于**个人学习与体验**，请遵守相关平台规则，不要用于商业或侵权场景。
@@ -75,3 +77,26 @@
 - 其余第三方依赖见各项目 LICENSE
 
 **免责声明**：本项目不存储、不提供任何音频文件；在线曲库仅作 API 转发。请仅用于学习和测试合法内容，商用或再发布请自行确认授权。
+
+## English
+
+`easy-radio-host` is an online AI radio host. DeepSeek creates themed show scripts, MiniMax or edge-tts synthesizes the host voice, and an online music API resolves playable tracks at request time. Audio tracks are not stored by this project.
+
+### Features
+
+- Generate a themed show with alternating host segments and songs.
+- Chat with the host and request songs.
+- Maintain a metadata-only playlist and resolve tracks from multiple online sources.
+- Run the FastAPI app and music proxy on a Linux server.
+
+### Quick start
+
+Requirements: Python 3.10+ and API keys for the enabled AI services. Create a virtual environment, install `backend/requirements.txt` and `zhconv`, configure `radio.env`, then run the app on port 8100 and `musiclib/proxy_server.py` on port 8001. Full instructions are in [DEPLOY-HANDOFF.md](DEPLOY-HANDOFF.md).
+
+### Privacy and limitations
+
+API keys are supplied by the operator and must stay outside Git. Requests are sent to DeepSeek, MiniMax/edge-tts and the configured music API. Availability, licensing and playback rights belong to those services and the respective rights holders. AI-generated scripts are not guaranteed to be factual.
+
+### Support and license
+
+Please use [GitHub Issues](https://github.com/HachikoJ/easy-radio-host/issues) for reproducible bugs and feature requests. Contribution rules are in [CONTRIBUTING.md](CONTRIBUTING.md); security reports should use [Security Advisories](https://github.com/HachikoJ/easy-radio-host/security/advisories/new). A repository license is not yet selected because the upstream copyright terms need confirmation.
