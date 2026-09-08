@@ -4,6 +4,8 @@
 
 项目地址：[github.com/HachikoJ/easy-radio-host](https://github.com/HachikoJ/easy-radio-host) · 问题反馈：[Issues](https://github.com/HachikoJ/easy-radio-host/issues) · 当前状态：实验性公开项目
 
+[English](#english) · [产品定位](#ai-电台主持人) · [核心体验](#效果) · [产品预览](#产品预览) · [快速开始](#部署云服务器--linux) · [API](#api) · [歌单维护](#歌单维护) · [项目治理](#项目治理) · [联系作者](#联系作者)
+
 用 **DeepSeek 大模型**当电台主持人 + **MiniMax TTS** 口播 + **在线音乐多音源曲库**，在浏览器里生成并连续播放一期"电台节目"（主持人口播与歌曲交替）。适合部署到**云服务器**，无需自己准备/下载任何 mp3。
 
 > ⚠️ 在线曲库涉及第三方歌曲版权。本项目仅用于**个人学习与体验**，请遵守相关平台规则，不要用于商业或侵权场景。
@@ -13,6 +15,18 @@
 - 主持人会基于歌单**智能选歌、串联话题**，口播由女声（MiniMax 或 edge-tts 降级）合成
 - 网页自动连播：口播 → 歌 → 口播 → 歌…
 - **音乐不落盘**：歌单只存「歌名、歌手、音源+id」，播放时经在线 API 动态拉取真实直链
+
+## 产品预览
+
+桌面端：
+
+![小蓝电台桌面端界面，展示主题选择、节目生成和播放控制](/docs/screenshot-desktop.png)
+
+移动端：
+
+![小蓝电台移动端界面，展示响应式播放控制](/docs/screenshot-mobile.png)
+
+截图来自当前仓库页面的本地预览；实际播放需要配置 AI 服务和在线音乐 API。
 
 ## 架构（云服务器版 / Python 裸跑）
 
@@ -78,7 +92,23 @@
 
 **免责声明**：本项目不存储、不提供任何音频文件；在线曲库仅作 API 转发。请仅用于学习和测试合法内容，商用或再发布请自行确认授权。
 
+## 项目治理
+
+- [贡献指南](CONTRIBUTING.md)：本地运行、验证、Issue 和 Pull Request 规范
+- [行为准则](CODE_OF_CONDUCT.md)：社区交流边界
+- [安全政策](SECURITY.md)：敏感信息和安全问题报告方式
+- [变更记录](CHANGELOG.md)：版本变更摘要
+- [GitHub Actions](.github/workflows/validate.yml)：提交和 PR 的 Python 语法校验
+
+关注项目：[![GitHub stars](https://img.shields.io/github/stars/HachikoJ/easy-radio-host?style=flat)](https://github.com/HachikoJ/easy-radio-host) [![Star History](https://api.star-history.com/svg?repos=HachikoJ/easy-radio-host&type=Date)](https://star-history.com/#HachikoJ/easy-radio-host&Date)
+
+## 联系作者
+
+请通过 [GitHub Issues](https://github.com/HachikoJ/easy-radio-host/issues) 提交 Bug、功能建议和部署问题；安全问题请使用 [Security Advisories](https://github.com/HachikoJ/easy-radio-host/security/advisories/new)。作者主页：[HachikoJ](https://github.com/HachikoJ)。
+
 ## English
+
+[中文 README](README.md) · [Repository](https://github.com/HachikoJ/easy-radio-host) · [Issues](https://github.com/HachikoJ/easy-radio-host/issues) · [Preview](#产品预览) · [Quick start](#quick-start) · [API](#api)
 
 `easy-radio-host` is an online AI radio host. DeepSeek creates themed show scripts, MiniMax or edge-tts synthesizes the host voice, and an online music API resolves playable tracks at request time. Audio tracks are not stored by this project.
 
@@ -88,6 +118,12 @@
 - Chat with the host and request songs.
 - Maintain a metadata-only playlist and resolve tracks from multiple online sources.
 - Run the FastAPI app and music proxy on a Linux server.
+
+### Product preview
+
+![Xiaolan Radio desktop interface](/docs/screenshot-desktop.png)
+
+![Xiaolan Radio mobile interface](/docs/screenshot-mobile.png)
 
 ### Quick start
 
