@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">Xiaolan Radio</title>
+  <desc id="desc">A blue speech bubble with a three-bar sound wave and a coral on-air signal.</desc>
+  <defs>
+    <mask id="signal-space">
+      <rect width="256" height="256" fill="white"/>
+      <circle cx="205" cy="51" r="31" fill="black"/>
+    </mask>
+  </defs>
+  <path d="M82 39H170C200 39 221 61 221 91V145C221 175 201 197 171 197H112L65 225V194C42 188 29 170 29 145V91C29 61 51 39 82 39Z" fill="#1677E8" mask="url(#signal-space)"/>
+  <g fill="white">
+    <rect x="73" y="99" width="20" height="42" rx="10"/>
+    <rect x="113" y="72" width="20" height="96" rx="10"/>
+    <rect x="153" y="88" width="20" height="64" rx="10"/>
+  </g>
+  <circle cx="205" cy="51" r="21" fill="#F46658"/>
+</svg>

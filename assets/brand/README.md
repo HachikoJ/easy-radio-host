@@ -2,6 +2,7 @@
 
 - Master: `xiaolan-radio-logo.svg`, custom vector geometry created for this project.
 - README asset: `xiaolan-radio-logo.png`, 1024 x 1024 transparent PNG exported from the SVG.
+- App asset: `../../backend/static/xiaolan-radio-logo.svg`, an identical copy of the master for the page header and browser favicon; keep both SVG files in sync.
 - Meaning: a speech bubble connects host conversation with a three-bar sound wave; the coral signal represents broadcasting.
 - Colors: blue `#1677E8`, coral `#F46658`, white waveform.
 - Use: display at 144 px in both READMEs; keep the built-in transparent margin and original aspect ratio. Minimum recommended mark size is 32 px.
