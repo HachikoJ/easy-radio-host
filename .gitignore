@@ -1,0 +1,21 @@
+# 数据/密钥
+data/
+*.key
+.env
+*.env
+radio.env
+docker-compose.local.yml
+
+# 备份/日志/本地产物
+*.bak
+*.bak-*
+*.log
+musiclib/*.log
+musiclib/voice_*.mp3
+!playlist.tsv
+
+# 系统
+.DS_Store
+__pycache__/
+*.pyc
+.nogit
