@@ -4,7 +4,7 @@
 
 项目地址：[github.com/HachikoJ/easy-radio-host](https://github.com/HachikoJ/easy-radio-host) · 问题反馈：[Issues](https://github.com/HachikoJ/easy-radio-host/issues) · 当前状态：实验性公开项目
 
-[English](#english) · [产品定位](#ai-电台主持人) · [核心体验](#效果) · [产品预览](#产品预览) · [快速开始](#部署云服务器--linux) · [API](#api) · [歌单维护](#歌单维护) · [项目治理](#项目治理) · [联系作者](#联系作者)
+[English README](README.en.md) · [产品定位](#ai-电台主持人) · [核心体验](#效果) · [产品预览](#产品预览) · [快速开始](#部署云服务器--linux) · [API](#api) · [歌单维护](#歌单维护) · [项目治理](#项目治理) · [联系作者](#联系作者)
 
 用 **DeepSeek 大模型**当电台主持人 + **MiniMax TTS** 口播 + **在线音乐多音源曲库**，在浏览器里生成并连续播放一期"电台节目"（主持人口播与歌曲交替）。适合部署到**云服务器**，无需自己准备/下载任何 mp3。
 
@@ -106,33 +106,5 @@
 
 请通过 [GitHub Issues](https://github.com/HachikoJ/easy-radio-host/issues) 提交 Bug、功能建议和部署问题；安全问题请使用 [Security Advisories](https://github.com/HachikoJ/easy-radio-host/security/advisories/new)。作者主页：[HachikoJ](https://github.com/HachikoJ)。
 
-## English
-
-[中文 README](README.md) · [Repository](https://github.com/HachikoJ/easy-radio-host) · [Issues](https://github.com/HachikoJ/easy-radio-host/issues) · [Preview](#产品预览) · [Quick start](#quick-start) · [API](#api)
-
-`easy-radio-host` is an online AI radio host. DeepSeek creates themed show scripts, MiniMax or edge-tts synthesizes the host voice, and an online music API resolves playable tracks at request time. Audio tracks are not stored by this project.
-
-### Features
-
-- Generate a themed show with alternating host segments and songs.
-- Chat with the host and request songs.
-- Maintain a metadata-only playlist and resolve tracks from multiple online sources.
-- Run the FastAPI app and music proxy on a Linux server.
-
-### Product preview
-
-![Xiaolan Radio desktop interface](/docs/screenshot-desktop.png)
-
-![Xiaolan Radio mobile interface](/docs/screenshot-mobile.png)
-
-### Quick start
-
-Requirements: Python 3.10+ and API keys for the enabled AI services. Create a virtual environment, install `backend/requirements.txt` and `zhconv`, configure `radio.env`, then run the app on port 8100 and `musiclib/proxy_server.py` on port 8001. Full instructions are in [DEPLOY-HANDOFF.md](DEPLOY-HANDOFF.md).
-
-### Privacy and limitations
-
-API keys are supplied by the operator and must stay outside Git. Requests are sent to DeepSeek, MiniMax/edge-tts and the configured music API. Availability, licensing and playback rights belong to those services and the respective rights holders. AI-generated scripts are not guaranteed to be factual.
-
-### Support and license
-
-Please use [GitHub Issues](https://github.com/HachikoJ/easy-radio-host/issues) for reproducible bugs and feature requests. Contribution rules are in [CONTRIBUTING.md](CONTRIBUTING.md); security reports should use [Security Advisories](https://github.com/HachikoJ/easy-radio-host/security/advisories/new). A repository license is not yet selected because the upstream copyright terms need confirmation.
+- 微信：`hostrow`，添加时请备注“AI 电台”
+- 邮箱：`946106011@qq.com`
