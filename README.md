@@ -108,3 +108,15 @@
 
 - 微信：`hostrow`，添加时请备注“AI 电台”
 - 邮箱：`946106011@qq.com`
+
+<table>
+  <tr>
+    <td align="center"><strong>微信联系</strong><br><img src="assets/wechat-contact.png" alt="微信联系二维码" width="220"></td>
+    <td align="center"><strong>微信支付</strong><br><img src="assets/donate-wechat.png" alt="微信支付二维码" width="220"></td>
+    <td align="center"><strong>支付宝支付</strong><br><img src="assets/donate-alipay.png" alt="支付宝支付二维码" width="220"></td>
+  </tr>
+</table>
+
+加入交流群，交流使用经验和反馈问题：
+
+<p align="center"><img src="assets/group-qr.jpg" alt="微信交流群二维码" width="260"></p>

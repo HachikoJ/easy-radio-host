@@ -60,4 +60,16 @@ API keys are supplied by the operator and must stay outside Git. Requests are se
 - Email: `946106011@qq.com`
 - WeChat: `hostrow` (please mention “AI Radio” when adding)
 
+<table>
+  <tr>
+    <td align="center"><strong>WeChat contact</strong><br><img src="assets/wechat-contact.png" alt="WeChat contact QR code" width="220"></td>
+    <td align="center"><strong>WeChat payment</strong><br><img src="assets/donate-wechat.png" alt="WeChat payment QR code" width="220"></td>
+    <td align="center"><strong>Alipay payment</strong><br><img src="assets/donate-alipay.png" alt="Alipay payment QR code" width="220"></td>
+  </tr>
+</table>
+
+WeChat group for discussion and feedback:
+
+<p align="center"><img src="assets/group-qr.jpg" alt="WeChat discussion group QR code" width="260"></p>
+
 The repository license is pending confirmation of the upstream copyright terms.
