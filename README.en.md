@@ -11,7 +11,7 @@
 ![DeepSeek](https://img.shields.io/badge/DeepSeek-AI-1677E8)
 [![GitHub stars](https://img.shields.io/github/stars/HachikoJ/easy-radio-host?style=flat)](https://github.com/HachikoJ/easy-radio-host)
 
-[中文](README.md) · [Personal site](https://www.deline.top) · [Features](#features) · [Preview](#product-preview) · [Quick start](#quick-start) · [Resources](#project-resources) · [Contact](#contact)
+[中文](README.md) · [Listen online](https://audio.deline.top) · [Personal site](https://www.deline.top) · [Features](#features) · [Preview](#product-preview) · [Quick start](#quick-start) · [Resources](#project-resources) · [Contact](#contact)
 
 **Choose a theme. Let music take it from here.**
 
@@ -19,7 +19,7 @@ Tingjian is an AI music radio for listeners who enjoy themed listening and are c
 
 **Repository:** [HachikoJ/easy-radio-host](https://github.com/HachikoJ/easy-radio-host)
 
-**Access:** After deployment, open port 8100 on your server. This repository does not provide a hosted listening service.
+**Listen online:** [audio.deline.top](https://audio.deline.top). Choose a theme and click "开始收听" (Start listening). You can also self-host using the steps below.
 
 ## Features
 
@@ -36,22 +36,22 @@ Tingjian is an AI music radio for listeners who enjoy themed listening and are c
 ### Desktop
 
 <p>
-  <img src="docs/radio-desktop.png" alt="Tingjian desktop demo: theme selection, show queue, chat, and bottom player" width="100%">
+  <img src="docs/radio-desktop.png" alt="Tingjian live desktop playback: theme selection, show queue, chat, and bottom player" width="100%">
 </p>
 
 ### Mobile
 
 <p>
-  <img src="docs/radio-mobile.png" alt="Tingjian mobile demo: theme artwork, show, and playback controls" width="375">
+  <img src="docs/radio-mobile.png" alt="Tingjian live mobile playback: theme artwork, show, and playback controls" width="375">
 </p>
 
 ### Immersive mode
 
 <p>
-  <img src="docs/radio-focus.png" alt="Tingjian immersive demo: current segment, theme artwork, and playback controls" width="100%">
+  <img src="docs/radio-focus.png" alt="Tingjian live immersive playback: current segment, theme artwork, and playback controls" width="100%">
 </p>
 
-Screenshots show the current frontend in local demo mode, labeled “演示节目” (demo show). The demo uses audio synthesized for this project and fixed replies; theme photos are not actual album artwork. Real show generation and online music playback require configured services.
+Screenshots show real generated shows and online music playback on the [live site](https://audio.deline.top). Theme photos represent listening settings, not actual album artwork. Track availability depends on third-party services.
 
 ## How it works
 
@@ -65,7 +65,7 @@ Browser
   → Proxy resolves track URLs through the music API and redirects playback
 ```
 
-The proxy reads `musiclib/playlist.tsv` and exposes titles and relative paths at `/songs.txt`. The `/s/<source>/<id>.mp3` endpoint resolves a track URL and returns a 302 redirect. Songs are not stored locally; generated narration is stored under `data/voice/` on the server.
+The proxy reads `musiclib/playlist.tsv` and exposes titles and relative paths at `/songs.txt`. The `/s/<source>/<id>.mp3` endpoint resolves a track URL and returns a 307 redirect. Songs are not stored locally; generated narration is stored under `DATA_DIR/voice/` (`/var/lib/tingjian/voice/` in the Tencent Cloud deployment).
 
 ## Quick start
 
@@ -79,9 +79,9 @@ source .venv/bin/activate
 python -m pip install -r backend/requirements.txt zhconv
 ```
 
-1. Create `radio.env` using the deployment guide; configure DeepSeek, MiniMax, and service URLs.
-2. Start the main app (8100) and online library proxy (8001).
-3. Make both ports accessible from your browser, open the main app, and generate a show.
+1. Follow the deployment guide to create `/etc/tingjian/radio.env` with DeepSeek, MiniMax, and service URLs, using file permissions of 600.
+2. Start the main app (8100) and online library proxy (8001), both listening only on `127.0.0.1`.
+3. Configure Nginx and HTTPS to serve the page, `/api/`, `/voice/`, and `/music/` on the same domain, then generate a show. Only ports 80 and 443 need public access.
 
 ### Try the interface without API keys
 

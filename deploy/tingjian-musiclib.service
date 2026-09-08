@@ -1,0 +1,21 @@
+[Unit]
+Description=Tingjian online music library
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=tingjian
+Group=tingjian
+WorkingDirectory=/opt/easy-radio-host/musiclib
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/easy-radio-host/.venv/bin/uvicorn proxy_server:app --host 127.0.0.1 --port 8001
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+
+[Install]
+WantedBy=multi-user.target

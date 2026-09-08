@@ -1,244 +1,218 @@
-# easy-radio-host 服务器部署手册
+# 听间 Tingjian · 腾讯云部署
 
-> 目标：在一台**全新的阿里云 Linux（64位，公网有 IP）**服务器上，部署这个「AI 电台」，供浏览器访问生成口播+在线音乐的电台节目。
-> 公网 IP 示例用 `<SERVER_IP>` 占位，部署时替换成你自己的。
+本手册适用于已有 Nginx 的 Ubuntu 服务器，沿用 Python venv 和 systemd 部署。产品入口为 `https://audio.deline.top`，正式前端位于 `backend/static/`。
 
----
+## 访问链路与目录
 
-## 0. 总览 / 架构
+```text
+浏览器 → Nginx HTTPS :443
+           ├─ /、/api/、/voice/ → 127.0.0.1:8100 主应用
+           └─ /music/          → 127.0.0.1:8001 在线曲库代理
 
+主应用 → DeepSeek 编排节目 → MiniMax 合成口播
+曲库代理 → 在线音乐 API → 307 跳转到第三方音频地址
 ```
-用户浏览器
-   │  GET /                (8100: 主应用 index.html)
-   │  POST /api/show 等     生成一期节目
-   ▼
-easy-radio-host  FastAPI  ──(8100)── backend/app.py
-   │  DeepSeek 生成「口播+选歌」JSON
-   │  MiniMax TTS 把口播合成 mp3 (无 key 降级 edge-tts)
-   │  歌曲 rel 形如 s/joox/<id>.mp3
-   ▼
-musiclib Proxy  FastAPI ──(8001)── musiclib/proxy_server.py
-   │   serve /songs.txt  (给 app 当曲库列表，含 歌名\trel)
-   │   serve /s/<source>/<id>.mp3 → 向第三方音乐API取直链 → 302 跳转
-   ▼
-music-api.gdstudio.xyz  (多音源 search/url)
-```
-- 主应用通过曲库代理读取 `/songs.txt`，并使用代理提供的歌曲地址播放。
-- 音乐**不落盘**，全部来自在线 API；歌单只存「歌名、歌手、source、source_id」。
 
----
+| 资源 | 位置 |
+| --- | --- |
+| 代码和虚拟环境 | `/opt/easy-radio-host`、`/opt/easy-radio-host/.venv` |
+| 运行用户 | `tingjian` |
+| 系统服务 | `tingjian.service`、`tingjian-musiclib.service` |
+| 运行配置 | `/etc/tingjian/radio.env`，root 所有、权限 600 |
+| 运行数据 | `/var/lib/tingjian` |
+| Nginx 站点 | `/etc/nginx/conf.d/audio.deline.top.conf` |
+| ACME 验证目录 | `/var/www/letsencrypt` |
 
-## 1. 运行方式：Python venv
+歌曲音频不落盘；口播保存在 `/var/lib/tingjian/voice/`。`NAS_*` 为兼容变量名，实际指向在线曲库代理，无需群晖或本地音乐库。
 
-推荐使用 **Python venv 裸跑**：
-- 依赖仅 3 行 requirements：`fastapi / uvicorn[standard] / edge-tts`(+ 解析脚本用 `zhconv`)。
-- PyPI 用清华源很快。
+## 1. 前置检查
 
-
----
-
-## 2. 克隆代码并放好
+- 域名 A 记录指向目标服务器；如配置 AAAA，IPv6 也必须能到达同一站点。
+- 腾讯云安全组允许 TCP 80、443，SSH 保留管理所需访问范围。8100、8001 仅绑定回环地址，无需公网放行。
+- 检查已有站点、监听端口和证书，保留其他业务的配置。
+- 服务器能够访问 PyPI、DeepSeek、MiniMax、在线音乐 API 及其音频 CDN。
 
 ```bash
-# 将仓库部署到 /opt/easy-radio-host
-git clone <你的仓库URL> /opt/easy-radio-host
-cd /opt/easy-radio-host
+sudo nginx -t
+sudo ss -ltnp
+python3 --version
 ```
 
-需要具备的文件（GitHub 仓库里应有）：
-```
-backend/app.py            # 主应用
-backend/requirements.txt
-backend/static/index.html
-musiclib/proxy_server.py  # 8001 在线曲库代理(多音源取播)
-musiclib/resolve_multi.py # 解析歌单→多渠道裁决锁定(joox/netease)
-musiclib/resolve_ids.py   # 单源解析工具
-musiclib/scan.sh          # 本地文件导入工具（在线曲库无需使用）
-musiclib/playlist-source.tsv  # 源歌单样例(歌名<TAB>歌手)
-musiclib/playlist.tsv     # 已裁决锁定的歌单(73首样例)
-```
+建议使用 Ubuntu 22.04 或 24.04 的 Python 3.10+。首次安装与已有部署的更新分开执行。
 
-> ⚠️ **不要把 `radio.env`、`*.bak`、`data/`(运行时 mp3) 推进仓库。** `radio.env` 含真实 API key，必须用 `.gitignore` 排除。仓库只放代码与歌单样例。
+## 2. 上传代码与安装依赖
 
----
-
-## 3. 配置说明
-
-- `backend/app.py` 的 `fetch_library()` 支持在线格式 `标题<TAB>rel`。
-- 关键 env（app 读的）：
-  - `NAS_LIST_URL` = `http://127.0.0.1:8001/songs.txt`（兼容变量名，指向在线曲库列表）
-  - `NAS_BASE_URL` = `http://<SERVER_IP>:8001`（兼容变量名，指向在线歌曲代理）
-  - `RADIO_BASE` = `http://<SERVER_IP>:8100`（串场/口播完整 URL 用）
-  - `DEEPSEEK_KEY`、`DEEPSEEK_MODEL=deepseek-chat`
-  - `MINIMAX_KEY`、`MINIMAX_VOICE`（如 `Chinese_huolishaonv` / `female-chengshu`）
-  - `DATA_DIR=/opt/easy-radio-host/data`
-
----
-
-## 4. 准备 venv 并安装依赖
+在本地已检出的仓库中执行，将当前已提交版本打包上传。用已配置的 SSH 目标替换 `<SSH_TARGET>`，服务器无需 GitHub 凭证。
 
 ```bash
-# Python3.10+ 即可
-python3 -m venv /opt/easy-radio-host/.venv   # 或 /home/<特立>/venvs/radio-venv
-source /opt/easy-radio-host/.venv/bin/activate
-pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple
-pip install -r backend/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
-pip install zhconv -i https://pypi.tuna.tsinghua.edu.cn/simple   # 解析脚本简繁归一用
+git status --short
+git rev-parse HEAD
+git archive --format=tar.gz --output=/tmp/tingjian-release.tar.gz HEAD
+scp /tmp/tingjian-release.tar.gz <SSH_TARGET>:/tmp/tingjian-release.tar.gz
 ```
-> requirements 已有 fastapi/uvicorn/edge-tts；`zhconv` 供 `resolve_multi.py` 用（不在原 requirements 里，需单装）。
 
-创建数据目录与 env（**先看第 7 步的 .env.example**）：
+包中不包含未提交文件。将输出的提交 SHA 作为该次发布记录。以下命令在服务器执行，代码目录应尚未安装本项目：
+
 ```bash
-mkdir -p /opt/easy-radio-host/data/voice   # TTS 产物目录
-chown -R <运行用户> /opt/easy-radio-host
+sudo apt-get update
+sudo apt-get install -y python3-venv nginx certbot
+sudo useradd --system --home-dir /var/lib/tingjian --shell /usr/sbin/nologin tingjian
+sudo install -d -o root -g root -m 755 /opt/easy-radio-host
+sudo install -d -o root -g root -m 700 /etc/tingjian
+sudo install -d -o root -g root -m 755 /var/www/letsencrypt
+sudo tar -xzf /tmp/tingjian-release.tar.gz -C /opt/easy-radio-host
+sudo python3 -m venv /opt/easy-radio-host/.venv
+sudo /opt/easy-radio-host/.venv/bin/pip install -r /opt/easy-radio-host/backend/requirements.txt
 ```
 
----
+已有 `tingjian` 用户时跳过创建用户，先核对其用途。代码由管理员维护；systemd 的 `StateDirectory=tingjian` 为主服务创建可写数据目录，运行用户只需读取代码。服务启用 `ProtectSystem=strict`，将写入限制在所需运行目录。
 
-## 5. 系统服务化
+## 3. 配置密钥与地址
 
-创建版源（两进程，均 `Restart=always`）：
+首次部署从模板创建环境文件；已有文件直接编辑，避免覆盖现有密钥。
 
-**A. 主应用 8100** — `/etc/systemd/system/easy-radio-host.service`
-```ini
-[Unit]
-Description=AI Radio Host (easy-radio-host) FastAPI on 8100
-After=network.target
-
-[Service]
-Type=simple
-User=admin            # 改你的运行用户
-WorkingDirectory=/opt/easy-radio-host/backend
-EnvironmentFile=/opt/easy-radio-host/radio.env
-ExecStart=/opt/easy-radio-host/.venv/bin/uvicorn app:app --host 0.0.0.0 --port 8100
-Restart=always
-RestartSec=3
-
-[Install]
-WantedBy=multi-user.target
-```
-
-**B. 在线曲库代理 8001** — `/etc/systemd/system/easy-radio-musiclib.service`
-```ini
-[Unit]
-Description=Online Music Library Proxy (8001)
-After=network.target easy-radio-host.service
-
-[Service]
-Type=simple
-User=admin
-WorkingDirectory=/opt/easy-radio-host/musiclib
-EnvironmentFile=/opt/easy-radio-host/radio.env
-ExecStart=/opt/easy-radio-host/.venv/bin/uvicorn proxy_server:app --host 0.0.0.0 --port 8001
-Restart=always
-RestartSec=3
-
-[Install]
-WantedBy=multi-user.target
-```
 ```bash
-systemctl daemon-reload
-systemctl enable --now easy-radio-host easy-radio-musiclib
+sudo install -o root -g root -m 600 /opt/easy-radio-host/deploy/radio.env.example /etc/tingjian/radio.env
+sudoedit /etc/tingjian/radio.env
 ```
 
----
+填写 `DEEPSEEK_KEY`、`MINIMAX_KEY`，并确认：
 
-## 6. 防火墙 / 安全组放行
-
-**云厂商安全组放行 8100、8001（TCP，来源 0.0.0.0/0 或你的访问网段）。**
-- 8100：主页面 + `/api/*` + `/voice/*.mp3`（口播）
-- 8001：歌曲播放——浏览器通过公网 IP:8001 拿歌，8001 再 302 到第三方 CDN。**必须公网可达**，否则浏览器端 402306。
-
-系统防火墙如启用也要放行：
-```bash
-firewall-cmd --permanent --add-port=8100/tcp --add-port=8001/tcp && firewall-cmd --reload  # 或 ufw/iptables 同理
-```
-
----
-
-## 7. radio.env（含 key，需你自填）—— 建议提供 `radio.env.example`
-
-真实机里 `/opt/easy-radio-host/radio.env`（chmod 600）：
-```env
+```dotenv
 NAS_LIST_URL=http://127.0.0.1:8001/songs.txt
-NAS_BASE_URL=http://<SERVER_IP>:8001
-RADIO_BASE=http://<SERVER_IP>:8100
-DATA_DIR=/opt/easy-radio-host/data
-PORT=8100
+NAS_BASE_URL=https://audio.deline.top/music
+RADIO_BASE=https://audio.deline.top
+DATA_DIR=/var/lib/tingjian
 HOST_NAME=小蓝
-
-DEEPSEEK_KEY=<你的DeepSeek API key>
 DEEPSEEK_BASE=https://api.deepseek.com
 DEEPSEEK_MODEL=deepseek-chat
-
-MINIMAX_KEY=<你的MiniMax T2A key>
-MINIMAX_VOICE=Chinese_huolishaonv   # 也可 female-chengshu / female-shaonv
+MINIMAX_BASE=https://api.minimaxi.com
+MINIMAX_MODEL=speech-02-turbo
+MINIMAX_VOICE=female-chengshu
 ```
-> 记得 `chmod 600 radio.env`。别提交。
 
----
+`MINIMAX_GROUP` 按账号接口要求填写，可为空。密钥仅放服务器运行配置，不放入 Git、前端或命令行参数。systemd 管理器读取 root 所有的环境文件后，以 `tingjian` 用户启动主服务；曲库服务不读取带密钥的配置。
 
-## 8. 初始化/扩展歌单（可选，仓库已带73首样例）
+供应商调用可能产生费用。缺少配置或调用失败时可能走模板节目、edge-tts 或纯文字降级，HTTP 200 不能单独证明 DeepSeek 和 MiniMax 调用成功。
 
-样例歌单 `musiclib/playlist-source.tsv` 已是「歌名<TAB>歌手」。想重新按多源裁决锁定：
-```bash
-cd /opt/easy-radio-host/musiclib
-# 1) 编辑 playlist-source.tsv 增删
-# 2) 删除旧结果，重跑多源裁决（joox 优先, netease 兜底, 会自动排除翻唱/验可播）
-rm -f playlist.tsv
-/opt/easy-radio-host/.venv/bin/python3 resolve_multi.py
-```
-`resolve_multi.py` 逻辑：对每歌并行搜 joox/netease → 歌名精确 + 歌手简繁归一匹配 + 排除 翻唱/Remix/Live/伴奏/深情/治愈 等 → 验证候选能取到可播直链 → joox 命中优先；joox 无则 netease。
-`proxy_server.py` 读 `playlist.tsv`（格式 `歌名\t歌手\tsource\tsource_id\t备注`），动态生成 `/songs.txt` 并 302 播放。
-
----
-
-## 9. 验证
+## 4. 启动服务
 
 ```bash
-# 服务
-systemctl status easy-radio-host easy-radio-musiclib   # active
-# 端口
-ss -tln | grep -E ':8100|:8001'
-# 前端
-curl -s -o /dev/null -w "%{http_code}\n" http://<SERVER_IP>:8100/            # 200
-# 曲库列表(应有歌)
-curl -s http://<SERVER_IP>:8001/songs.txt | head
-# 生成一期节目(需已填 DEEPSEEK_KEY；口播会实时合成)
-curl -s -X POST http://127.0.0.1:8100/api/show -H 'Content-Type: application/json' -d '{"theme":"怀旧金曲"}'
-# 抽一首歌确认能拉通到音频(浏览器会跟随302)
-curl -sL -o /dev/null -w "%{http_code} %{content_type} %{size_download}\n" \
-     "http://<SERVER_IP>:8001/s/joox/<某id>.mp3"   # 期望 200 audio/mpeg 有 size
+sudo install -m 644 /opt/easy-radio-host/deploy/tingjian.service /etc/systemd/system/tingjian.service
+sudo install -m 644 /opt/easy-radio-host/deploy/tingjian-musiclib.service /etc/systemd/system/tingjian-musiclib.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now tingjian-musiclib tingjian
+sudo systemctl is-active tingjian-musiclib tingjian
+curl --fail --silent http://127.0.0.1:8001/_health
+curl --fail --silent --output /dev/null http://127.0.0.1:8100/
 ```
 
----
+曲库健康接口的 `songs` 应大于零。服务读取 `/opt/easy-radio-host/musiclib/playlist.tsv`；迁移代码目录时须同时检查曲库路径。
 
-## 10. 关键排坑清单
+## 5. 域名与 HTTPS
 
-| 现象 | 原因与处理 |
-|---|---|
-| 说话后不出歌 | 歌曲 URL 若含 `127.0.0.1` → 在用户浏览器=用户自己机器。务必用公网 `NAS_BASE_URL` |
-| 播的是翻唱/错版本 | 单源(网易)周杰伦版权下架→全是翻唱。改用多音源裁决 `resolve_multi.py`(joox 主源) |
-| 第三方 API 报 403/503 | 需带浏览器 UA(见 proxy_server.py)；请求过快会软限流→`can_play` 要退避 |
-| 简/繁匹配不上(周杰倫=周杰伦) | resolve_multi 已内置 zhconv 归一 |
-| Docker 拉不到 python 镜像 | 直接用 Python venv 裸跑(本节方案) |
-
----
-
-## 11. 排障日志
+首次安装 HTTP 模板供证书验证使用。若已存在同域名配置，先核对并备份该文件，避免重复 `server_name`；其他站点保持原配置。
 
 ```bash
-journalctl -u easy-radio-host -f          # 主应用
-journalctl -u easy-radio-musiclib -f      # 曲库代理
-ls /opt/easy-radio-host/data/voice/       # TTS 产物
+sudo install -m 644 /opt/easy-radio-host/deploy/nginx-audio-http.conf /etc/nginx/conf.d/audio.deline.top.conf
+sudo nginx -t
+sudo systemctl reload nginx
+sudo certbot certonly --webroot --webroot-path /var/www/letsencrypt --domain audio.deline.top
 ```
 
----
+Certbot 首次运行会要求通知邮箱和证书服务条款确认。签发后启用 HTTPS 模板，证书路径为 `/etc/letsencrypt/live/audio.deline.top/fullchain.pem` 与 `privkey.pem`。
 
-### 附：致谢 / Credits
-- easy-radio-host 原始项目：https://gitee.com/weak0001/easy-radio-host （作者 weak0001）
-- 在线音乐 API：https://music-api.gdstudio.xyz/api.php（搜索/取链为多音源数据源，版权归平台方与相应**唱片权利人**）
-- DeepSeek / MiniMax 语音：版权归各自公司
-- 本项目不落盘音乐，仅作 API 转发；仅供学习/合法内容体验，商用或再发布请自行确认授权，侵权风险自负。
+```bash
+sudo cp -a /etc/nginx/conf.d/audio.deline.top.conf /etc/tingjian/nginx-http.backup
+sudo install -m 644 /opt/easy-radio-host/deploy/nginx-audio.conf /etc/nginx/conf.d/audio.deline.top.conf
+sudo nginx -t
+sudo systemctl reload nginx
+sudo install -m 755 /opt/easy-radio-host/deploy/renew-nginx.sh /etc/letsencrypt/renewal-hooks/deploy/tingjian-nginx
+sudo systemctl enable --now certbot.timer
+sudo certbot renew --dry-run --run-deploy-hooks
+```
 
-默认 `musiclib/playlist-source.tsv` 已含 73 首华语精选（晴天/七里香/稻香/成都/后来/平凡之路…），推送仓库即含，目标机 clone 后无需再跑解析即可直接出歌。
+模板保留 HTTP ACME 验证路径，其余 HTTP 请求跳转至 HTTPS。`/music/` 的 `proxy_pass` 末尾保留 `/`，将 `/music/s/...` 转发为曲库服务的 `/s/...`。Nginx API 读取超时为 300 秒；前端请求超时为 90 秒，浏览器不会等待满 300 秒。模板还提供每 IP 12 次/分钟、突发 8 次、每 IP 3 个并发及全站 8 个 API 并发的限制；超限返回 429。限流不能替代供应商预算管理。
+
+`deploy/renew-nginx.sh` 会在证书续期成功后检查配置并重新加载 Nginx；已有同用途 hook 时复用。上述 dry-run 命令通过 `--run-deploy-hooks` 同时验证续期流程与 Nginx reload hook。
+
+## 6. 验收
+
+```bash
+curl --silent --show-error --dump-header - --output /dev/null http://audio.deline.top/
+curl --fail --silent --show-error --output /dev/null --write-out '%{http_code}\n' https://audio.deline.top/
+curl --fail --silent https://audio.deline.top/music/_health
+sudo ss -ltnp
+sudo systemctl status tingjian tingjian-musiclib --no-pager
+```
+
+检查 HTTP 跳转 HTTPS、证书域名及有效期、首页 200、曲库非空，以及 8100/8001 只监听 `127.0.0.1`。
+
+真实节目验证会调用供应商服务：
+
+```bash
+curl --fail --silent --show-error --max-time 360 \
+  https://audio.deline.top/api/show \
+  -H 'Content-Type: application/json' \
+  -d '{"theme":"午后咖啡","exclude":[]}'
+```
+
+检查返回的 `items` 中有歌曲和口播；歌曲地址应以 `https://audio.deline.top/music/` 开头，口播使用本站 `/voice/`。跟随歌曲 307 跳转验证实际音频可访问，检查最终音频地址支持 HTTPS。结合供应商请求结果与服务日志确认真实模型、语音调用，不能用降级结果代替验证。
+
+在桌面和手机浏览器打开正式入口，验证主题生成、口播到歌曲连续播放、暂停与恢复、下一首、点歌、聊天、收藏和历史。检查布局无横向溢出、控制台无混合内容错误。`?demo=1` 只能验证演示交互，不能作为真实 API 验收。
+
+## 7. 更新与恢复
+
+保留上次发布的代码包和提交 SHA。每次更新前备份配置、代码与用户数据，备份只允许管理员访问，不上传仓库：
+
+```bash
+backup_dir="/var/backups/tingjian/$(date +%Y%m%d-%H%M%S)"
+sudo install -d -m 700 "$backup_dir"
+sudo cp -a /etc/tingjian "$backup_dir/config"
+sudo cp -a /etc/nginx/conf.d/audio.deline.top.conf "$backup_dir/nginx.conf"
+sudo cp -a /etc/systemd/system/tingjian.service /etc/systemd/system/tingjian-musiclib.service "$backup_dir/"
+sudo tar -czf "$backup_dir/code.tar.gz" --exclude=.venv -C /opt easy-radio-host
+sudo tar -czf "$backup_dir/data.tar.gz" -C /var/lib tingjian
+```
+
+使用第 2 节方法生成、上传新的已提交代码包。先比较发布差异；若服务器修改过代码或歌单，合并并保留这些修改后再更新。上传包会覆盖同路径文件，尤其需要保留用户维护的 `musiclib/playlist.tsv`。确认备份和合并后停止本项目两项服务，将新包解压到固定代码目录，再安装依赖并启动：
+
+```bash
+sudo systemctl stop tingjian tingjian-musiclib
+sudo tar -xzf /tmp/tingjian-release.tar.gz -C /opt/easy-radio-host
+sudo /opt/easy-radio-host/.venv/bin/pip install -r /opt/easy-radio-host/backend/requirements.txt
+sudo systemctl start tingjian-musiclib tingjian
+```
+
+如果更新涉及 `deploy/`，审阅后重新安装对应配置，再执行 `systemctl daemon-reload` 或 `nginx -t` 与 reload。保留真实 `radio.env`，只补齐必要变量。重新执行第 6 节验收。
+
+若新版未通过验收，停止本项目两项服务，将当前代码目录改名保留，然后从 `code.tar.gz` 恢复 `/opt/easy-radio-host`，按旧版 requirements 重建 venv。必要时恢复备份中的 systemd/Nginx 配置，校验后启动服务并复验。改名后的目录保留到恢复确认完成，不直接删除。用户口播等数据独立存放，普通代码回退无需回退数据；涉及数据迁移时先核对兼容性再恢复备份。
+
+## 8. 歌单维护与排障
+
+维护 `musiclib/playlist-source.tsv` 后，可用 `musiclib/resolve_multi.py` 重新解析来源 ID。该脚本另需 `zhconv`，并会写入 `playlist.tsv`；运行前保留原歌单备份。在线来源及可播性可能变化，应重新核对曲目和版本。
+
+```bash
+sudo journalctl -u tingjian -n 100 --no-pager
+sudo journalctl -u tingjian-musiclib -n 100 --no-pager
+sudo nginx -t
+sudo certbot certificates
+```
+
+| 现象 | 检查项 |
+| --- | --- |
+| 首页可开，生成超时 | 主服务日志、供应商连通性、额度、Nginx 超时 |
+| 只有文字或模板节目 | 模型/语音调用结果、音色配置、edge-tts 网络 |
+| 歌曲不播放 | 公网 `NAS_BASE_URL`、`/music/` 映射、歌曲源与最终音频 HTTPS |
+| 曲库为空 | `playlist.tsv` 路径、权限、TSV 格式 |
+| 口播 404 | `DATA_DIR`、服务写权限、`/voice/` 转发 |
+| HTTP 429 | API 请求频率和并发限制，稍后重试 |
+| 证书续期失败 | DNS、80 端口、ACME 目录、timer 和 reload hook |
+
+排障时不要公开包含凭证、用户输入或个人数据的完整日志。AI 编排内容不保证事实准确；公开服务会使用部署者的供应商额度，应按访问规模配置预算和访问范围。
+
+## 版权与致谢
+
+- 原始项目：[weak0001 / easy-radio-host](https://gitee.com/weak0001/easy-radio-host)。原始许可证尚未核实，不因此将整个仓库重新声明为 MIT。
+- 交互参考：[hllqkb / Claudio](https://github.com/hllqkb/Claudio)，MIT 许可；参考范围与许可全文见 [第三方说明](THIRD_PARTY_NOTICES.md)。
+- 在线音乐 API：[GD 音乐台 API](https://music-api.gdstudio.xyz/api.php)。歌曲版权归来源平台和相应权利人，服务不提供自有音源或歌曲授权。

@@ -11,7 +11,7 @@
 ![DeepSeek](https://img.shields.io/badge/DeepSeek-AI-1677E8)
 [![GitHub stars](https://img.shields.io/github/stars/HachikoJ/easy-radio-host?style=flat)](https://github.com/HachikoJ/easy-radio-host)
 
-[English](README.en.md) · [个人官网](https://www.deline.top) · [核心体验](#核心体验) · [产品预览](#产品预览) · [如何运行](#如何运行) · [项目资料](#项目资料) · [联系作者](#联系作者)
+[English](README.en.md) · [在线收听](https://audio.deline.top) · [个人官网](https://www.deline.top) · [核心体验](#核心体验) · [产品预览](#产品预览) · [如何运行](#如何运行) · [项目资料](#项目资料) · [联系作者](#联系作者)
 
 **选一个主题，把接下来的时间交给音乐。**
 
@@ -19,7 +19,7 @@
 
 **项目地址：** [HachikoJ/easy-radio-host](https://github.com/HachikoJ/easy-radio-host)
 
-**使用入口：** 自行部署后访问服务器的 8100 端口；本仓库未提供托管播放服务。
+**在线收听：** [audio.deline.top](https://audio.deline.top)，选择主题后点击「开始收听」。也可按下方步骤自行部署。
 
 ## 核心体验
 
@@ -36,22 +36,22 @@
 ### 桌面端
 
 <p>
-  <img src="docs/radio-desktop.png" alt="听间桌面端演示页面：主题选择、节目单、点歌互动和底部播放器" width="100%">
+  <img src="docs/radio-desktop.png" alt="听间桌面端在线播放：主题选择、节目单、点歌互动和底部播放器" width="100%">
 </p>
 
 ### 移动端
 
 <p>
-  <img src="docs/radio-mobile.png" alt="听间移动端演示页面：主题封面、节目和播放控制" width="375">
+  <img src="docs/radio-mobile.png" alt="听间移动端在线播放：主题封面、节目和播放控制" width="375">
 </p>
 
 ### 沉浸模式
 
 <p>
-  <img src="docs/radio-focus.png" alt="听间沉浸模式演示页面：当前片段、主题封面和播放控制" width="100%">
+  <img src="docs/radio-focus.png" alt="听间沉浸模式在线播放：当前片段、主题封面和播放控制" width="100%">
 </p>
 
-截图来自当前前端的本地演示模式，页面标有「演示节目」。演示使用本项目合成的音频与固定回复；主题摄影不是歌曲的真实唱片封面。真实节目生成和在线歌曲播放需要配置相应服务。
+截图来自 [正式站点](https://audio.deline.top) 的真实节目与在线歌曲播放。主题摄影用于表达收听场景，并非歌曲的真实唱片封面。在线音源的曲目和可用性由第三方服务决定。
 
 ## 工作原理
 
@@ -65,7 +65,7 @@
   → 曲库代理调用音乐 API，跳转至歌曲直链
 ```
 
-曲库代理读取 `musiclib/playlist.tsv`，通过 `/songs.txt` 提供标题与相对路径；通过 `/s/<source>/<id>.mp3` 获取歌曲地址并返回 302 跳转。歌曲音频不落盘，生成的口播文件保存在服务端 `data/voice/`。
+曲库代理读取 `musiclib/playlist.tsv`，通过 `/songs.txt` 提供标题与相对路径；通过 `/s/<source>/<id>.mp3` 获取歌曲地址并返回 307 跳转。歌曲音频不落盘，生成的口播文件保存在服务端 `DATA_DIR/voice/`（腾讯云部署为 `/var/lib/tingjian/voice/`）。
 
 ## 如何运行
 
@@ -79,9 +79,9 @@ source .venv/bin/activate
 python -m pip install -r backend/requirements.txt zhconv
 ```
 
-1. 按部署手册创建 `radio.env`，配置 DeepSeek、MiniMax 和服务地址。
-2. 启动主应用（8100）与在线曲库代理（8001）。
-3. 确认浏览器可以访问两个端口，打开主应用页面并生成一期节目。
+1. 按部署手册创建 `/etc/tingjian/radio.env`，配置 DeepSeek、MiniMax 和服务地址，密钥文件权限设为 600。
+2. 启动主应用（8100）与在线曲库代理（8001），两项服务仅监听 `127.0.0.1`。
+3. 配置 Nginx 与 HTTPS，通过同一域名访问页面、`/api/`、`/voice/` 和 `/music/`，生成一期节目。公网只需开放 80、443。
 
 ### 无密钥体验界面
 

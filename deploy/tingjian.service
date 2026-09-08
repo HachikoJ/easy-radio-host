@@ -1,0 +1,26 @@
+[Unit]
+Description=Tingjian AI radio
+After=network-online.target tingjian-musiclib.service
+Wants=network-online.target tingjian-musiclib.service
+
+[Service]
+Type=simple
+User=tingjian
+Group=tingjian
+WorkingDirectory=/opt/easy-radio-host/backend
+EnvironmentFile=/etc/tingjian/radio.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/easy-radio-host/.venv/bin/uvicorn app:app --host 127.0.0.1 --port 8100 --proxy-headers --forwarded-allow-ips=127.0.0.1
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+StateDirectory=tingjian
+StateDirectoryMode=0750
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+
+[Install]
+WantedBy=multi-user.target
