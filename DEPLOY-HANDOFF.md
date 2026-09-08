@@ -236,4 +236,11 @@ ls /opt/easy-radio-host/data/voice/       # TTS 产物
 
 ---
 
-### 附：默认 `musiclib/playlist-source.tsv` 已含 73 首华语精选（晴天/七里香/稻香/成都/后来/平凡之路…），推送仓库即含，目标机 clone 后无需再跑解析即可直接出歌。
+### 附：致谢 / Credits（二次改造，请避免侵权）
+本项目基于他人作品改造，部署/再分发请保留如下归属：
+- 原项目 easy-radio-host：https://gitee.com/weak0001/easy-radio-host （原作者 weak0001）
+- 在线音乐 API：https://music-api.gdstudio.xyz/api.php（搜索/取链为多音源数据源，版权归平台方与相应**唱片权利人**）
+- DeepSeek / MiniMax 语音：版权归各自公司
+- 本项目不落盘音乐，仅作 API 转发；仅供学习/合法内容体验，商用或再发布请自行确认授权，侵权风险自负。
+
+默认 `musiclib/playlist-source.tsv` 已含 73 首华语精选（晴天/七里香/稻香/成都/后来/平凡之路…），推送仓库即含，目标机 clone 后无需再跑解析即可直接出歌。
