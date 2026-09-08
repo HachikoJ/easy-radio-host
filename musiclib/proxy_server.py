@@ -1,0 +1,108 @@
+#!/usr/bin/env python3
+# easy-radio-host 多音源在线曲库代理 (端口 8001)
+# 读取 resolve_multi.py 生成的新歌单 (歌名\t歌手\tsource\tsource_id)
+# 1) /songs.txt -> 供 app fetch_library: 每行 "<DeepSeek标题>TAB<s/<src>/<id>.mp3>"
+# 2) /s/<src>/<id>.mp3 -> 从该音源取真实播放直链 -> 307 跳转
+import json
+import time
+import urllib.parse
+import urllib.error
+import urllib.request
+
+from fastapi import FastAPI, Response
+from fastapi.responses import RedirectResponse, PlainTextResponse
+
+PLAYLIST = "/opt/easy-radio-host/musiclib/playlist.tsv"
+API = "https://music-api.gdstudio.xyz/api.php"
+UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+      "(KHTML, like Gecko) Chrome/120.0 Safari/537.36")
+
+app = FastAPI(title="radio-online-musiclib")
+
+
+def http_get(url, tries=3):
+    for n in range(tries):
+        req = urllib.request.Request(
+            url, headers={"User-Agent": UA,
+                          "Referer": "https://music.gdstudio.xyz/"})
+        try:
+            with urllib.request.urlopen(req, timeout=15) as r:
+                return r.status, r.read()
+        except urllib.error.HTTPError as e:
+            if e.code in (403, 503, 429):
+                time.sleep(1.0 * (n + 1))
+                continue
+            return e.code, e.read()
+        except Exception:
+            return 0, b""
+    return 503, b"limit"
+
+
+def load_playlist():
+    """-> list[{title, artist, source, sid, note}]"""
+    rows = []
+    try:
+        with open(PLAYLIST, encoding="utf-8") as f:
+            for ln in f:
+                ln = ln.strip()
+                if not ln or ln.startswith("#"):
+                    continue
+                p = [c.strip() for c in ln.split("\t")]
+                # 新格式 4+列; 兼容旧 3列(id-only, source=netease)
+                if len(p) >= 4:
+                    rows.append({"title": p[0], "artist": p[1],
+                                 "source": p[2], "sid": p[3], "note": p[4] if len(p) > 4 else ""})
+                elif len(p) == 3:
+                    rows.append({"title": p[0], "artist": p[1],
+                                 "source": "netease", "sid": p[2], "note": ""})
+    except FileNotFoundError:
+        pass
+    return rows
+
+
+@app.get("/songs.txt")
+def songs_txt():
+    rows = load_playlist()
+    buf = ["# 在线精选歌单 (多音源, 自动生成)", ]
+    for r in rows:
+        t = f"{r['artist']} - {r['title']}"
+        buf.append(f"{t}\ts/{r['source']}/{urllib.parse.quote(r['sid'])}.mp3")
+    return PlainTextResponse("\n".join(buf) + "\n", media_type="text/plain; charset=utf-8")
+
+
+def _resolve_play_url(source, sid):
+    # 逐档取真实播放直链
+    for br in ("320", "192", "128"):
+        u = f"{API}?types=url&source={source}&id={sid}&br={br}"
+        code, body = http_get(u)
+        if code == 200:
+            try:
+                d = json.loads(body)
+                url = (d or {}).get("url") or ""
+                if url:
+                    return url
+            except Exception:
+                pass
+    return None
+
+
+@app.get("/s/{source}/{song_id}.mp3")
+def play(source: str, song_id: str):
+    url = _resolve_play_url(source, song_id)
+    if url:
+        return RedirectResponse(url)
+    return Response(status_code=404, content="audio unavailable")
+
+
+# 兼容旧路径: /s/id/<id>.mp3  -> netease
+@app.get("/s/id/{song_id}.mp3")
+def play_legacy(song_id: str):
+    url = _resolve_play_url("netease", song_id)
+    if url:
+        return RedirectResponse(url)
+    return Response(status_code=404, content="audio unavailable")
+
+
+@app.get("/_health")
+def health():
+    return {"status": "ok", "songs": len(load_playlist())}
