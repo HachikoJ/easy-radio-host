@@ -20,6 +20,7 @@
 | 系统服务 | `tingjian.service`、`tingjian-musiclib.service` |
 | 运行配置 | `/etc/tingjian/radio.env`，root 所有、权限 600 |
 | 运行数据 | `/var/lib/tingjian` |
+| GD 额度状态 | `/var/lib/tingjian/gd-quota.sqlite3`，计数与冷却跨重启保留 |
 | Nginx 站点 | `/etc/nginx/conf.d/audio.deline.top.conf` |
 | ACME 验证目录 | `/var/www/letsencrypt` |
 
@@ -65,7 +66,7 @@ sudo python3 -m venv /opt/easy-radio-host/.venv
 sudo /opt/easy-radio-host/.venv/bin/pip install -r /opt/easy-radio-host/backend/requirements.txt
 ```
 
-已有 `tingjian` 用户时跳过创建用户，先核对其用途。代码由管理员维护；systemd 的 `StateDirectory=tingjian` 为主服务创建可写数据目录，运行用户只需读取代码。服务启用 `ProtectSystem=strict`，将写入限制在所需运行目录。
+已有 `tingjian` 用户时跳过创建用户，先核对其用途。代码由管理员维护；两项 systemd 服务使用 `StateDirectory=tingjian` 创建可写数据目录，曲库服务将 `GD_QUOTA_DB` 指向 `/var/lib/tingjian/gd-quota.sqlite3`，运行用户只需读取代码。服务启用 `ProtectSystem=strict`，将写入限制在所需运行目录。所有共享 GD 额度的代理进程须指向同一个数据库文件。
 
 ## 3. 配置密钥与地址
 
@@ -136,7 +137,9 @@ sudo systemctl enable --now certbot.timer
 sudo certbot renew --dry-run --run-deploy-hooks
 ```
 
-模板保留 HTTP ACME 验证路径，其余 HTTP 请求跳转至 HTTPS。`/music/` 的 `proxy_pass` 末尾保留 `/`，将 `/music/s/...` 转发为曲库服务的 `/s/...`。Nginx API 读取超时为 300 秒；前端节目/点歌请求超时为 240 秒，音源恢复为 60 秒。模板还提供每 IP 12 次/分钟、突发 8 次、每 IP 3 个并发及全站 8 个 API 并发的限制；超限返回 429。GD 搜索、取链与歌词在常驻曲库代理内共享 50 次/300 秒的滚动预算，其他进程的请求不计入该本地预算。
+模板保留 HTTP ACME 验证路径，其余 HTTP 请求跳转至 HTTPS。`/music/` 的 `proxy_pass` 末尾保留 `/`，将 `/music/s/...` 转发为曲库服务的 `/s/...`。Nginx API 读取超时为 300 秒；前端节目/点歌请求超时为 240 秒，音源恢复为 60 秒。模板还提供每 IP 12 次/分钟、突发 8 次、每 IP 3 个并发及全站 8 个 API 并发的限制；超限返回 429。GD 搜索、取链与歌词共享滚动 300 秒最多 45 次的预算，SQLite 事务协调共用数据库的进程。计数与上游冷却在重启后保留，完整遵守上游 `Retry-After`，不因等待超过 300 秒而缩短。独立程序若不使用同一额度数据库，其请求不在该预算内。
+
+Nginx 为 `/api/playback/announcement/` 和精确匹配的 `/api/playback/availability` 设置独立 `location`，缓存播报与额度查询不占用 AI 节目生成的每分钟 12 次及并发预算，也不调用 GD API。
 
 `deploy/renew-nginx.sh` 会在证书续期成功后检查配置并重新加载 Nginx；已有同用途 hook 时复用。上述 dry-run 命令通过 `--run-deploy-hooks` 同时验证续期流程与 Nginx reload hook。
 
@@ -146,6 +149,7 @@ sudo certbot renew --dry-run --run-deploy-hooks
 curl --silent --show-error --dump-header - --output /dev/null http://audio.deline.top/
 curl --fail --silent --show-error --output /dev/null --write-out '%{http_code}\n' https://audio.deline.top/
 curl --fail --silent https://audio.deline.top/music/_health
+curl --fail --silent https://audio.deline.top/api/playback/availability
 sudo ss -ltnp
 sudo systemctl status tingjian tingjian-musiclib --no-pager
 ```
@@ -163,7 +167,7 @@ curl --fail --silent --show-error --max-time 360 \
 
 检查返回的 `items` 中有歌曲和口播；歌曲地址应以 `https://audio.deline.top/music/` 开头并带 `stream=1`，口播使用本站 `/voice/`。对歌曲发送小范围 GET，验证 206、音频文件头及 Content-Range，并在浏览器确认实际播放时间前进与拖动。原不带 `stream` 的歌曲地址保留 307 兼容。结合供应商请求结果与服务日志确认真实模型、语音调用，不能用降级结果代替验证。音源状态与完整恢复规则见 [音源检索与恢复](docs/MUSIC-SOURCES.md)。
 
-在桌面和手机浏览器打开正式入口，验证主题生成、口播到歌曲连续播放、暂停与恢复、下一首、点歌、聊天、收藏和历史。检查布局无横向溢出、控制台无混合内容错误。`?demo=1` 只能验证演示交互，不能作为真实 API 验收。
+在桌面和手机浏览器打开正式入口，验证主题生成、口播到歌曲连续播放、暂停与恢复、下一首、点歌、聊天、收藏和历史。使用受控模拟验证无音源、限流与临时故障的文字说明、原因播报、自动下一曲及等待恢复；不能为验收主动向上游发送 45 次请求触发限额。核对暂停或关闭页面后不再产生后续检索，音频连接与计时停止，恢复播放保持原位置。缓存播报接口应返回可播放语音，故障时不应每次重新合成。检查布局无横向溢出、控制台无混合内容错误。`?demo=1` 只能验证演示交互，不能作为真实 API 验收。
 
 确认服务器 `ffmpeg -version` 可运行。生成新口播后，可用下面的只读命令检查实际文件的响度；将 `<VOICE_FILE>` 换成本次生成的本地口播文件路径：
 
@@ -191,20 +195,38 @@ sudo tar -czf "$backup_dir/code.tar.gz" --exclude=.venv -C /opt easy-radio-host
 sudo tar -czf "$backup_dir/data.tar.gz" -C /var/lib tingjian
 ```
 
-使用第 2 节方法生成、上传新的已提交代码包。先比较发布差异；若服务器修改过代码或歌单，合并并保留这些修改后再更新。上传包会覆盖同路径文件，尤其需要保留用户维护的 `musiclib/playlist.tsv`。确认备份和合并后停止本项目两项服务，将新包解压到固定代码目录，再安装依赖并启动：
+使用第 2 节方法生成、上传新的已提交代码包。先比较发布差异；若服务器修改过代码或歌单，合并并保留这些修改后再更新。上传包会覆盖同路径文件，尤其需要保留用户维护的 `musiclib/playlist.tsv`。确认备份和合并后停止本项目两项服务，将新包解压到固定代码目录，再安装依赖：
 
 ```bash
 sudo systemctl stop tingjian tingjian-musiclib
 sudo tar -xzf /tmp/tingjian-release.tar.gz -C /opt/easy-radio-host
 sudo /opt/easy-radio-host/.venv/bin/pip install -r /opt/easy-radio-host/backend/requirements.txt
-sudo systemctl start tingjian-musiclib tingjian
 ```
 
-如果更新涉及 `deploy/`，审阅后重新安装对应配置，再执行 `systemctl daemon-reload` 或 `nginx -t` 与 reload。保留真实 `radio.env`，只补齐必要变量。重新执行第 6 节验收。
+如果更新涉及 `deploy/`，审阅后重新安装对应配置，再执行 `systemctl daemon-reload` 或 `nginx -t` 与 reload。保留真实 `radio.env`，只补齐必要变量。
+
+从仅有内存计数的版本首次升级至 SQLite 额度管理时，须在停止旧曲库服务后、首次启动新服务前创建共享额度状态，并写入至少 300 秒的迁移冷却。若已知上游 `Retry-After` 尚未结束，则以更晚时间为准。该步骤补偿旧进程无法导出的最近请求，之后重启直接沿用数据库，不重复清零或重新迁移。可在确认数据库尚不存在时执行：
+
+```bash
+sudo install -d -o tingjian -g tingjian -m 755 /var/lib/tingjian
+sudo -u tingjian /opt/easy-radio-host/.venv/bin/python -c \
+  'from musiclib.quota import RollingQuota; q = RollingQuota("/var/lib/tingjian/gd-quota.sqlite3"); q.inspect(cooldown=300)'
+```
+
+此命令在 `/opt/easy-radio-host` 执行，且只适用于首次迁移；已有数据库必须保留其当前计数和更长冷却。数据库写权限故障应修复权限，不可通过删除文件绕过限额。完成适用的迁移步骤后启动服务，再执行第 6 节验收；首次迁移时，额度接口应仍处于预期等待期：
+
+```bash
+sudo systemctl start tingjian-musiclib tingjian
+curl --fail --silent http://127.0.0.1:8100/api/playback/availability
+```
+
+本次接口兼容性变化：`/api/show` 的歌曲不可用错误将 `detail` 从字符串改为结构对象，客户端应读取其中的原因与恢复信息；`/api/intent` 的所有音源失败均包含 `next` 动作，须先提示并播报，再切换。新增 `/api/playback/availability` 及 `/api/playback/announcement/{reason}.mp3`，前后端应一同更新，避免旧客户端忽略恢复信息。
 
 从未安装 ffmpeg 的版本更新时，安装系统包 `ffmpeg` 后可启用新口播响度处理；暂未安装仍会保留原音播放。需要采用新的默认音色时，应同时审阅现有 `MINIMAX_VOICE`，不能只依赖更新代码。音色配置恢复使用更新前的环境文件备份；代码回退不会自动改变已显式配置的音色。
 
 若新版未通过验收，停止本项目两项服务，将当前代码目录改名保留，然后从 `code.tar.gz` 恢复 `/opt/easy-radio-host`，按旧版 requirements 重建 venv。必要时恢复备份中的 systemd/Nginx 配置，校验后启动服务并复验。改名后的目录保留到恢复确认完成，不直接删除。用户口播等数据独立存放，普通代码回退无需回退数据；涉及数据迁移时先核对兼容性再恢复备份。
+
+额度数据库例外：始终保留最新 `gd-quota.sqlite3` 及当前冷却，不用旧数据备份覆盖它。优先保留兼容的持久额度模块，仅回退播放行为。若必须运行不读取 SQLite 的旧代理，先确认已记录冷却结束，且最后一次 GD 请求已过去 300 秒，再启动；旧代码的预算也必须保持每 300 秒最多 45 次，不能恢复为 50 次。回退不是重新获得请求额度的方式。
 
 ## 8. 歌单维护与排障
 
@@ -225,7 +247,9 @@ sudo certbot certificates
 | 曲库为空 | `playlist.tsv` 路径、权限、TSV 格式 |
 | 口播 404 | `DATA_DIR`、服务写权限、`/voice/` 转发 |
 | 新口播仍明显偏轻或偏响 | ffmpeg 可用性、`TTS loudness normalization` 日志、实际新文件的响度；旧口播不会重新处理 |
-| HTTP 429 | API 请求频率和并发限制，稍后重试 |
+| HTTP 429 | 区分 Nginx 限制、GD 本地预算和上游限制；查询恢复时间并等待，不清空额度数据库或循环切换渠道 |
+| 故障提示后没有声音 | 检查缓存播报接口与浏览器音频权限；核对浏览器语音降级及当前主音量 |
+| 暂停后仍有请求 | 检查前端版本、请求取消及服务端断开检测；已发送的请求仍计入额度 |
 | 证书续期失败 | DNS、80 端口、ACME 目录、timer 和 reload hook |
 
 排障时不要公开包含凭证、用户输入或个人数据的完整日志。AI 编排内容不保证事实准确；公开服务会使用部署者的供应商额度，应按访问规模配置预算和访问范围。

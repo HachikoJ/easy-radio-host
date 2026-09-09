@@ -9,6 +9,8 @@ User=tingjian
 Group=tingjian
 WorkingDirectory=/opt/easy-radio-host/musiclib
 Environment=PYTHONDONTWRITEBYTECODE=1
+StateDirectory=tingjian
+Environment=GD_QUOTA_DB=/var/lib/tingjian/gd-quota.sqlite3
 ExecStart=/opt/easy-radio-host/.venv/bin/uvicorn proxy_server:app --host 127.0.0.1 --port 8001
 Restart=on-failure
 RestartSec=5

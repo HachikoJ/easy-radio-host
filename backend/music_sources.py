@@ -6,6 +6,7 @@ import urllib.parse
 import urllib.request
 
 import zhconv
+import aiohttp
 
 SOURCES = frozenset(("netease", "tencent", "kuwo", "tidal", "qobuz", "joox",
                      "bilibili", "apple", "ytmusic", "spotify"))
@@ -61,6 +62,51 @@ def resolve_song(list_url, song, exclude=()):
             body = response.read(128 * 1024 + 1)
         if len(body) > 128 * 1024:
             raise ValueError("oversized music response")
+        return parse_resolution(body, song)
+    except urllib.error.HTTPError as error:
+        status = "limited" if error.code == 429 else "temporary"
+        error.close()
+        return {"status": status, "searched": []}
+    except (OSError, ValueError, TypeError):
+        return {"status": "temporary", "searched": []}
+
+
+async def resolve_song_async(list_url, song, exclude=()):
+    # Cancelling this task closes the socket so the proxy stops its search.
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=50)) as client:
+            async with client.post(urllib.parse.urljoin(list_url, "resolve"),
+                                   json={**identity(song), "exclude": list(exclude)}) as response:
+                if response.status != 200:
+                    return {"status": "limited" if response.status == 429 else "temporary",
+                            "retry_after": int(response.headers.get("Retry-After", 30)), "searched": []}
+                body = bytearray()
+                async for chunk in response.content.iter_chunked(16 * 1024):
+                    body.extend(chunk)
+                    if len(body) > 128 * 1024:
+                        break
+                return parse_resolution(body, song)
+    except (aiohttp.ClientError, OSError, ValueError, TypeError):
+        return {"status": "temporary", "searched": []}
+
+
+async def proxy_availability(list_url):
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=3)) as client:
+            async with client.get(urllib.parse.urljoin(list_url, "availability")) as response:
+                response.raise_for_status()
+                data = await response.json()
+                if data.get("status") not in ("ready", "limited"):
+                    raise ValueError("invalid quota status")
+                return data
+    except (aiohttp.ClientError, OSError, ValueError, TypeError):
+        return {"status": "temporary", "retry_after": 30, "remaining": 0}
+
+
+def parse_resolution(body, song):
+    try:
+        if len(body) > 128 * 1024:
+            raise ValueError("oversized music response")
         data = json.loads(body)
         if not isinstance(data, dict) or data.get("status") not in {"available", "unavailable", "limited", "temporary"}:
             raise ValueError("invalid music response")
@@ -83,10 +129,6 @@ def resolve_song(list_url, song, exclude=()):
                 result["title"] = f"{track['artist']} - {track['title']}" if track["artist"] else track["title"]
             data["song"] = result
         return data
-    except urllib.error.HTTPError as error:
-        status = "limited" if error.code == 429 else "temporary"
-        error.close()
-        return {"status": status, "searched": []}
     except (OSError, ValueError, TypeError):
         return {"status": "temporary", "searched": []}
 
@@ -96,5 +138,5 @@ def availability_notice(status, title):
     if status == "unavailable":
         return f"{label}未找到歌名、歌手和版本相符的可用音源，将继续下一曲。"
     if status == "limited":
-        return f"{label}的音源检索遇到调用限额，暂未完成；请稍后重试，这不代表没有相关音源。"
-    return f"{label}的部分音源服务暂时未响应，检索尚未完成，请重试。"
+        return f"{label}的音源检索遇到调用限额，暂未完成，将尝试下一首推荐；没有可播歌曲时会等待额度恢复后自动继续。"
+    return f"{label}的音源服务暂时未响应，检索尚未完成，将尝试下一首推荐。"

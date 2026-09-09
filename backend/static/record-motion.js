@@ -164,6 +164,7 @@ export function createRecordMotion(stages, audio) {
         frame = requestAnimationFrame(tick);
       } else {
         cancelAnimationFrame(frame); frame = null;
+        releaseAnalysis();
         audioContext?.suspend().catch(() => {});
       }
     }

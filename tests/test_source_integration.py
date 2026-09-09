@@ -55,7 +55,7 @@ class SourceAPI(unittest.IsolatedAsyncioTestCase):
         with patch.object(radio, "fetch_library", return_value=catalog), \
                 patch.object(radio, "select_songs", side_effect=selections), \
                 patch.object(radio, "verify_song", side_effect=check), \
-                patch.object(radio, "llm_json", return_value={"introductions": ["Next"] * 4}) as narrator:
+                patch.object(radio, "llm_json_async", return_value={"introductions": ["Next"] * 4}) as narrator:
             status, body = await request("/api/show", {})
         result = json.loads(body)
         self.assertEqual(status, 200)
@@ -68,7 +68,7 @@ class SourceAPI(unittest.IsolatedAsyncioTestCase):
         for reason, expected in (("unavailable", 422), ("limited", 429), ("temporary", 503)):
             with self.subTest(reason=reason), patch.object(radio, "fetch_library", return_value=[{"title": "Artist - Missing", "rel": "s/netease/1.mp3"}]), \
                     patch.object(radio, "verify_song", new=AsyncMock(return_value={"status": reason})), \
-                    patch.object(radio, "llm_json") as llm:
+                    patch.object(radio, "llm_json_async") as llm:
                 status, body = await request("/api/show", {})
                 self.assertEqual(status, expected)
                 self.assertNotIn("items", json.loads(body))
@@ -77,7 +77,7 @@ class SourceAPI(unittest.IsolatedAsyncioTestCase):
     async def test_requested_missing_song_has_notice_then_next_only_after_exhaustion(self):
         for reason in ("unavailable", "limited", "temporary"):
             with self.subTest(reason=reason), patch.object(radio, "fetch_library", return_value=[]), \
-                    patch.object(radio, "llm_json", return_value={"reply": "马上为你播放", "actions": [{"type": "play_song", "title": "不存在", "artist": "指定歌手"}]}), \
+                    patch.object(radio, "llm_json_async", return_value={"reply": "马上为你播放", "actions": [{"type": "play_song", "title": "不存在", "artist": "指定歌手"}]}), \
                     patch.object(radio, "verify_song", new=AsyncMock(return_value={"status": reason})):
                 status, body = await request("/api/intent", {"message": "听指定歌手的不存在"})
             result = json.loads(body)
@@ -85,14 +85,14 @@ class SourceAPI(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(result["items"], [])
             self.assertIn("不存在", result["notice"])
             self.assertEqual(result["availability"], reason)
-            self.assertEqual(result["actions"], [{"type": "next"}] if reason == "unavailable" else [])
+            self.assertEqual(result["actions"], [{"type": "next"}])
             self.assertNotIn("马上为你播放", body.decode())
 
     async def test_song_outside_catalog_can_be_requested_when_llm_fails(self):
         matched = {"title": "罗大佑 - 童年", "artist": "罗大佑", "source": "netease", "id": "109530",
                    "lyric_id": "999", "rel": "s/netease/109530.mp3", "_verified": True}
         with patch.object(radio, "fetch_library", return_value=[]), \
-                patch.object(radio, "llm_json", side_effect=TimeoutError()), \
+                patch.object(radio, "llm_json_async", side_effect=TimeoutError()), \
                 patch.object(radio, "verify_song", new=AsyncMock(return_value={"status": "available", "song": matched})) as resolve:
             status, body = await request("/api/intent", {"message": "请播放《罗大佑 - 童年》"})
         self.assertEqual(status, 200)

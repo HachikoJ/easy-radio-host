@@ -3,12 +3,18 @@
 # 读取 resolve_multi.py 生成的新歌单 (歌名\t歌手\tsource\tsource_id)
 # 1) /songs.txt -> 供 app fetch_library: 每行 "<DeepSeek标题>TAB<s/<src>/<id>.mp3>"
 # 2) /s/<src>/<id>.mp3 -> 从该音源取真实播放直链 -> 307 跳转
+import asyncio
+from contextvars import ContextVar
+from email.utils import parsedate_to_datetime
+from functools import partial
 import json
+import math
 import re
+import sqlite3
 import time
-from collections import OrderedDict, deque
+from collections import OrderedDict
 from concurrent.futures import Future
-from threading import Lock
+from threading import Event, Lock
 import urllib.parse
 import urllib.error
 import urllib.request
@@ -20,8 +26,10 @@ from starlette.background import BackgroundTask
 
 try:
     from musiclib.matching import SOURCES, artists, base_title, recording_match, simplified
+    from musiclib.quota import RollingQuota, default_quota_path
 except ModuleNotFoundError:
     from matching import SOURCES, artists, base_title, recording_match, simplified
+    from quota import RollingQuota, default_quota_path
 
 PLAYLIST = "/opt/easy-radio-host/musiclib/playlist.tsv"
 API = "https://music-api.gdstudio.xyz/api.php"
@@ -40,6 +48,7 @@ PLAY_PROBE_BYTES = 512
 PLAY_TIMEOUT = 5
 PLAY_BUDGET = 20
 PLAY_CACHE_TTL = 45
+PLAY_CANDIDATE_TTL = 6 * 3600
 PLAY_CACHE_SIZE = 128
 PLAY_CDN_DOMAINS = ("joox.com", "126.net", "163.com", "qq.com", "kuwo.cn", "sycdn.kuwo.cn",
                     "bilivideo.com", "bilivideo.cn", "bilibili.com", "akamaized.net",
@@ -47,17 +56,17 @@ PLAY_CDN_DOMAINS = ("joox.com", "126.net", "163.com", "qq.com", "kuwo.cn", "sycd
                     "scdn.co", "spotifycdn.com")
 _play_cache = OrderedDict()
 _play_cache_lock = Lock()
-API_LIMIT = 50
+_recording_cache = OrderedDict()
+API_LIMIT = 45
 API_WINDOW = 300
 API_CACHE_SIZE = 512
-_api_times = deque()
+_quota = RollingQuota(default_quota_path(), API_LIMIT, API_WINDOW)
 _api_cache = OrderedDict()
 _api_pending = {}
 _api_lock = Lock()
-_api_blocked_until = 0
+_emergency_cooldown_until = 0
 _unsupported = {}
-_resolve_pending = {}
-_resolve_lock = Lock()
+_request_cancel = ContextVar("request_cancel", default=None)
 RESOLVE_BUDGET = 44
 
 
@@ -68,16 +77,45 @@ class ResolveFailure(Exception):
         super().__init__(status)
 
 
+def _check_cancelled():
+    event = _request_cancel.get()
+    if event is not None and event.is_set():
+        raise ResolveFailure("cancelled")
+
+
+def _quota_state(reserve=False, cooldown=0):
+    global _emergency_cooldown_until
+    if cooldown:
+        _emergency_cooldown_until = max(_emergency_cooldown_until, time.monotonic() + cooldown)
+    emergency_wait = max(0, math.ceil(_emergency_cooldown_until - time.monotonic()))
+    try:
+        result = _quota.inspect(reserve=reserve and not emergency_wait, cooldown=cooldown)
+        if emergency_wait:
+            result.update(status="limited", retry_after=max(emergency_wait, result["retry_after"]))
+        return result
+    except (OSError, sqlite3.Error):
+        # If durable accounting fails, never issue an uncounted upstream call.
+        return {"status": "limited", "retry_after": API_WINDOW, "remaining": 0}
+
+
+def _upstream_retry(value):
+    try:
+        return max(1, int(value))
+    except (ValueError, TypeError):
+        try:
+            return max(1, math.ceil(parsedate_to_datetime(value).timestamp() - time.time()))
+        except (ValueError, TypeError, AttributeError, OverflowError):
+            return API_WINDOW
+
+
 def http_get(url, tries=1, timeout=PLAY_TIMEOUT):
     """All GD traffic shares one rolling quota, bounded cache and in-flight work."""
-    global _api_blocked_until
+    _check_cancelled()
     params = urllib.parse.parse_qs(urllib.parse.urlsplit(url).query)
     source = params.get("source", [""])[0]
     kind = params.get("types", [""])[0]
     now = time.monotonic()
     with _api_lock:
-        while _api_times and _api_times[0] <= now - API_WINDOW:
-            _api_times.popleft()
         cached = _api_cache.get(url)
         if cached and cached[0] > now:
             _api_cache.move_to_end(url)
@@ -86,18 +124,24 @@ def http_get(url, tries=1, timeout=PLAY_TIMEOUT):
             return 400, b"unsupported source"
         pending = _api_pending.get(url)
         if pending is None:
-            if _api_blocked_until > now or len(_api_times) >= API_LIMIT:
+            _check_cancelled()
+            if _quota_state(reserve=True)["status"] == "limited":
                 return 429, b""
-            _api_times.append(now)
             pending = _api_pending[url] = Future()
             owner = True
         else:
             owner = False
     if not owner:
-        try:
-            return pending.result(timeout=timeout)
-        except TimeoutError:
-            return 0, b""
+        deadline = time.monotonic() + timeout
+        while True:
+            _check_cancelled()
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return 0, b""
+            try:
+                return pending.result(timeout=min(0.1, remaining))
+            except TimeoutError:
+                continue
     result = (0, b"")
     try:
         req = urllib.request.Request(
@@ -111,12 +155,7 @@ def http_get(url, tries=1, timeout=PLAY_TIMEOUT):
         except urllib.error.HTTPError as e:
             result = (e.code, b"")
             if e.code == 429:
-                try:
-                    retry = max(1, min(300, int(e.headers.get("Retry-After", "300"))))
-                except (ValueError, TypeError, AttributeError):
-                    retry = 300
-                with _api_lock:
-                    _api_blocked_until = max(_api_blocked_until, time.monotonic() + retry)
+                _quota_state(cooldown=_upstream_retry((e.headers or {}).get("Retry-After")))
             e.close()
         except (OSError, ValueError):
             pass
@@ -144,20 +183,22 @@ def http_get(url, tries=1, timeout=PLAY_TIMEOUT):
 
 
 def _retry_after():
-    with _api_lock:
-        now = time.monotonic()
-        remaining = max(0, _api_blocked_until - now)
-        if len(_api_times) >= API_LIMIT:
-            remaining = max(remaining, _api_times[0] + API_WINDOW - now)
-        return max(1, int(remaining) + 1)
+    return max(1, _quota_state()["retry_after"])
+
+
+@app.get("/availability")
+def availability():
+    return _quota_state()
 
 
 def _api_data(kind, source, deadline, **params):
+    _check_cancelled()
     remaining = deadline - time.monotonic()
     if remaining <= 0:
         raise ResolveFailure("temporary")
     query = urllib.parse.urlencode({"types": kind, "source": source, **params})
     code, body = http_get(f"{API}?{query}", timeout=min(PLAY_TIMEOUT, remaining))
+    _check_cancelled()
     if code == 429:
         raise ResolveFailure("limited", _retry_after())
     if time.monotonic() >= deadline:
@@ -204,8 +245,8 @@ def songs_txt():
     return PlainTextResponse("\n".join(buf) + "\n", media_type="text/plain; charset=utf-8")
 
 
-@app.get("/lyrics/{source}/{song_id}.json")
 def lyrics(source: str, song_id: str):
+    _check_cancelled()
     if source not in LYRIC_SOURCES or not re.fullmatch(r"[A-Za-z0-9_+=.-]{1,200}", song_id):
         raise HTTPException(status_code=400, detail="invalid song identifier")
     key = (source, song_id)
@@ -218,7 +259,8 @@ def lyrics(source: str, song_id: str):
 
     query = urllib.parse.urlencode({"types": "lyric", "source": source, "id": song_id})
     try:
-        code, body = http_get(f"{API}?{query}", timeout=10)
+        code, body = http_get(f"{API}?{query}", timeout=PLAY_TIMEOUT)
+        _check_cancelled()
         if code == 429:
             raise HTTPException(status_code=429, detail="lyrics rate limited",
                                 headers={"Retry-After": str(_retry_after())})
@@ -278,6 +320,7 @@ def _has_audio_header(body):
 
 
 def _media_available(url, timeout):
+    _check_cancelled()
     if not _allowed_media_url(url):
         return False
     request = urllib.request.Request(url, headers={
@@ -287,8 +330,10 @@ def _media_available(url, timeout):
     try:
         opener = urllib.request.build_opener(_MediaRedirectHandler())
         with opener.open(request, timeout=timeout) as response:
-            return (response.status in (200, 206)
-                    and _has_audio_header(response.read(PLAY_PROBE_BYTES)))
+            available = (response.status in (200, 206)
+                         and _has_audio_header(response.read(PLAY_PROBE_BYTES)))
+            _check_cancelled()
+            return available
     except urllib.error.HTTPError as error:
         status = error.code
         error.close()
@@ -302,20 +347,37 @@ def _media_available(url, timeout):
 
 
 def _resolve_play_url(source, sid, refresh=False, deadline=None, strict=False):
+    _check_cancelled()
     key = (source, sid)
+    now = time.monotonic()
+    deadline = deadline or now + PLAY_BUDGET
     with _play_cache_lock:
         cached = _play_cache.get(key)
-        if not refresh and cached and cached[0] > time.monotonic():
+        if not refresh and cached and cached[0] > now:
             _play_cache.move_to_end(key)
             return cached[1]
-        _play_cache.pop(key, None)
-
-    deadline = deadline or time.monotonic() + PLAY_BUDGET
+    # Signed CDN URLs often outlive their short verification interval. Recheck
+    # them directly, including during GD cooldown, before asking for a new URL.
+    keep_candidate = False
+    if cached and cached[2] > now:
+        try:
+            if _media_available(cached[1], min(PLAY_TIMEOUT, max(0.1, deadline - time.monotonic()))):
+                with _play_cache_lock:
+                    _play_cache[key] = (time.monotonic() + PLAY_CACHE_TTL, cached[1], cached[2])
+                return cached[1]
+        except ResolveFailure as error:
+            if error.status == "cancelled":
+                raise
+            keep_candidate = True
+    if not keep_candidate:
+        with _play_cache_lock:
+            _play_cache.pop(key, None)
     checked = set()
     temporary = False
     # A nonempty signed URL can still return a CDN 404. Check a small range
     # before redirecting, keeping every fallback on the same recording ID.
     for br in ("320", "192", "128"):
+        _check_cancelled()
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             break
@@ -338,12 +400,15 @@ def _resolve_play_url(source, sid, refresh=False, deadline=None, strict=False):
                 if time.monotonic() >= deadline:
                     raise ResolveFailure("temporary")
                 with _play_cache_lock:
-                    _play_cache[key] = (time.monotonic() + PLAY_CACHE_TTL, url)
+                    now = time.monotonic()
+                    _play_cache[key] = (now + PLAY_CACHE_TTL, url, now + PLAY_CANDIDATE_TTL)
                     _play_cache.move_to_end(key)
                     while len(_play_cache) > PLAY_CACHE_SIZE:
                         _play_cache.popitem(last=False)
                 return url
         except ResolveFailure as failure:
+            if failure.status == "cancelled":
+                raise
             if failure.status == "limited":
                 if strict:
                     raise
@@ -380,6 +445,7 @@ def _resolve_recording(payload):
     searched, checked, failed = [], set(), False
 
     def attempt(source, row):
+        _check_cancelled()
         sid = row.get("url_id") or row.get("id", row.get("sid"))
         key = (source, str(sid))
         if not _valid_id(sid) or key in checked or key in excluded or not recording_match(title, artist, row):
@@ -388,6 +454,11 @@ def _resolve_recording(payload):
         url = _resolve_play_url(source, str(sid), deadline=deadline, strict=True)
         if not url:
             return None
+        with _play_cache_lock:
+            _recording_cache[key] = (time.monotonic() + PLAY_CANDIDATE_TTL, dict(row))
+            _recording_cache.move_to_end(key)
+            while len(_recording_cache) > PLAY_CACHE_SIZE:
+                _recording_cache.popitem(last=False)
         lyric_id = row.get("lyric_id") or sid
         return {"status": "available", "track": {
             "title": row.get("name", row.get("title")), "artist": " / ".join(artists(row.get("artist"))),
@@ -396,6 +467,21 @@ def _resolve_recording(payload):
         }, "searched": searched.copy()}
 
     try:
+        with _play_cache_lock:
+            candidates = list(_recording_cache.items())
+        for (source, sid), (expires, row) in reversed(candidates):
+            if expires <= time.monotonic() or (source, sid) in excluded or not recording_match(title, artist, row):
+                continue
+            if source not in searched:
+                searched.append(source)
+            try:
+                result = attempt(source, row)
+                if result:
+                    return result
+            except ResolveFailure as error:
+                if error.status == "cancelled":
+                    raise
+                failed = True
         # An old playlist ID is only a hint when its stored version also matches.
         if payload.source in SOURCES and _valid_id(payload.id):
             for row in load_playlist():
@@ -412,7 +498,7 @@ def _resolve_recording(payload):
                         if result:
                             return result
                     except ResolveFailure as error:
-                        if error.status == "limited":
+                        if error.status in ("limited", "cancelled"):
                             raise
                         failed = True
                     break
@@ -425,6 +511,7 @@ def _resolve_recording(payload):
         for page in (1, 2, 3):
             for query in queries:
                 for source in SOURCES:
+                    _check_cancelled()
                     if time.monotonic() >= deadline:
                         raise ResolveFailure("temporary")
                     if (source, query) in exhausted:
@@ -444,14 +531,14 @@ def _resolve_recording(payload):
                             try:
                                 result = attempt(source, row) if isinstance(row, dict) else None
                             except ResolveFailure as error:
-                                if error.status == "limited":
+                                if error.status in ("limited", "cancelled"):
                                     raise
                                 failed = True
                                 continue
                             if result:
                                 return result
                     except ResolveFailure as error:
-                        if error.status == "limited":
+                        if error.status in ("limited", "cancelled"):
                             raise
                         failed = True
         # Full pages beyond the bounded traversal are not proof of absence.
@@ -465,33 +552,61 @@ def _resolve_recording(payload):
         return result
 
 
-@app.post("/resolve")
 def resolve(payload: ResolveRequest):
-    key = (payload.title.strip(), payload.artist.strip(), payload.source, payload.id,
-           tuple(sorted((item.source, item.id) for item in payload.exclude)))
-    with _resolve_lock:
-        future = _resolve_pending.get(key)
-        owner = future is None
-        if owner:
-            future = _resolve_pending[key] = Future()
-    if not owner:
+    return _resolve_recording(payload)
+
+
+async def _run_for_request(request, function):
+    cancelled = Event()
+
+    def work():
+        token = _request_cancel.set(cancelled)
         try:
-            return future.result(timeout=RESOLVE_BUDGET + 1)
-        except TimeoutError:
-            return {"status": "temporary", "searched": []}
+            return function()
+        finally:
+            _request_cancel.reset(token)
+
+    worker = asyncio.create_task(asyncio.to_thread(work))
+    completed = False
+
+    def finish(task):
+        try:
+            result = task.result()
+            close = getattr(result, "_close_upstream", None)
+            if cancelled.is_set() and close:
+                close()
+        except (Exception, asyncio.CancelledError):
+            pass
+
+    worker.add_done_callback(finish)
     try:
-        result = _resolve_recording(payload)
-        future.set_result(result)
+        while not worker.done():
+            await asyncio.wait({worker}, timeout=0.1)
+            if await request.is_disconnected():
+                cancelled.set()
+                return Response(status_code=499)
+        result = await asyncio.shield(worker)
+        completed = True
         return result
-    except Exception as error:
-        future.set_exception(error)
-        raise
     finally:
-        with _resolve_lock:
-            _resolve_pending.pop(key, None)
+        if not completed:
+            cancelled.set()
+            if worker.done():
+                finish(worker)
+
+
+@app.post("/resolve")
+async def resolve_route(payload: ResolveRequest, request: Request):
+    return await _run_for_request(request, partial(resolve, payload))
+
+
+@app.get("/lyrics/{source}/{song_id}.json")
+async def lyrics_route(source: str, song_id: str, request: Request):
+    return await _run_for_request(request, partial(lyrics, source, song_id))
 
 
 def _stream_audio(url, range_header):
+    _check_cancelled()
     if not _allowed_media_url(url):
         raise HTTPException(status_code=502, detail="audio temporarily unavailable")
     if range_header and not re.fullmatch(r"bytes=(?:\d+-\d*|-\d+)", range_header):
@@ -527,11 +642,12 @@ def _stream_audio(url, range_header):
                 yield block
         finally:
             upstream.close()
-    return StreamingResponse(chunks(), status_code=upstream.status, media_type=content_type,
-                             headers=response_headers, background=BackgroundTask(upstream.close))
+    response = StreamingResponse(chunks(), status_code=upstream.status, media_type=content_type,
+                                 headers=response_headers, background=BackgroundTask(upstream.close))
+    response._close_upstream = upstream.close
+    return response
 
 
-@app.get("/s/{source}/{song_id}.mp3")
 def play(source: str, song_id: str, refresh: bool = False, stream: bool = False, request: Request = None):
     # FastAPI already decodes the path once; the library URLs may encode IDs twice.
     song_id = urllib.parse.unquote(song_id)
@@ -545,6 +661,11 @@ def play(source: str, song_id: str, refresh: bool = False, stream: bool = False,
         return RedirectResponse(url, headers={"Cache-Control": "no-store"})
     return Response(status_code=502, content="audio temporarily unavailable",
                     headers={"Cache-Control": "no-store"})
+
+
+@app.get("/s/{source}/{song_id}.mp3")
+async def play_route(source: str, song_id: str, request: Request, refresh: bool = False, stream: bool = False):
+    return await _run_for_request(request, partial(play, source, song_id, refresh, stream, request))
 
 
 # 兼容旧路径: /s/id/<id>.mp3  -> netease

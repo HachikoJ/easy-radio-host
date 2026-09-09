@@ -2,6 +2,7 @@
 # 主题化节目 / 生动口播 / 点歌互动 / 栏目包装 / 防重复
 # 曲库来自在线音乐代理; DeepSeek 编排; MiniMax TTS (v2, audio 为 hex 字符串)
 import asyncio
+import contextlib
 import csv
 import json
 import os
@@ -15,17 +16,19 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
+from fastapi.routing import APIRoute
+import aiohttp
 from pydantic import BaseModel, Field
 from typing import Annotated
 
 try:
     from recommendations import select_songs, track_key
     from speech_audio import normalize_speech
-    from music_sources import resolve_song, catalog_match, identity, availability_notice, SOURCES, IDENTIFIER
+    from music_sources import resolve_song_async, proxy_availability, catalog_match, identity, availability_notice, SOURCES, IDENTIFIER
 except ModuleNotFoundError:
     from backend.recommendations import select_songs, track_key
     from backend.speech_audio import normalize_speech
-    from backend.music_sources import resolve_song, catalog_match, identity, availability_notice, SOURCES, IDENTIFIER
+    from backend.music_sources import resolve_song_async, proxy_availability, catalog_match, identity, availability_notice, SOURCES, IDENTIFIER
 
 # ---------------- 配置 ----------------
 DEEPSEEK_KEY = os.getenv("DEEPSEEK_KEY", "").strip()
@@ -65,7 +68,31 @@ def profile_hint(profile):
             "选歌与口播请尽量贴近听众口味；歌单内没有强匹配时，选风格接近的并自然过渡。")
 
 
+class ConnectedRoute(APIRoute):
+    def get_route_handler(self):
+        handler = super().get_route_handler()
+
+        async def connected(request):
+            if request.url.path not in {"/api/show", "/api/intent", "/api/chat", "/api/playback/resolve"}:
+                return await handler(request)
+            await request.body()
+            task = asyncio.create_task(handler(request))
+            try:
+                while not task.done():
+                    if await request.is_disconnected():
+                        task.cancel()
+                        return Response(status_code=499)
+                    await asyncio.wait({task}, timeout=0.1)
+                return await task
+            finally:
+                if not task.done():
+                    task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
+        return connected
+
+
 app = FastAPI(title="听间 Tingjian · AI 音乐电台")
+app.router.route_class = ConnectedRoute
 
 # ---------------- 主题与包装 ----------------
 THEMES = [
@@ -143,7 +170,7 @@ def find_song(library, title):
 
 
 async def verify_song(song, exclude=()):
-    return await asyncio.to_thread(resolve_song, NAS_LIST_URL, song, exclude)
+    return await resolve_song_async(NAS_LIST_URL, song, exclude)
 
 
 def song_item(song, requested=False):
@@ -162,7 +189,7 @@ PERSONA = (
     '每段口播 40~110 字。始终严格只输出 JSON。'
 )
 
-def llm_json(user_text, max_tokens=900):
+def llm_request(user_text, max_tokens=900):
     body = json.dumps({
         "model": DEEPSEEK_MODEL,
         "messages": [{"role": "system", "content": PERSONA.replace("{HOST}", HOST_NAME)},
@@ -171,12 +198,25 @@ def llm_json(user_text, max_tokens=900):
         "temperature": 1.15,
         "max_tokens": max_tokens,
     }).encode()
-    req = urllib.request.Request(
+    return urllib.request.Request(
         DEEPSEEK_BASE + "/chat/completions", data=body,
         headers={"Content-Type": "application/json",
                  "Authorization": "Bearer " + DEEPSEEK_KEY})
-    with urllib.request.urlopen(req, timeout=60) as r:
+def llm_json(user_text, max_tokens=900):
+    with urllib.request.urlopen(llm_request(user_text, max_tokens), timeout=60) as r:
         data = json.loads(r.read().decode())
+    return json.loads(data["choices"][0]["message"]["content"])
+
+
+async def post_provider(req):
+    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=60)) as client:
+        async with client.post(req.full_url, data=req.data, headers=dict(req.header_items())) as response:
+            response.raise_for_status()
+            return await response.read()
+
+
+async def llm_json_async(user_text, max_tokens=900):
+    data = json.loads(await post_provider(llm_request(user_text, max_tokens)))
     return json.loads(data["choices"][0]["message"]["content"])
 
 def template_show(library, theme, tod):
@@ -189,7 +229,7 @@ def template_show(library, theme, tod):
     return show
 
 # ---------------- TTS (MiniMax 主; hex audio) ----------------
-def minimax_synth(text, path):
+async def minimax_synth(text, path):
     body = json.dumps({
         "model": MINIMAX_MODEL, "text": text, "stream": False,
         "voice_setting": {"voice_id": MINIMAX_VOICE, "speed": 1.0, "vol": 1.0, "pitch": 0},
@@ -201,8 +241,7 @@ def minimax_synth(text, path):
     req = urllib.request.Request(url, data=body, headers={
         "Content-Type": "application/json", "Authorization": "Bearer " + MINIMAX_KEY})
     try:
-        with urllib.request.urlopen(req, timeout=60) as r:
-            data = r.read()
+        data = await post_provider(req)
     except Exception as e:
         print("MiniMax 失败:", e)
         return False
@@ -213,7 +252,8 @@ def minimax_synth(text, path):
         hexaudio = j.get("data", {}).get("audio", "")
         if not hexaudio:
             print("MiniMax 无 audio:", str(j)[:200]); return False
-        Path(path).write_bytes(normalize_speech(bytes.fromhex(hexaudio)))
+        normalized_audio = await asyncio.to_thread(normalize_speech, bytes.fromhex(hexaudio))
+        Path(path).write_bytes(normalized_audio)
         return True
     except Exception as e:
         print("MiniMax 解析失败:", e, str(data[:160])); return False
@@ -222,7 +262,7 @@ async def tts_to_mp3(text, path):
     if MINIMAX_KEY:
         # 静默重试最多 3 次 (不通报), 偶发失败/限流可恢复
         for attempt in range(3):
-            if await asyncio.to_thread(minimax_synth, text, str(path)):
+            if await minimax_synth(text, str(path)):
                 return True
             await asyncio.sleep(0.4)
         print("MiniMax 3 次失败, 使用固定串场语音")
@@ -246,6 +286,51 @@ FALLBACK_LINES = [
 _fb_lock = asyncio.Lock()
 _fb_ready = None      # None=未初始化, True/False
 _fb_round = 0         # 轮换用
+
+ANNOUNCEMENT_LINES = {
+    "unavailable": "没有找到这首歌相符的可用音源，接下来尝试下一首推荐。",
+    "limited": "音源检索遇到调用限额，已停止新的检索请求。接下来尝试已有的推荐歌曲；没有可播歌曲时，等待额度恢复后自动继续。",
+    "temporary": "音源服务暂时没有响应，检索尚未完成。接下来尝试下一首推荐。",
+    "waiting": "目前没有可播放的歌曲，正在等待音源服务或调用额度恢复，稍后会自动继续播放推荐歌曲。",
+}
+_announcement_task = None
+
+
+async def prepare_announcements():
+    # Generate once at startup, never as part of an error or retry loop.
+    for reason, text in ANNOUNCEMENT_LINES.items():
+        path = VOICE_DIR / f"notice_v1_{reason}.mp3"
+        if not path.is_file() or not path.stat().st_size:
+            await tts_to_mp3(text, path)
+
+
+@app.on_event("startup")
+async def start_announcements():
+    global _announcement_task
+    _announcement_task = asyncio.create_task(prepare_announcements())
+
+
+@app.on_event("shutdown")
+async def stop_announcements():
+    if _announcement_task:
+        _announcement_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await _announcement_task
+
+
+@app.get("/api/playback/announcement/{reason}.mp3")
+def announcement_file(reason: str):
+    if reason not in ANNOUNCEMENT_LINES:
+        raise HTTPException(404)
+    path = VOICE_DIR / f"notice_v1_{reason}.mp3"
+    if not path.is_file() or not path.stat().st_size:
+        raise HTTPException(503, "播报缓存准备中", headers={"Retry-After": "30"})
+    return FileResponse(path, media_type="audio/mpeg", headers={"Cache-Control": "public, max-age=3600"})
+
+
+@app.get("/api/playback/availability")
+async def playback_availability():
+    return await proxy_availability(NAS_LIST_URL)
 
 async def ensure_fallback_voice():
     """确保至少一条固定串场语音可用; 返回是否可用"""
@@ -282,7 +367,7 @@ def _cleanup_old_voice():
         files = sorted(VOICE_DIR.glob("*.mp3"), key=lambda p: p.stat().st_mtime)
         if len(files) > 240:
             for f in files[: len(files) - 200]:
-                if f.name.startswith("fb_"):
+                if f.name.startswith(("fb_", "notice_")):
                     continue
                 f.unlink(missing_ok=True)
     except Exception as e:
@@ -346,8 +431,10 @@ async def make_show(library, theme, tod, tod_note, exclude, recommendation=None)
     songs, checks = await verify_recommendations(library, songs, theme, exclude, recommendation)
     if not songs:
         status = "limited" if "limited" in checks else "temporary" if "temporary" in checks else "unavailable"
+        quota = await playback_availability() if status == "limited" else {}
         raise HTTPException(429 if status == "limited" else 503 if status == "temporary" else 422,
-                            availability_notice(status, "本期候选歌曲"))
+                            {"status": status, "notice": availability_notice(status, "本期候选歌曲"),
+                             "retry_after": max(1, int(quota.get("retry_after", 30)))})
     recommendation_meta["count"] = len(songs)
     recommendation_meta["availability_checked"] = True
     failed = sum(status != "available" for status in checks)
@@ -363,7 +450,7 @@ async def make_show(library, theme, tod, tod_note, exclude, recommendation=None)
             '只输出 JSON: {"introductions":["第一首引介", "第二首引介"],"closing":"简短结束语"}。'
             f"introductions 必须恰好有 {len(songs)} 条，closing 可为空字符串。")
     try:
-        raw = await asyncio.to_thread(llm_json, user)
+        raw = await llm_json_async(user)
         introductions = raw.get("introductions")
         if not isinstance(introductions, list) or len(introductions) != len(songs):
             # Accept the older response shape only when its exact song order is
@@ -406,7 +493,13 @@ async def verify_recommendations(library, candidates, theme, exclude, recommenda
         batch = candidates[:target - len(verified)]
         tried.update(song["rel"] for song in batch)
         tasks = [asyncio.create_task(verify_song(song)) for song in batch]
-        done, pending = await asyncio.wait(tasks, timeout=remaining)
+        try:
+            done, pending = await asyncio.wait(tasks, timeout=remaining)
+        except asyncio.CancelledError:
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+            raise
         for task in tasks:
             if task in pending:
                 task.cancel()
@@ -535,7 +628,7 @@ async def api_intent(req: IntentReq):
     quoted = re.fullmatch(r"(?:请|帮我|麻烦)?\s*(?:播放|点播|放|我想听|想听|听)\s*《([^》]{1,500})》[。！!\s]*", msg)
     try:
         raw = ({"actions": [{"type": "play_song", "title": quoted.group(1), "artist": ""}]}
-               if quoted else await asyncio.to_thread(llm_json, user, max_tokens=700))
+               if quoted else await llm_json_async(user, max_tokens=700))
     except Exception as e:
         print("intent LLM 失败:", e)
         raw = {"reply": f"嗯，你说的是「{msg}」吗？我接着放歌陪你。", "actions": []}
@@ -549,6 +642,7 @@ async def api_intent(req: IntentReq):
         segs.append({"type": "talk", "text": reply})
     valid_actions = []
     notice, availability = "", ""
+    retry_after = 0
     song_requests = 0
     for a in actions:
         if not isinstance(a, dict):
@@ -563,6 +657,7 @@ async def api_intent(req: IntentReq):
             hit = catalog_match(library, title, artist)
             result = await verify_song(hit or {"title": title, "artist": artist})
             availability = result["status"]
+            retry_after = result.get("retry_after", 30 if availability in ("limited", "temporary") else 0)
             if result.get("song"):
                 hit = result["song"]
                 library = [hit]
@@ -572,8 +667,7 @@ async def api_intent(req: IntentReq):
                 notice = availability_notice(availability, f"{artist} - {title}" if artist else title)
                 # A deterministic visible reply cannot be lost to a TTS fallback.
                 segs = []
-                if availability == "unavailable":
-                    valid_actions.append({"type": "next"})
+                valid_actions.append({"type": "next"})
         elif t in ("pause", "resume", "next", "prev", "stop"):
             valid_actions.append({"type": t})
         elif t == "set_auto":
@@ -590,7 +684,7 @@ async def api_intent(req: IntentReq):
             if segs else []
     response = {"items": items, "actions": valid_actions}
     if notice:
-        response.update(notice=notice, availability=availability)
+        response.update(notice=notice, availability=availability, retry_after=retry_after)
     return response
 
 

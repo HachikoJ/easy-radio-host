@@ -2,6 +2,7 @@
 import importlib.util
 import io
 import json
+import tempfile
 from pathlib import Path
 import unittest
 from unittest.mock import patch
@@ -26,8 +27,11 @@ class LyricsProxy(unittest.TestCase):
     def setUp(self):
         proxy._lyric_cache.clear()
         proxy._api_cache.clear()
-        proxy._api_times.clear()
-        proxy._api_blocked_until = 0
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        quota = patch.object(proxy, "_quota", proxy.RollingQuota(Path(directory.name) / "quota.sqlite3"))
+        quota.start()
+        self.addCleanup(quota.stop)
 
     def test_joox_identifier_and_translation_are_preserved(self):
         sid = "bLnv0PqDX_qAlIqapc+Okw=="
@@ -43,7 +47,7 @@ class LyricsProxy(unittest.TestCase):
         self.assertIn("%3D%3D", request.full_url)
         self.assertEqual(result, {"lyric": "[00:01.00]Original test line",
                                   "translation": "[00:01.00]Test translation", "source": "joox"})
-        self.assertEqual(fetch.call_args.kwargs["timeout"], 10)
+        self.assertEqual(fetch.call_args.kwargs["timeout"], 5)
 
     def test_empty_lyrics_are_a_success(self):
         for data in ({"lyric": "", "tlyric": ""}, {}, {"lyric": None, "tlyric": None}):
@@ -107,7 +111,7 @@ class LyricsProxy(unittest.TestCase):
                 patch.object(proxy.urllib.request, "urlopen", side_effect=lambda *args, **kw: upstream({"lyric": "new line"})) as fetch:
             self.assertEqual(proxy.lyrics("netease", "1")["lyric"], "new line")
             self.assertEqual(fetch.call_count, 1)
-            with patch.object(proxy, "API_LIMIT", 1000):
+            with patch.object(proxy._quota, "limit", 1000):
                 for number in range(2, proxy.LYRIC_CACHE_SIZE + 2):
                     proxy.lyrics("netease", str(number))
             self.assertEqual(len(proxy._lyric_cache), proxy.LYRIC_CACHE_SIZE)
@@ -118,7 +122,11 @@ class LyricsRoute(unittest.IsolatedAsyncioTestCase):
     async def test_encoded_identifier_survives_the_asgi_route(self):
         proxy._lyric_cache.clear()
         proxy._api_cache.clear()
-        proxy._api_times.clear()
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        quota = patch.object(proxy, "_quota", proxy.RollingQuota(Path(directory.name) / "quota.sqlite3"))
+        quota.start()
+        self.addCleanup(quota.stop)
         sid = "bLnv0PqDX_qAlIqapc+Okw=="
         raw_path = "/lyrics/joox/" + urllib.parse.quote(sid, safe="") + ".json"
         messages = []

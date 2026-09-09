@@ -148,7 +148,7 @@ class RecommendationAPI(unittest.IsolatedAsyncioTestCase):
 
     async def show(self, library, llm, body=None):
         with patch.object(radio, "fetch_library", return_value=library), \
-             patch.object(radio, "llm_json", side_effect=llm), \
+             patch.object(radio, "llm_json_async", side_effect=llm), \
              patch.object(radio, "tts_to_mp3", new=AsyncMock(return_value=False)), \
              patch.object(radio, "ensure_fallback_voice", new=AsyncMock(return_value=False)):
             status, content = await request("/api/show", body or {"theme": "午后咖啡"})
@@ -230,7 +230,7 @@ class RecommendationAPI(unittest.IsolatedAsyncioTestCase):
         with patch.object(radio, "fetch_library", return_value=library), \
              patch.object(radio, "tts_to_mp3", new=AsyncMock(return_value=False)), \
              patch.object(radio, "ensure_fallback_voice", new=AsyncMock(return_value=False)), \
-             patch.object(radio, "llm_json", return_value={"reply": "", "actions": [{"type": "play_song", "title": library[0]["title"]}]}):
+             patch.object(radio, "llm_json_async", return_value={"reply": "", "actions": [{"type": "play_song", "title": library[0]["title"]}]}):
             status, content = await request("/api/intent", {"message": "再放这首", "exclude": [library[0]["title"]]})
         self.assertEqual(status, 200)
         self.assertEqual(next(row for row in json.loads(content)["items"] if row["kind"] == "song")["title"], library[0]["title"])

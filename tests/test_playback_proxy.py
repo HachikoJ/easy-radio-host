@@ -2,6 +2,7 @@
 import importlib.util
 import io
 import json
+import tempfile
 from pathlib import Path
 import unittest
 from unittest.mock import Mock, patch
@@ -30,8 +31,11 @@ class PlaybackProxy(unittest.TestCase):
     def setUp(self):
         proxy._play_cache.clear()
         proxy._api_cache.clear()
-        proxy._api_times.clear()
-        proxy._api_blocked_until = 0
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        quota = patch.object(proxy, "_quota", proxy.RollingQuota(Path(directory.name) / "quota.sqlite3"))
+        quota.start()
+        self.addCleanup(quota.stop)
 
     def test_broken_high_bitrates_fall_back_on_the_same_recording(self):
         sid = "bLnv0PqDX_qAlIqapc+Okw=="
@@ -63,8 +67,9 @@ class PlaybackProxy(unittest.TestCase):
             proxy._resolve_play_url("joox", "one")
             self.assertEqual(api.call_count, 1)
             proxy._resolve_play_url("joox", "one", refresh=True)
-            self.assertEqual(api.call_count, 2)
+            self.assertEqual(api.call_count, 1)
         with patch.object(proxy, "http_get", return_value=(503, b"")) as api, \
+                patch.object(proxy, "_media_available", return_value=False), \
                 patch.object(proxy.time, "monotonic", return_value=146):
             self.assertIsNone(proxy._resolve_play_url("joox", "one"))
             self.assertEqual(api.call_count, 3)
@@ -79,11 +84,27 @@ class PlaybackProxy(unittest.TestCase):
         self.assertNotIn(("joox", "0"), proxy._play_cache)
 
     def test_exhausted_budget_stops_further_requests(self):
-        with patch.object(proxy.time, "monotonic", side_effect=[0, 1, 2, 3, 21]), \
-                patch.object(proxy, "http_get", return_value=(503, b"")) as api:
+        now = [0]
+        def failure(*args, **kwargs):
+            now[0] = 21
+            return 503, b""
+        with patch.object(proxy.time, "monotonic", side_effect=lambda: now[0]), \
+                patch.object(proxy, "http_get", side_effect=failure) as api:
             self.assertIsNone(proxy._resolve_play_url("joox", "one"))
         api.assert_called_once()
         self.assertLessEqual(api.call_args.kwargs["timeout"], proxy.PLAY_TIMEOUT)
+
+    def test_expired_validation_reprobes_cached_url_during_quota_cooldown(self):
+        proxy._quota.inspect(cooldown=300)
+        url = "https://music.126.net/still-valid"
+        with patch.object(proxy.time, "monotonic", return_value=100):
+            proxy._play_cache[("netease", "one")] = (99, url, 1000)
+            with patch.object(proxy, "_media_available", return_value=True) as probe, \
+                    patch.object(proxy.urllib.request, "urlopen") as api:
+                self.assertEqual(proxy._resolve_play_url("netease", "one"), url)
+                self.assertEqual(proxy._resolve_play_url("netease", "one", refresh=True), url)
+            self.assertEqual(probe.call_count, 2)
+            api.assert_not_called()
 
     def test_invalid_api_urls_are_never_probed(self):
         urls = [None, 123, "file:///etc/passwd", "http://127.0.0.1/a", "https://joox.com.evil.test/a",

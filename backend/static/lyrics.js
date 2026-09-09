@@ -14,7 +14,7 @@ export function createLyricsExperience({ audio, state, seek, demo }) {
   const recordMotion = createRecordMotion([...document.querySelectorAll('.record-stage')], audio);
   let itemKey = null, controller = null, lines = [], timed = false, active = -2;
   let translations = [], offset = 0, ready = false, motion = true;
-  let browseTimer = null;
+  let browseTimer = null, suspended = false;
   try { motion = localStorage.getItem('tingjian.motion.v1') !== 'off'; } catch { /* Optional preference. */ }
   get('motion-enabled').checked = motion;
 
@@ -83,6 +83,7 @@ export function createLyricsExperience({ audio, state, seek, demo }) {
     preview(text);
   }
   async function load(item) {
+    if (suspended) return;
     controller?.abort();
     clearTimeout(browseTimer); browseTimer = null;
     const request = new AbortController(); controller = request;
@@ -122,7 +123,7 @@ export function createLyricsExperience({ audio, state, seek, demo }) {
       draw();
       if (!timed && lines.length) preview(lines[0].text);
     } catch {
-      if (controller !== request) return;
+      if (controller !== request || suspended) return;
       status(request.signal.aborted ? '歌词请求超时，请重试' : '歌词请求失败，请重试');
       panel.dataset.state = 'error'; get('lyrics-retry').hidden = false;
     } finally { clearTimeout(timeout); }
@@ -133,7 +134,7 @@ export function createLyricsExperience({ audio, state, seek, demo }) {
   function render() {
     const item = state(), key = item?.kind === 'song' ? `${item.url}|${item.title}|${item.source || ''}|${item.lyric_id || ''}` : item?.kind || '';
     place(); motionState();
-    if (key !== itemKey) { itemKey = key; load(item); }
+    if (!suspended && key !== itemKey) { itemKey = key; load(item); }
   }
   function resumeFollow() { clearTimeout(browseTimer); browseTimer = null; center(true); }
   const manualScroll = () => {
@@ -156,5 +157,15 @@ export function createLyricsExperience({ audio, state, seek, demo }) {
   window.addEventListener('resize', () => center(true));
   new ResizeObserver(() => requestAnimationFrame(() => center(true))).observe(viewport);
   render();
-  return { render };
+  return {
+    render,
+    suspend() {
+      suspended = true;
+      controller?.abort(); controller = null;
+      clearTimeout(browseTimer); browseTimer = null;
+      recordMotion.setPlaying(false);
+      if (!lines.length) itemKey = null;
+    },
+    resume() { suspended = false; }
+  };
 }
