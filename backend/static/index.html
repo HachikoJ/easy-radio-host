@@ -77,12 +77,14 @@
       </div>
       <aside class="conversation" id="conversation" aria-labelledby="chat-heading">
         <div class="section-heading"><h2 id="chat-heading">和小蓝聊聊</h2><span class="host-avatar small">蓝</span></div>
-        <div class="host-intro"><span class="tiny-label">小蓝 · 主持人</span><p>今天想听什么？<br>一首歌，或者一种心情，都可以。</p></div>
-        <div class="chat-log" id="chat-log" role="log" aria-live="polite" aria-label="与主持人的对话"></div>
-        <p class="chat-status" id="chat-status" aria-live="polite"></p>
-        <form class="chat-form" id="chat-form"><label class="sr-only" for="message">点歌或与主持人聊天</label><textarea id="message" placeholder="想听什么，说给小蓝…" rows="2" maxlength="1000"></textarea><div class="composer-footer"><span id="message-count">0 / 1000</span><button class="send-button" id="send" type="submit" aria-label="发送给小蓝" data-tip="发送给小蓝"><span class="icon" style="--icon:url(assets/Send.svg)"></span></button></div></form>
-        <p class="chat-error" id="chat-error" role="alert" hidden></p>
-        <div class="transcript" id="transcript" hidden><span class="tiny-label">此刻口播</span><p id="transcript-text"></p></div>
+        <div class="chat-log" id="chat-log" role="log" aria-live="polite" aria-label="与主持人的对话" tabindex="0">
+          <div class="host-intro"><span class="host-avatar" aria-hidden="true"><span class="icon" style="--icon:url(assets/Headphones.svg)"></span></span><span class="tiny-label">小蓝 · AI 主持人</span><h3>今天想听什么？</h3><p>一首歌，或者一种心情，都可以。</p></div>
+          <details class="transcript" id="transcript" hidden><summary class="tiny-label">此刻口播</summary><p id="transcript-text"></p></details>
+        </div>
+        <div class="chat-composer">
+          <p class="chat-error" id="chat-error" role="alert" hidden></p>
+          <form class="chat-form" id="chat-form" aria-busy="false"><label class="sr-only" for="message">点歌或与主持人聊天</label><textarea id="message" placeholder="想听什么，说给小蓝…" rows="2" maxlength="1000" aria-describedby="chat-error"></textarea><div class="composer-footer"><div class="composer-meta"><span class="chat-status" id="chat-status" role="status"></span><span id="message-count">0 / 1000</span></div><button class="send-button" id="send" type="submit" aria-label="发送给小蓝" data-tip="发送给小蓝" disabled><span class="icon" id="send-icon" style="--icon:url(assets/Send.svg)"></span></button></div></form>
+        </div>
       </aside>
     </div>
     <footer class="page-footer"><span>TINGJIAN / 听间</span><a id="credits-link" href="credits.html" target="_blank" rel="noopener noreferrer">开源致谢</a><a id="author-link" href="https://github.com/HachikoJ" target="_blank" rel="noopener noreferrer">联系作者 · GitHub</a><a class="icon-button" href="#top" aria-label="返回顶部" data-tip="返回顶部"><span class="icon" style="--icon:url(assets/ChevronDown.svg);transform:rotate(180deg)"></span></a></footer>

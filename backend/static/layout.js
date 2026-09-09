@@ -73,6 +73,22 @@ export function createQuietLayout({ icon }) {
   const shade = document.createElement('div'); shade.className = 'drawer-shade'; shade.hidden = true;
   document.body.append(shade, drawer);
   let opener = null, activePanel = null;
+  const fitChatViewport = () => {
+    drawer.classList.remove('compact-chat');
+    drawer.style.removeProperty('--chat-top');
+    if (activePanel !== 'conversation') return;
+    const viewport = window.visualViewport;
+    const visibleBottom = viewport ? viewport.offsetTop + viewport.height : innerHeight;
+    const playerTop = document.querySelector('.player-bar').getBoundingClientRect().top;
+    const bottom = Math.min(visibleBottom, playerTop) - 8;
+    drawer.style.setProperty('--chat-bottom', `${Math.max(8, innerHeight - bottom)}px`);
+    const room = bottom - drawer.getBoundingClientRect().top;
+    if (room < 240) drawer.style.setProperty('--chat-top', `${(viewport?.offsetTop || 0) + 8}px`);
+    drawer.classList.toggle('compact-chat', room < 360);
+  };
+  window.visualViewport?.addEventListener('resize', fitChatViewport);
+  window.visualViewport?.addEventListener('scroll', fitChatViewport);
+  window.addEventListener('resize', fitChatViewport);
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   function closeDrawer(restore = true) {
     if (!drawer.open) return;
@@ -87,9 +103,11 @@ export function createQuietLayout({ icon }) {
     if (drawer.open && activePanel === id) { closeDrawer(); return; }
     settings.open = false;
     opener = trigger; activePanel = id;
+    drawer.dataset.panel = id;
     for (const { node } of sections.values()) node.hidden = node !== selected.node;
     title.textContent = selected.title;
     if (!drawer.open) drawer.show();
+    fitChatViewport();
     shade.hidden = false;
     get('listening').inert = true;
     nav.querySelectorAll('a').forEach(link => link.classList.toggle('active', link.hash === `#${id}`));

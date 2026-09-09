@@ -299,13 +299,27 @@ async function generateShow({ replace = false, seed = '' } = {}) {
   } finally { if (generation === controller) generation = null; renderPlayback(); }
 }
 function addMessage(speaker, text, user = false) {
-  const entry = document.createElement('div'); entry.className = `chat-entry${user ? ' user' : ''}`;
+  const entry = document.createElement('div'); entry.className = `chat-entry${user ? ' user' : speaker === '点歌' ? ' song' : ''}`;
   const name = document.createElement('span'); name.className = 'speaker'; name.textContent = speaker;
+  if (!user) name.prepend(icon(speaker === '点歌' ? 'Music2' : 'Mic2'));
   const body = document.createElement('p'); body.textContent = text;
   entry.append(name, body); $('chat-log').append(entry);
-  while ($('chat-log').children.length > 40) $('chat-log').firstChild.remove();
+  while ($('chat-log').querySelectorAll('.chat-entry').length > 40) $('chat-log').querySelector('.chat-entry').remove();
   $('chat-log').scrollTop = $('chat-log').scrollHeight;
   return name;
+}
+function updateChatComposer() {
+  const input = $('message'), busy = Boolean(chatRequest);
+  $('message-count').textContent = `${input.value.length} / 1000`;
+  $('send').disabled = busy || !input.value.trim();
+  $('chat-form').setAttribute('aria-busy', String(busy));
+  const label = busy ? '正在发送' : '发送给小蓝';
+  $('send').setAttribute('aria-label', label); $('send').dataset.tip = label;
+  setIcon('send-icon', busy ? 'LoaderCircle' : 'Send');
+  if (input.clientWidth) {
+    input.style.height = 'auto';
+    input.style.height = `${Math.min(input.scrollHeight, parseFloat(getComputedStyle(input).maxHeight))}px`;
+  }
 }
 function applyActions(actions) {
   const theme = actions.find(action => action.type === 'play_theme');
@@ -323,7 +337,8 @@ async function sendChat(event, requestedMessage) {
   const message = requestedMessage || $('message').value.trim();
   if (!message || chatRequest) return;
   const controller = new AbortController(), version = programmeVersion; chatRequest = controller;
-  $('send').disabled = true; $('chat-error').hidden = true; $('chat-status').textContent = '小蓝正在回应…';
+  $('chat-error').hidden = true; $('chat-status').textContent = '小蓝正在回应…';
+  updateChatComposer();
   if (requestedMessage) $('library-status').textContent = '小蓝正在处理点播…';
   const label = addMessage('你', message, true);
   try {
@@ -332,7 +347,7 @@ async function sendChat(event, requestedMessage) {
     const items = normalizeItems(data.items), actions = Array.isArray(data.actions) ? data.actions.filter(action => action && typeof action.type === 'string') : [];
     if (!items.length && !actions.length) throw new Error('小蓝暂时没有回应，请再试一次。');
     if (!requestedMessage && $('message').value.trim() === message) $('message').value = '';
-    $('message-count').textContent = `${$('message').value.length} / 1000`;
+    updateChatComposer();
     for (const item of items) addMessage(item.kind === 'song' ? '点歌' : '小蓝', item.kind === 'song' ? item.title : item.text || item.title);
     for (const action of actions) if (action.type === 'set_auto') $('auto').checked = action.on === true;
     insert(items, () => { if (version === programmeVersion) applyActions(actions); });
@@ -340,8 +355,8 @@ async function sendChat(event, requestedMessage) {
     label.textContent = controller.signal.aborted && controller.signal.reason !== 'timeout' ? '你 · 已取消' : '你 · 未发送';
     if (controller.signal.aborted && controller.signal.reason !== 'timeout') return;
     $('chat-error').textContent = error.message || '消息发送失败，请重试。'; $('chat-error').hidden = false;
-    notify(error.message || '点播失败，请重试。');
-  } finally { if (chatRequest === controller) chatRequest = null; $('send').disabled = false; $('chat-status').textContent = ''; if (requestedMessage) $('library-status').textContent = ''; }
+    if (requestedMessage || !$('conversation').closest('dialog')?.open || $('conversation').hidden) notify(error.message || '点播失败，请重试。');
+  } finally { if (chatRequest === controller) chatRequest = null; updateChatComposer(); $('chat-status').textContent = ''; if (requestedMessage) $('library-status').textContent = ''; }
 }
 
 $('today').textContent = new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' }).format(new Date());
@@ -365,7 +380,8 @@ $('dismiss-notice').addEventListener('click', clearNotice);
 $('auto').addEventListener('change', () => { if ($('auto').checked && !current() && !generation) generateShow(); });
 $('chat-form').addEventListener('submit', sendChat);
 $('message').addEventListener('keydown', event => { if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) { event.preventDefault(); sendChat(); } });
-$('message').addEventListener('input', () => { $('message-count').textContent = `${$('message').value.length} / 1000`; });
+$('message').addEventListener('input', updateChatComposer);
+new ResizeObserver(updateChatComposer).observe($('message').parentElement);
 $('volume').addEventListener('input', event => { volume = Number(event.target.value) / 100; muted = volume === 0; updateVolume(); });
 $('mute').addEventListener('click', () => { muted = !muted; if (!muted && !volume) volume = .75; updateVolume(); });
 function updateVolume() {
