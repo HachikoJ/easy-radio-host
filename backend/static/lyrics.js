@@ -6,9 +6,18 @@ export function createLyricsExperience({ audio, state, seek, demo }) {
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   const focusMount = document.createElement('div'); focusMount.id = 'lyrics-focus';
   document.querySelector('.focus-copy').insertBefore(focusMount, document.querySelector('.up-next'));
-  for (const target of document.querySelectorAll('.cover-wrap,.focus-art')) {
+  const summaryMotion = document.createElement('div'); summaryMotion.className = 'summary-motion';
+  document.querySelector('.show-summary').insertBefore(summaryMotion, document.querySelector('.show-actions'));
+  for (const target of [...document.querySelectorAll('.cover-wrap,.focus-art'), summaryMotion, get('lyrics-visualizer'), get('player-motion')]) {
     const bars = document.createElement('span'); bars.className = 'playback-motion'; bars.setAttribute('aria-hidden', 'true');
-    for (let i = 0; i < 7; i++) bars.append(document.createElement('i'));
+    const count = target === get('lyrics-visualizer') ? 32 : target === get('player-motion') ? 5 : 15;
+    for (let i = 0; i < count; i++) {
+      const bar = document.createElement('i');
+      bar.style.setProperty('--beat-delay', `${-(i % 7) * .17}s`);
+      bar.style.setProperty('--beat-duration', `${.55 + (i % 5) * .13}s`);
+      bar.style.setProperty('--beat-height', `${40 + (i * 17 % 60)}%`);
+      bars.append(bar);
+    }
     target.append(bars);
   }
   let itemKey = null, controller = null, lines = [], timed = false, active = -2;
@@ -17,7 +26,11 @@ export function createLyricsExperience({ audio, state, seek, demo }) {
   get('motion-enabled').checked = motion;
 
   function motionState() {
-    document.body.classList.toggle('motion-playing', motion && !reduced.matches && !document.hidden && ready && !audio.paused && !audio.ended && !audio.seeking && state()?.kind === 'song');
+    const song = state()?.kind === 'song';
+    const moving = motion && !reduced.matches && !document.hidden && ready && !audio.paused && !audio.ended && !audio.seeking && song;
+    document.body.classList.toggle('motion-playing', moving);
+    document.body.classList.toggle('motion-disabled', !motion || reduced.matches);
+    get('motion-status').textContent = !motion ? '动效已关闭' : reduced.matches ? '系统已减少动态效果' : !song ? state() ? '主持人口播中' : '等待播放' : audio.error ? '音频暂不可用' : audio.paused ? '已暂停' : !ready || audio.seeking ? '缓冲中' : '正在播放';
   }
   for (const event of ['playing', 'canplay']) audio.addEventListener(event, () => { ready = true; motionState(); });
   for (const event of ['waiting', 'loadstart', 'emptied', 'ended', 'error']) audio.addEventListener(event, () => { ready = false; motionState(); });
@@ -44,6 +57,7 @@ export function createLyricsExperience({ audio, state, seek, demo }) {
       line.classList.toggle('current-line', i === active);
       if (i === active) line.setAttribute('aria-current', 'true'); else line.removeAttribute('aria-current');
     });
+    preview(active >= 0 ? lines[active].text || '间奏' : '前奏 · 歌词即将开始');
     center(force);
   }
   function draw() {
@@ -64,7 +78,15 @@ export function createLyricsExperience({ audio, state, seek, demo }) {
     }));
     active = -2; update(true);
   }
-  function status(text) { get('lyrics-status').textContent = text; }
+  function preview(text) {
+    get('player-lyric-text').textContent = text;
+    get('player-lyric').setAttribute('aria-label', `查看歌词：${text}`);
+  }
+  function status(text) {
+    get('lyrics-status').textContent = text;
+    get('lyrics-panel').dataset.state = lines.length ? timed ? 'synced' : 'plain' : 'empty';
+    preview(text);
+  }
   async function load(item) {
     controller?.abort();
     const request = new AbortController(); controller = request;
@@ -74,8 +96,10 @@ export function createLyricsExperience({ audio, state, seek, demo }) {
     get('lyrics-retry').hidden = true; get('translation-control').hidden = true;
     get('lyrics-timing').hidden = true;
     get('lyrics-source').textContent = '';
+    get('player-lyric').disabled = item?.kind !== 'song';
     if (item?.kind !== 'song') { status(item ? '主持人口播中' : '选择歌曲后显示歌词'); return; }
     status('正在获取歌词…');
+    panel.dataset.state = 'loading';
     const timeout = setTimeout(() => request.abort(), 18000);
     try {
       let data;
@@ -95,12 +119,14 @@ export function createLyricsExperience({ audio, state, seek, demo }) {
       get('translation-control').hidden = !translations.length || !timed;
       get('lyrics-timing').hidden = !timed;
       get('lyrics-source').textContent = demo ? '原创演示文案 · 非歌曲原词' : lines.length ? '歌词来源：GD 音乐 API · 版权归原权利人' : '';
-      status(!lines.length ? '暂无歌词，继续享受音乐' : timed ? '同步歌词' : '纯文本歌词');
+      status(!lines.length ? '该音源未返回歌词' : timed ? `同步歌词 · ${lines.length} 行` : '纯文本歌词 · 无时间戳');
       get('lyrics-retry').hidden = lines.length > 0;
       draw();
+      if (!timed && lines.length) preview(lines[0].text);
     } catch {
       if (controller !== request) return;
-      status('歌词暂时无法获取'); get('lyrics-retry').hidden = false;
+      status(request.signal.aborted ? '歌词请求超时，请重试' : '歌词请求失败，请重试');
+      panel.dataset.state = 'error'; get('lyrics-retry').hidden = false;
     } finally { clearTimeout(timeout); }
   }
   function place() {

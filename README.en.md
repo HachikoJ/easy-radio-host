@@ -33,8 +33,8 @@ Tingjian is an AI music radio for listeners who enjoy themed listening and are c
 - **Favorites and history:** Store up to 100 favorites and 50 recent tracks locally in your browser, deduplicated by title; history records songs only once playback actually starts.
 - **Song requests:** Chat with Xiaolan, request tracks, or control playback; cancel generation, retry failures, and keep your draft when a request fails.
 - **Online library:** Store track names, artists, sources, and IDs; resolve playback URLs on demand.
-- **Synchronized lyrics:** LRC line highlighting, tap-to-seek including 0 seconds, a follow toggle, and lyric delay adjustments from -10 to +10 seconds. Manual scrolling stops following; timestamped translations are optional. Plain text lyrics are not assigned guessed timings, and empty or failed results can be retried.
-- **Playback animation:** Lightweight CSS animation follows actual playback and stops during buffering, pauses, or when the page is hidden. It remembers the toggle and respects reduced-motion preferences; it is not a real-time spectrum.
+- **Synchronized lyrics:** The fixed player shows the current line; its lyric preview and the header lyric button open the immersive view. LRC highlighting, tap-to-seek including 0 seconds, follow control, and -10 to +10 second delay adjustment are available. Manual scrolling stops following; timestamped translations are optional. Loading, missing lyrics, failure, and timeout have distinct states; plain text stays untimed.
+- **Playback animation:** Visible CSS bars in the playback area, lyrics view, and fixed player follow actual playback and stop during buffering, pauses, or when the page is hidden. The toggle is remembered and system reduced-motion status is shown explicitly; this is not a real-time spectrum.
 
 ## Product preview
 

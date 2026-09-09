@@ -328,6 +328,15 @@ $('play').addEventListener('click', togglePlay);
 $('previous').addEventListener('click', previous);
 $('next').addEventListener('click', advance);
 $('stop').addEventListener('click', stop);
+function showLyrics() {
+  listening?.setFocus(true);
+  $('lyrics-panel').scrollIntoView({ block: 'center', behavior: 'auto' });
+  $('lyrics-lines').focus({ preventScroll: true });
+  $('lyrics-follow').checked = true;
+  $('lyrics-follow').dispatchEvent(new Event('change'));
+}
+$('lyrics-toggle').addEventListener('click', showLyrics);
+$('player-lyric').addEventListener('click', showLyrics);
 $('retry').addEventListener('click', () => { const action = retryAction; clearNotice(); action?.(); });
 $('dismiss-notice').addEventListener('click', clearNotice);
 $('auto').addEventListener('change', () => { if ($('auto').checked && !current() && !generation) generateShow(); });
