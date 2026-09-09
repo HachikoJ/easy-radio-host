@@ -15,7 +15,7 @@
 
 **选一个主题，把接下来的时间交给音乐。**
 
-听间是一个面向喜欢主题听歌、愿意自行部署的听众的 AI 音乐电台。主持人「小蓝」选歌、串联话题并合成口播，浏览器连续播放「口播 → 歌曲 → 口播」。歌曲来自在线音乐 API，无需准备本地音乐文件。
+听间是一个面向喜欢主题听歌、愿意自行部署的听众的 AI 音乐电台。推荐引擎结合主题和可选偏好选歌，主持人「小蓝」串联话题并合成口播，浏览器连续播放「口播 → 歌曲 → 口播」。歌曲来自在线音乐 API，无需准备本地音乐文件。
 
 **项目地址：** [HachikoJ/easy-radio-host](https://github.com/HachikoJ/easy-radio-host)
 
@@ -23,7 +23,10 @@
 
 ## 核心体验
 
-- **六个主题**：午后咖啡、城市漫游、深夜安眠、怀旧金曲、元气早班、心情小站；DeepSeek 根据主题和歌单编排节目。
+- **六个主题**：午后咖啡、城市漫游、深夜安眠、怀旧金曲、元气早班、心情小站；程序筛选歌曲，DeepSeek 按选定顺序编排口播。
+- **多路推荐**：融合主题、收藏歌曲、收藏歌手、部署者配置的歌手偏好及探索候选；支持从当前歌曲延伸同歌手作品，展示实际选歌依据。
+- **去重与多样性**：一期内歌曲不重复，优先避开最近播放并分散歌手；候选不足时缩短节目，必要的近期回补和歌手限制放宽会标明。
+- **自主偏好**：「按我的偏好选歌」默认关闭；开启后才将本地收藏、历史和「少推荐」标题用于本次推荐。「少推荐」可撤回，普通跳过与播放失败不视为不喜欢，主动点歌仍可播放指定歌曲。
 - **主持人口播**：MiniMax 合成主持人声音，支持 edge-tts 降级。
 - **连续播放**：节目单、上一段与下一段、进度和音量控制，支持自动续播与停止。
 - **专注收听**：桌面与手机适配，明暗配色和沉浸模式，支持键盘及兼容浏览器的系统媒体控制。
@@ -63,12 +66,21 @@
 
 这两张截图来自明确标注的演示模式，使用原创器乐与原创演示文案，不收录第三方歌曲原词。
 
+### 推荐与偏好
+
+<img src="docs/radio-recommendations.png" alt="听间桌面推荐界面：偏好开关、歌曲推荐依据与少推荐管理" width="100%">
+
+<img src="docs/radio-recommendations-mobile.png" alt="听间手机推荐界面：本地偏好和歌曲推荐操作" width="375">
+
+推荐截图展示实际界面；演示模式中的固定曲目和理由仅用于预览，不代表真实服务的推荐效果。
+
 ## 工作原理
 
 ```text
 浏览器
   → 主应用 :8100
-      → DeepSeek 编排节目
+      → 多路候选融合、近期过滤、去重与歌手分散
+      → DeepSeek 按选定歌曲顺序编排口播
       → MiniMax / edge-tts 合成口播
       → 在线曲库代理 :8001 读取歌单
   ← 口播与歌曲播放清单
@@ -76,6 +88,8 @@
 ```
 
 曲库代理读取 `musiclib/playlist.tsv`，通过 `/songs.txt` 提供标题与相对路径；通过 `/s/<source>/<id>.mp3` 获取歌曲地址并返回 307 跳转。歌曲音频不落盘，生成的口播文件保存在服务端 `DATA_DIR/voice/`（腾讯云部署为 `/var/lib/tingjian/voice/`）。
+
+推荐仅使用当前曲库及可用元数据，不连接 Embeat 的模型、向量库或数据集。主题匹配使用本项目策划的标签，不声称是声学分析或协同过滤。默认选取 4 首，候选不足时缩短；模型失败时仍按同一选歌结果生成模板口播。详细规则、隐私边界和验证方法见 [推荐设计与 Embeat 参考说明](docs/EMBEAT-ADAPTATION.md)。
 
 ## 如何运行
 
@@ -130,6 +144,24 @@ node scripts/serve-demo.mjs
 | 曲库代理 :8001 | GET | `/s/<source>/<id>.mp3` | 获取直链并跳转 |
 | 同域 `/music/` → 曲库代理 :8001 | GET | `/music/lyrics/{source}/{song_id}.json` | 获取当前歌曲歌词及可用译文；代理直连路径为 `/lyrics/{source}/{song_id}.json` |
 
+`POST /api/show` 保留原有 `theme` 和 `exclude`，新增可选 `recommendation`：
+
+```json
+{
+  "theme": "午后咖啡",
+  "exclude": [],
+  "recommendation": {
+    "personalize": false,
+    "favorites": [],
+    "history": [],
+    "disliked": [],
+    "seed": ""
+  }
+}
+```
+
+`favorites`、`history`、`disliked` 为标题数组，仅在 `personalize: true` 时参与推荐；`seed` 为主动选择的同歌手延伸起点标题。歌曲项的 `recommendation.sources` 和 `recommendation.reason` 返回实际候选来源与推荐理由，`meta.recommendation` 提供候选和降级信息。旧客户端可省略新增字段；主动点歌仍使用 `/api/intent`。
+
 ## 歌单维护
 
 在部署目录 `/opt/easy-radio-host` 编辑 `musiclib/playlist-source.tsv`，每行填写「歌名 + Tab + 歌手」。备份现有的 `musiclib/playlist.tsv` 后运行：
@@ -144,7 +176,9 @@ node scripts/serve-demo.mjs
 
 - API Key、Cookie 和 `radio.env` 不得提交到 GitHub。
 - 节目主题、对话和曲目元数据会发送至相关 AI 或音乐服务；口播音频与运行数据保存在服务端。
-- 收藏与历史仅在当前浏览器保存标题、主题和时间，不跨设备同步；演示与正式记录隔离。清除浏览器站点数据会丢失这些记录，禁用本地存储时仅在当前页面保留。
+- 收藏、历史和「少推荐」记录保存在当前浏览器，不跨设备同步；演示与正式记录隔离。清除浏览器站点数据会丢失这些记录，禁用本地存储时仅在当前页面保留。
+- 「按我的偏好选歌」默认关闭。开启后，收藏、历史和「少推荐」标题随每次节目请求发往听间服务器，仅在本次请求中使用，不新增服务端偏好档案。DeepSeek 只接收选定歌曲及节目上下文，不接收这些完整偏好列表；关闭后不再发送这些本地偏好。当前会话的近期歌曲仍用于减少重复，同歌手延伸会发送主动选定的起点标题。
+- 服务器已有的全局歌手偏好配置属于部署者配置，不是每位听众的独立档案；推荐理由会区分该来源与浏览器本地收藏。
 - 再次点播会按标题重新请求匹配与播放地址；收藏不保存精确歌曲 ID 或永久音频链接，可能匹配到不同版本。
 - DeepSeek、MiniMax 等服务可能产生费用，价格与额度以各服务商为准。
 - AI 生成的口播不保证事实准确；歌曲可用性、版本匹配和响应时间依赖第三方服务。
@@ -159,6 +193,7 @@ node scripts/serve-demo.mjs
 - [行为准则](CODE_OF_CONDUCT.md) · [安全政策](SECURITY.md)。
 - [更新记录](CHANGELOG.md) · [协作约定](AGENTS.md)。
 - [设计约定](DESIGN.md) · [Claudio 能力适配与后续路线](docs/CLAUDIO-ADAPTATION.md)。
+- [推荐设计与 Embeat 参考说明](docs/EMBEAT-ADAPTATION.md)：候选融合、边界、降级规则与评测。
 - [持续集成](https://github.com/HachikoJ/easy-radio-host/actions)：Python 语法、接口契约及前端静态服务检查。
 
 ## 致谢
@@ -166,6 +201,7 @@ node scripts/serve-demo.mjs
 - [easy-radio-host 原始项目](https://gitee.com/weak0001/easy-radio-host)，作者 `weak0001`；保留原作者署名与版权归属。
 - [Claudio](https://github.com/hllqkb/Claudio)，作者 `hllqkb`，MIT；听间前端参考其沉浸播放、明暗主题、收藏/历史和系统媒体控制交互，采用独立实现。详见[第三方来源与授权](THIRD_PARTY_NOTICES.md)，含来源版本与完整许可文本。
 - [Qiaomu Music Player Web](https://github.com/joeseesun/qiaomu-music-player-web)，作者 Qiaomu / 向阳乔木，MIT；参考歌词跟随、点按跳播和播放动效等通用交互并独立实现，未复制源码或资产。
+- [Embeat](https://github.com/gdstudio-org/Embeat/tree/7617a505ec42f109685802d1a3319e1957ac0a99)，GD Studio；借鉴多路候选融合、去重、多样性控制及可解释推荐的通用思路，独立实现。参考版本的 README 与根许可证存在适用范围差异，未复制其源码、模型、数据或品牌；详见[许可核查记录](THIRD_PARTY_NOTICES.md#embeat)。
 - [lrc-kit 1.2.1](https://www.npmjs.com/package/lrc-kit/v/1.2.1)，Copyright (c) 2016 Weirong Xu，MIT；用于解析 LRC，保留[完整许可](backend/static/vendor/lrc-kit/LICENSE)和[源码改动记录](THIRD_PARTY_NOTICES.md#lrc-kit)。
 - [Lucide](https://lucide.dev) 提供 ISC 授权的界面图标；[Unsplash](https://unsplash.com) 提供主题摄影，逐图来源见[资产来源](backend/static/assets/SOURCES.md)。
 - [在线音乐 API](https://music-api.gdstudio.xyz/api.php)，提供多音源搜索与取链。

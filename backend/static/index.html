@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="listening.css">
   <link rel="stylesheet" href="lyrics.css">
+  <link rel="stylesheet" href="recommendations.css">
   <script src="listening.js" defer></script>
   <script src="app.js" type="module"></script>
 </head>
@@ -35,7 +36,7 @@
     <header class="page-header"><div class="page-greeting"><p class="eyebrow" id="today"></p><h1>留一点时间，给音乐。</h1></div><a class="focus-brand" href="#listening"><img src="assets/brand.svg" alt="" width="36" height="36"><strong>听间</strong></a><span class="demo-badge" id="demo-badge" hidden>演示节目</span><div class="view-actions"><button class="icon-button" id="appearance" aria-label="切换深色模式" data-tip="切换深色模式"><span class="icon" id="appearance-icon" style="--icon:url(assets/Moon.svg)"></span></button><button class="icon-button" id="focus-toggle" aria-label="进入沉浸模式" aria-pressed="false" data-tip="进入沉浸模式"><span class="icon" id="focus-icon" style="--icon:url(assets/Maximize.svg)"></span></button><a class="icon-button" href="https://github.com/HachikoJ/easy-radio-host" target="_blank" rel="noopener noreferrer" aria-label="GitHub 项目" data-tip="GitHub 项目"><span class="icon" style="--icon:url(assets/ArrowUpRight.svg)"></span></a></div></header>
     <section class="focus-stage" id="focus-stage" aria-label="沉浸收听" hidden>
       <figure class="focus-art"><img id="focus-cover" src="assets/coffee.jpg" alt="午后咖啡主题封面" width="600" height="600"><figcaption id="focus-caption">午后咖啡 · 主题封面</figcaption></figure>
-      <div class="focus-copy"><p class="eyebrow" id="focus-status">准备就绪</p><h1 id="focus-title" tabindex="-1">午后咖啡</h1><p class="focus-subtitle" id="focus-subtitle">小蓝 · 主题电台</p><button class="icon-button favorite-action" id="focus-favorite" aria-label="收藏当前歌曲" aria-pressed="false" data-tip="收藏当前歌曲" disabled><span class="icon" style="--icon:url(assets/Heart.svg)"></span></button><div class="focus-note" id="focus-note" hidden><p class="tiny-label">小蓝 · 此刻口播</p><p id="focus-text"></p></div><div class="up-next"><span>接下来</span><p id="focus-next">节目单尚未生成</p></div></div>
+      <div class="focus-copy"><p class="eyebrow" id="focus-status">准备就绪</p><h1 id="focus-title" tabindex="-1">午后咖啡</h1><p class="focus-subtitle" id="focus-subtitle">小蓝 · 主题电台</p><div class="song-actions"><button class="icon-button favorite-action" id="focus-favorite" aria-label="收藏当前歌曲" aria-pressed="false" data-tip="收藏当前歌曲" disabled><span class="icon" style="--icon:url(assets/Heart.svg)"></span></button><button class="icon-button" id="focus-related" aria-label="生成同歌手延伸节目" data-tip="同歌手延伸" disabled><span class="icon" style="--icon:url(assets/Radio.svg)"></span></button><button class="icon-button" id="focus-dislike" aria-label="少推荐这首" aria-pressed="false" data-tip="少推荐这首" disabled><span class="icon" style="--icon:url(assets/ThumbsDown.svg)"></span></button></div><p class="recommendation-reason" id="focus-recommendation-reason" hidden></p><div class="focus-note" id="focus-note" hidden><p class="tiny-label">小蓝 · 此刻口播</p><p id="focus-text"></p></div><div class="up-next"><span>接下来</span><p id="focus-next">节目单尚未生成</p></div></div>
     </section>
     <div class="workspace">
       <div class="listen-column">
@@ -44,13 +45,24 @@
           <div class="show-summary">
             <p class="show-status"><span class="status-dot" id="status-dot"></span><span id="show-status" aria-live="polite">准备就绪</span></p>
             <p class="selected-theme" id="show-theme">午后咖啡</p>
-            <div class="now-heading"><h2 id="now-title">午后咖啡</h2><button class="icon-button favorite-action" id="favorite" aria-label="收藏当前歌曲" aria-pressed="false" data-tip="收藏当前歌曲" disabled><span class="icon" style="--icon:url(assets/Heart.svg)"></span></button></div>
+            <div class="now-heading"><h2 id="now-title">午后咖啡</h2><div class="song-actions"><button class="icon-button favorite-action" id="favorite" aria-label="收藏当前歌曲" aria-pressed="false" data-tip="收藏当前歌曲" disabled><span class="icon" style="--icon:url(assets/Heart.svg)"></span></button><button class="icon-button" id="related" aria-label="生成同歌手延伸节目" data-tip="同歌手延伸" disabled><span class="icon" style="--icon:url(assets/Radio.svg)"></span></button><button class="icon-button" id="dislike" aria-label="少推荐这首" aria-pressed="false" data-tip="少推荐这首" disabled><span class="icon" style="--icon:url(assets/ThumbsDown.svg)"></span></button></div></div>
+            <p class="recommendation-reason" id="recommendation-reason" hidden></p>
             <p class="show-slogan" id="show-slogan">忙里偷闲的一杯歌</p>
             <p class="host-byline">小蓝主持 <span>·</span> 音乐与片刻陪伴</p>
             <div class="show-actions"><button class="primary-button" id="generate"><span class="icon" style="--icon:url(assets/Play.svg)"></span><span id="generate-label">开始收听</span></button><button class="icon-button" id="cancel-generate" aria-label="取消生成" data-tip="取消生成" hidden><span class="icon" style="--icon:url(assets/X.svg)"></span></button></div>
             <label class="toggle-label"><input id="auto" type="checkbox" role="switch" checked><span class="switch" aria-hidden="true"></span><span>连续播放下一期</span></label>
           </div>
         </section>
+        <details class="recommendation-settings" id="recommendation-settings">
+          <summary><span>选歌偏好</span><small id="recommendation-state">主题选歌</small><span class="icon" style="--icon:url(assets/ChevronDown.svg)" aria-hidden="true"></span></summary>
+          <div class="recommendation-options">
+            <label class="toggle-label"><input id="personalize" type="checkbox" role="switch" aria-describedby="recommendation-consent"><span class="switch" aria-hidden="true"></span><span>按我的偏好选歌</span></label>
+            <p class="recommendation-consent" id="recommendation-consent">开启后，收藏、最近收听与少推荐列表中的歌曲标题会随节目请求发送至听间服务器，仅用于本次选歌，不在服务器保存。所选曲目会交给 DeepSeek 生成口播。关闭后停止发送本地偏好记录。</p>
+            <details><summary id="disliked-summary">少推荐的歌曲<span id="disliked-count">0</span></summary><p class="library-empty" id="disliked-empty">还没有少推荐的歌曲</p><ul class="disliked-list" id="disliked-list" aria-label="少推荐的歌曲"></ul></details>
+            <p class="recommendation-storage" id="recommendation-storage" role="status"></p>
+          </div>
+        </details>
+        <p class="recommendation-summary" id="recommendation-summary" role="status" hidden></p>
         <div id="lyrics-home">
           <section class="lyrics-panel" id="lyrics-panel" aria-label="歌词">
             <div class="lyrics-heading"><h2>歌词</h2><label><input id="motion-enabled" type="checkbox" role="switch" checked>播放动效</label></div>

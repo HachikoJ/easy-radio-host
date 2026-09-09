@@ -2,6 +2,7 @@
 # 主题化节目 / 生动口播 / 点歌互动 / 栏目包装 / 防重复
 # 曲库来自在线音乐代理; DeepSeek 编排; MiniMax TTS (v2, audio 为 hex 字符串)
 import asyncio
+import csv
 import json
 import os
 import re
@@ -13,7 +14,13 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from typing import Annotated
+
+try:
+    from recommendations import select_songs
+except ModuleNotFoundError:
+    from backend.recommendations import select_songs
 
 # ---------------- 配置 ----------------
 DEEPSEEK_KEY = os.getenv("DEEPSEEK_KEY", "").strip()
@@ -100,7 +107,28 @@ def fetch_library():
         title = re.sub(r"\.(mp3|wav|flac|m4a|aac)$", "", name, flags=re.I)
         title = re.sub(r"\[mqms\d*\]", "", title).strip()
         out.append({"rel": rel, "title": title})
-    return out
+    return enrich_library(out)
+
+
+def enrich_library(library):
+    """Attach independently curated scene tags only to identified catalog rows."""
+    root = Path(__file__).resolve().parents[1]
+    try:
+        catalog = json.loads((root / "backend" / "recommendation_catalog.json").read_text("utf-8"))
+        with (root / "musiclib" / "playlist.tsv").open(encoding="utf-8") as stream:
+            rows = list(csv.reader((line for line in stream if not line.startswith("#")), delimiter="\t"))
+        metadata = {}
+        for row in rows:
+            if len(row) < 3:
+                continue
+            title, artist = row[:2]
+            source, sid = row[2:4] if len(row) >= 4 else ("netease", row[2])
+            rel = f"s/{source}/{urllib.parse.quote(sid)}.mp3"
+            key = f"{artist} - {title}"
+            metadata[rel] = {"artist": artist, "themes": catalog.get("songs", {}).get(key, [])}
+        return [dict(song, **metadata.get(song["rel"], {})) for song in library]
+    except (OSError, ValueError, TypeError):
+        return library
 
 def song_url(rel):
     return NAS_BASE_URL.rstrip("/") + "/" + urllib.parse.quote(rel, safe="/")
@@ -136,19 +164,12 @@ def llm_json(user_text, max_tokens=900):
     return json.loads(data["choices"][0]["message"]["content"])
 
 def template_show(library, theme, tod):
-    import random
-    songs = random.sample(library, min(3, len(library)))
-    show = [
-        {"type": "talk", "text": f"{tod}，欢迎来到《{theme['name']}》，{theme['slogan']}。"
-                                   f"我是{HOST_NAME}，先来一首吧。"},
-        {"type": "song", "title": songs[0]["title"]},
-        {"type": "talk", "text": f"喜欢刚才的旋律吗？咱们继续往下听。"},
-        {"type": "song", "title": songs[1]["title"]},
-        {"type": "talk", "text": f"最后这首歌，送给正在收听的你。"},
-        {"type": "song", "title": songs[2]["title"]},
-        {"type": "talk", "text": f"今天的《{theme['name']}》就到这里，我是{HOST_NAME}，"
-                                   "愿你带着好心情入睡。"},
-    ]
+    show = []
+    for index, song in enumerate(library):
+        text = (f"{tod}，欢迎来到《{theme['name']}》，{theme['slogan']}。我是{HOST_NAME}。"
+                if index == 0 else "让音乐继续陪伴你。")
+        show.extend([{"type": "talk", "text": f"{text}接下来听《{song['title']}》。"},
+                     {"type": "song", "title": song["title"], "rel": song["rel"]}])
     return show
 
 # ---------------- TTS (MiniMax 主; hex audio) ----------------
@@ -265,12 +286,15 @@ async def segments_to_items(library, segments, key, add_song_fallback=True):
                           "title": "主持人", "ok": False})
         elif kind == "song":
             title = (seg.get("title") or "").strip()
-            hit = find_song(library, title)
+            hit = (next((song for song in library if song["rel"] == seg["rel"]), None)
+                   if "rel" in seg else find_song(library, title))
             if not hit:
                 print("歌单中未找到:", title)
                 continue
             items.append({"kind": "song", "url": song_url(hit["rel"]), "text": "",
                           "title": hit["title"]})
+            if "recommendation" in hit:
+                items[-1]["recommendation"] = hit["recommendation"]
     if add_song_fallback and not any(i["kind"] == "song" for i in items) and library:
         items.append({"kind": "song", "url": song_url(library[0]["rel"]),
                       "text": "", "title": library[0]["title"]})
@@ -294,31 +318,62 @@ async def segments_to_items(library, segments, key, add_song_fallback=True):
                         it.pop("url", None)
     return items
 
-async def make_show(library, theme, tod, tod_note, exclude):
-    titles = "\n".join(f"- {t}" for t in library[:80])
-    excl = "、".join(exclude[:10]) or "（无）"
-    ph = profile_hint(load_profile())
+async def make_show(library, theme, tod, tod_note, exclude, recommendation=None):
+    songs, recommendation_meta = select_songs(
+        library, theme["name"], exclude, recommendation, load_profile())
+    if not songs:
+        raise HTTPException(422, "没有可推荐歌曲，请调整少推荐列表或换一首作为推荐起点")
+    titles = json.dumps([song["title"] for song in songs], ensure_ascii=False)
     user = (f"现在是{theme['name']}时段：{tod}，{tod_note}。本期栏目《{theme['name']}》，"
             f"口号：{theme['slogan']}。风格：{theme['brief']}。"
-            f"最近已经播过这些，本期请避免重复：{excl}。"
-            f"请编一期完整的栏目：{theme['brief']}，共 3~5 首歌，每首歌前都要有一句口播引介，"
-            f"开场第一句要先自然呼应听众口味画像（比如提到他最近常听/偏好的风格或艺人），"
-            f"再进入栏目主题；结束语也可回到口味。口播可偶尔引用一句歌词或感受，别说空话套话。\n\n"
-            f"{ph}\n可选歌单:\n{titles}\n\n"
-            '输出 JSON: {"show":[{"type":"talk","text":"..."},{"type":"song","title":"歌单原标题"}]}')
+            f"节目选歌已经完成，以下歌曲及顺序不可更改：{titles}。"
+            "请按这个顺序为每首歌写一句自然的口播引介，第一句兼作开场。"
+            "可以围绕栏目情境表达感受，不要编造歌词、歌曲年代、声学特征或听众偏好。"
+            '只输出 JSON: {"introductions":["第一首引介", "第二首引介"],"closing":"简短结束语"}。'
+            f"introductions 必须恰好有 {len(songs)} 条，closing 可为空字符串。")
     try:
-        raw = llm_json(user)
-        segments = raw.get("show", [])
+        raw = await asyncio.to_thread(llm_json, user)
+        introductions = raw.get("introductions")
+        if not isinstance(introductions, list) or len(introductions) != len(songs):
+            # Accept the older response shape only when its exact song order is
+            # already the selected order. It cannot introduce or duplicate songs.
+            legacy = raw.get("show", [])
+            if not isinstance(legacy, list) or any(not isinstance(seg, dict) for seg in legacy):
+                raise ValueError("invalid narration")
+            if [seg.get("title") for seg in legacy if seg.get("type") == "song"] != [song["title"] for song in songs]:
+                raise ValueError("narration changed selected songs")
+            introductions = [seg.get("text") for seg in legacy if seg.get("type") == "talk"]
+        if len(introductions) != len(songs) or any(not isinstance(text, str) or not text.strip() or len(text) > 1000 for text in introductions):
+            raise ValueError("invalid narration length")
+        segments = []
+        for song, text in zip(songs, introductions):
+            segments.extend([{"type": "talk", "text": text.strip()},
+                             {"type": "song", "title": song["title"], "rel": song["rel"]}])
+        closing = raw.get("closing", "")
+        if isinstance(closing, str) and closing.strip() and len(closing) <= 1000:
+            segments.append({"type": "talk", "text": closing.strip()})
+        recommendation_meta["narration_fallback"] = False
     except Exception as e:
-        print("LLM 失败, 用模板:", e)
-        segments = template_show(library, theme, tod)
-    items = await segments_to_items(library, segments, f"s{int(__import__('time').time()*1000)}")
+        print("LLM 口播失败, 用模板:", type(e).__name__)
+        segments = template_show(songs, theme, tod)
+        recommendation_meta["narration_fallback"] = True
+    items = await segments_to_items(songs, segments, f"s{int(__import__('time').time()*1000)}", add_song_fallback=False)
     return {"meta": {"theme": theme["name"], "slogan": theme["slogan"],
-                     "time": tod}, "items": items}
+                     "time": tod, "recommendation": recommendation_meta}, "items": items}
+
+SongTitle = Annotated[str, Field(max_length=500)]
+
+class RecommendationReq(BaseModel):
+    personalize: bool = False
+    favorites: list[SongTitle] = Field(default_factory=list, max_length=100)
+    history: list[SongTitle] = Field(default_factory=list, max_length=100)
+    disliked: list[SongTitle] = Field(default_factory=list, max_length=100)
+    seed: SongTitle = ""
 
 class ShowReq(BaseModel):
-    exclude: list = []
-    theme: str = ""
+    exclude: list[SongTitle] = Field(default_factory=list, max_length=100)
+    theme: str = Field(default="", max_length=100)
+    recommendation: RecommendationReq = Field(default_factory=RecommendationReq)
 
 @app.post("/api/show")
 async def api_show(req: ShowReq):
@@ -328,7 +383,7 @@ async def api_show(req: ShowReq):
     tod, tod_note = time_of_day()
     theme = next((t for t in THEMES if t["name"] == req.theme), None) or \
             __import__("random").choice(THEMES)
-    return await make_show(library, theme, tod, tod_note, req.exclude)
+    return await make_show(library, theme, tod, tod_note, req.exclude, req.recommendation.model_dump())
 
 class ChatReq(BaseModel):
     message: str = ""

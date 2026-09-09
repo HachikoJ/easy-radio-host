@@ -1,4 +1,5 @@
 import { createLyricsExperience } from './lyrics.js';
+import { createRecommendationExperience } from './recommendations.js';
 
 const $ = id => document.getElementById(id);
 const audio = $('audio');
@@ -18,7 +19,8 @@ let timer = null, lastTick = 0, nextSeek = 0, mediaGeneration = 0;
 let generation = null, chatRequest = null, retryAction = null;
 let programmeVersion = 0;
 let muted = false, volume = .75;
-let listening, lyrics;
+let listening, lyrics, recommendations;
+let lastRecentItem = null;
 
 function icon(name) {
   const span = document.createElement('span');
@@ -47,7 +49,8 @@ function normalizeItems(items) {
     kind: item.kind,
     title: typeof item.title === 'string' && item.title.trim() ? item.title : item.kind === 'song' ? '未命名歌曲' : '小蓝的口播',
     text: typeof item.text === 'string' ? item.text : '',
-    url: typeof item.url === 'string' ? item.url : ''
+    url: typeof item.url === 'string' ? item.url : '',
+    recommendation: item.recommendation && typeof item.recommendation.reason === 'string' ? { reason: item.recommendation.reason.slice(0, 300) } : null
   })).filter(item => item.kind !== 'song' || item.url);
 }
 async function request(path, body, controller) {
@@ -58,7 +61,10 @@ async function request(path, body, controller) {
       return await respond(path, body, controller.signal);
     }
     const response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: controller.signal });
-    if (!response.ok) throw new Error(response.status >= 500 ? '服务暂时不可用，请稍后重试。' : `请求未完成（${response.status}），请检查服务配置。`);
+    if (!response.ok) {
+      const failure = await response.json().catch(() => null);
+      throw new Error(response.status >= 500 ? '服务暂时不可用，请稍后重试。' : typeof failure?.detail === 'string' ? failure.detail : `请求未完成（${response.status}），请检查选歌设置。`);
+    }
     const result = await response.json();
     if (!result || typeof result !== 'object') throw new Error('服务返回的节目格式不正确。');
     return result;
@@ -106,7 +112,7 @@ function renderQueue() {
     const type = document.createElement('span'); type.className = 'queue-kind'; type.append(icon(item.kind === 'song' ? 'Music2' : 'Mic2'));
     const copy = document.createElement('span'); copy.className = 'queue-copy';
     const title = document.createElement('strong'); title.textContent = item.title;
-    const subtitle = document.createElement('small'); subtitle.textContent = inserted ? '互动插播' : item.kind === 'song' ? '歌曲' : '小蓝 · 主持人口播'; copy.append(title, subtitle);
+    const subtitle = document.createElement('small'); subtitle.textContent = inserted ? '互动插播' : item.kind === 'song' ? item.recommendation?.reason || '歌曲' : '小蓝 · 主持人口播'; copy.append(title, subtitle);
     const tail = document.createElement('span'); tail.className = 'queue-tail'; tail.textContent = isCurrent ? playing ? '播放中' : '已暂停' : inserted ? '插播' : String(i + 1).padStart(2, '0');
     button.append(number, type, copy, tail);
     button.addEventListener('click', () => { if (inserted) { interrupt.index = i; } else { interrupt = null; index = i; } activate(); });
@@ -138,6 +144,7 @@ function renderPlayback() {
   $('now-title').textContent = item?.title || selected.name;
   listening?.render();
   lyrics?.render();
+  recommendations?.render();
   renderQueue(); renderProgress();
 }
 function renderProgress() {
@@ -171,7 +178,6 @@ function activate(offset = 0, autoplay = true) {
     catch { notify('歌曲地址无效，请切换其他片段。'); renderPlayback(); return; }
     mode = 'media'; nextSeek = offset; audio.src = url.href;
     audio.volume = volume; audio.muted = muted;
-    if (item.kind === 'song') { recent = [...recent, item.title].slice(-30); }
     if (autoplay) playMedia();
   }
   renderPlayback();
@@ -244,7 +250,7 @@ function handleMediaError() {
   }
   renderPlayback();
 }
-async function generateShow({ replace = false } = {}) {
+async function generateShow({ replace = false, seed = '' } = {}) {
   if (generation && !replace) return;
   generation?.abort();
   chatRequest?.abort();
@@ -253,18 +259,19 @@ async function generateShow({ replace = false } = {}) {
   const controller = new AbortController(), theme = selected;
   generation = controller; renderPlayback();
   try {
-    const data = await request('/api/show', { exclude: recent, theme: theme.name }, controller);
+    const data = await request('/api/show', { exclude: recent, theme: theme.name, recommendation: recommendations?.request(seed) }, controller);
     if (controller.signal.aborted) return;
     const items = normalizeItems(data.items);
     if (!items.length) throw new Error('这一期还没有可播放的内容，请重试。');
     programmeVersion++;
     chatRequest?.abort();
     interrupt = null; queue = items; index = 0;
+    recommendations?.setSummary(data.meta?.recommendation);
     activeTheme = themes.find(item => item.name === data.meta?.theme) || theme;
     selectTheme(activeTheme); activate();
   } catch (error) {
     if (controller.signal.aborted && controller.signal.reason !== 'timeout') return;
-    notify(error.message || '节目生成失败，请重试。', generateShow);
+    notify(error.message || '节目生成失败，请重试。', () => generateShow({ seed }));
   } finally { if (generation === controller) generation = null; renderPlayback(); }
 }
 function addMessage(speaker, text, user = false) {
@@ -342,7 +349,16 @@ audio.addEventListener('timeupdate', renderProgress);
 audio.addEventListener('ended', () => { if (mode === 'media') advance(); });
 audio.addEventListener('error', handleMediaError);
 audio.addEventListener('pause', () => { if (mode === 'media' && audio.paused) { playing = false; renderPlayback(); } });
-audio.addEventListener('playing', () => { if (mode === 'media' && !audio.paused) { playing = true; listening?.recordPlay(); renderPlayback(); } });
+audio.addEventListener('playing', () => {
+  if (mode !== 'media' || audio.paused) return;
+  playing = true;
+  const item = current();
+  if (item?.kind === 'song' && item !== lastRecentItem) {
+    recent = [...recent.filter(title => title !== item.title), item.title].slice(-30);
+    lastRecentItem = item;
+  }
+  listening?.recordPlay(); renderPlayback();
+});
 document.querySelectorAll('.nav-link').forEach(link => link.addEventListener('click', () => { document.querySelectorAll('.nav-link').forEach(item => item.classList.toggle('active', item === link)); }));
 listening = createListeningExperience({
   demo, icon,
@@ -354,5 +370,10 @@ listening = createListeningExperience({
 });
 lyrics = createLyricsExperience({ audio, state: current, demo,
   seek: seconds => { if (mode === 'media' && Number.isFinite(audio.duration)) { audio.currentTime = Math.max(0, Math.min(audio.duration, seconds)); renderProgress(); } }
+});
+recommendations = createRecommendationExperience({ demo, icon, notify,
+  state: () => ({ item: current(), busy: Boolean(generation) }),
+  signals: () => listening.recommendationSignals(),
+  related: seed => generateShow({ seed })
 });
 updateVolume(); renderThemes(); renderPlayback();

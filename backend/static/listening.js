@@ -171,5 +171,7 @@ function createListeningExperience(actions) {
     }
   }
   renderLibrary();
-  return { render, recordPlay, updatePosition };
+  return { render, recordPlay, updatePosition,
+    recommendationSignals: () => ({ favorites: library.favorites.map(entry => entry.title), history: library.history.map(entry => entry.title).reverse() })
+  };
 }

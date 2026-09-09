@@ -15,7 +15,7 @@
 
 **Choose a theme. Let music take it from here.**
 
-Tingjian is an AI music radio for listeners who enjoy themed listening and are comfortable hosting their own service. The host, Xiaolan, selects tracks, connects them with commentary, and synthesizes narration. Your browser plays narration and songs in sequence. Tracks come from an online music API, so no local music collection is required.
+Tingjian is an AI music radio for listeners who enjoy themed listening and are comfortable hosting their own service. Its recommendation engine selects tracks using themes and optional preferences; the host, Xiaolan, connects them with commentary and synthesizes narration. Your browser plays narration and songs in sequence. Tracks come from an online music API, so no local music collection is required.
 
 **Repository:** [HachikoJ/easy-radio-host](https://github.com/HachikoJ/easy-radio-host)
 
@@ -23,7 +23,10 @@ Tingjian is an AI music radio for listeners who enjoy themed listening and are c
 
 ## Features
 
-- **Six themes:** Afternoon Coffee, City Walk, Sleep at Night, Nostalgic Hits, Morning Energy, and Mood Station; DeepSeek arranges shows around the theme and playlist.
+- **Six themes:** Afternoon Coffee, City Walk, Sleep at Night, Nostalgic Hits, Morning Energy, and Mood Station; the program selects tracks, and DeepSeek writes narration in the selected order.
+- **Multiple recommendation sources:** Combine themes, favorite tracks, favorite artists, artist preferences configured by the deployment owner, and exploration candidates. Extend a current track with more works by the same artist and see the actual selection reasons.
+- **Deduplication and variety:** No repeated tracks within a show; recent tracks are avoided where possible and artists are spread out. Shows shorten when candidates are scarce, and any recent-track reuse or relaxed artist limits are disclosed.
+- **Optional preferences:** "按我的偏好选歌" (Use my preferences) is off by default. Enabling it allows local favorites, history, and "Recommend less" titles to inform the current recommendation. "Recommend less" can be undone; ordinary skips and playback failures are not treated as dislikes, and explicit song requests remain available.
 - **Host narration:** MiniMax synthesizes the voice, with edge-tts fallback support.
 - **Continuous playback:** A show queue, previous/next segments, seeking and volume, automatic continuation, and stop controls.
 - **Focused listening:** Desktop and mobile layouts, light/dark appearance, immersive mode, keyboard controls, and system media controls in supported browsers.
@@ -63,12 +66,21 @@ Screenshots show real generated shows and online music playback on the [live sit
 
 These two screenshots use the explicitly labeled demo mode with original instrumental audio and original sample text, without reproducing third-party song lyrics.
 
+### Recommendations and preferences
+
+<img src="docs/radio-recommendations.png" alt="Tingjian desktop recommendations: preference toggle, selection reasons, and Recommend less management" width="100%">
+
+<img src="docs/radio-recommendations-mobile.png" alt="Tingjian mobile recommendations: local preferences and track recommendation actions" width="375">
+
+Recommendation screenshots show the actual interface. Fixed demo tracks and reasons are previews and do not establish recommendation quality in the live service.
+
 ## How it works
 
 ```text
 Browser
   → Main app :8100
-      → DeepSeek arranges the show
+      → Candidate fusion, recent-track filtering, deduplication, and artist variety
+      → DeepSeek writes narration in the selected track order
       → MiniMax / edge-tts synthesizes narration
       → Online library proxy :8001 reads the playlist
   ← Narration and song playback queue
@@ -76,6 +88,8 @@ Browser
 ```
 
 The proxy reads `musiclib/playlist.tsv` and exposes titles and relative paths at `/songs.txt`. The `/s/<source>/<id>.mp3` endpoint resolves a track URL and returns a 307 redirect. Songs are not stored locally; generated narration is stored under `DATA_DIR/voice/` (`/var/lib/tingjian/voice/` in the Tencent Cloud deployment).
+
+Recommendations use the current catalog and available metadata without connecting to Embeat models, vector databases, or datasets. Theme matching uses tags curated by this project, not acoustic analysis or collaborative filtering. Shows target four tracks and shorten when candidates are scarce. If the model fails, template narration uses the same selected tracks. See [recommendation design and the Embeat reference record](docs/EMBEAT-ADAPTATION.md) for rules, privacy boundaries, and validation.
 
 ## Quick start
 
@@ -130,6 +144,24 @@ The `NAS_*` names are retained for compatibility and point to the online library
 | Library proxy :8001 | GET | `/s/<source>/<id>.mp3` | Resolve a track URL and redirect |
 | Same-origin `/music/` → library proxy :8001 | GET | `/music/lyrics/{source}/{song_id}.json` | Fetch lyrics and available translations for the current song; the direct proxy path is `/lyrics/{source}/{song_id}.json` |
 
+`POST /api/show` retains `theme` and `exclude`, and adds an optional `recommendation` object:
+
+```json
+{
+  "theme": "午后咖啡",
+  "exclude": [],
+  "recommendation": {
+    "personalize": false,
+    "favorites": [],
+    "history": [],
+    "disliked": [],
+    "seed": ""
+  }
+}
+```
+
+`favorites`, `history`, and `disliked` are title arrays used only when `personalize` is `true`. `seed` is the explicitly selected track title for extending an artist. Each song's `recommendation.sources` and `recommendation.reason` provide actual candidate sources and a selection reason; `meta.recommendation` reports candidate and fallback information. Existing clients can omit the new fields. Explicit song requests still use `/api/intent`.
+
 ## Playlist maintenance
 
 In the deployment directory `/opt/easy-radio-host`, edit `musiclib/playlist-source.tsv` with one track name and artist per line, separated by a tab. Back up the existing `musiclib/playlist.tsv`, then run:
@@ -144,7 +176,9 @@ The script rewrites the resolved playlist, searches multiple sources, filters ve
 
 - Never commit API keys, cookies, or `radio.env` to GitHub.
 - Show themes, conversations, and track metadata are sent to the relevant AI or music services; narration and runtime data are stored on the server.
-- Favorites and history store only titles, themes, and timestamps in the current browser, without cross-device sync; demo and real listening records are separate. Clearing site data removes these records. If local storage is unavailable, records last only for the current page.
+- Favorites, history, and "Recommend less" records are stored in the current browser without cross-device sync; demo and real listening records are separate. Clearing site data removes these records. If local storage is unavailable, records last only for the current page.
+- "Use my preferences" is off by default. When enabled, favorite, history, and "Recommend less" titles accompany each show request to the Tingjian server, where they are used only for that request without adding a server-side preference profile. DeepSeek receives selected tracks and show context, not these complete preference lists. Turning the option off stops sending these local preferences. Recent tracks in the current session still help avoid repeats, and extending an artist sends the explicitly selected seed title.
+- Existing global artist preferences are configured by the deployment owner, not maintained as individual listener profiles. Recommendation reasons distinguish this source from browser favorites.
 - Replaying a saved title requests a fresh match and playback URL. Favorites do not retain exact track IDs or permanent audio links, so a different version may be selected.
 - DeepSeek, MiniMax, and other services may incur charges. Pricing and quotas are set by each provider.
 - AI narration is not guaranteed to be factual. Track availability, version matching, and response times depend on third-party services.
@@ -159,6 +193,7 @@ The script rewrites the resolved playlist, searches multiple sources, filters ve
 - [Code of Conduct](CODE_OF_CONDUCT.md) · [Security Policy](SECURITY.md).
 - [Changelog](CHANGELOG.md) · [Collaboration guidelines](AGENTS.md).
 - [Design guidelines](DESIGN.md) · [Claudio adaptation and roadmap](docs/CLAUDIO-ADAPTATION.md).
+- [Recommendation design and Embeat reference record](docs/EMBEAT-ADAPTATION.md): candidate fusion, boundaries, fallback rules, and evaluation.
 - [Continuous integration](https://github.com/HachikoJ/easy-radio-host/actions): Python syntax, API contracts, and frontend static-server checks.
 
 ## Credits
@@ -166,6 +201,7 @@ The script rewrites the resolved playlist, searches multiple sources, filters ve
 - [Original easy-radio-host project](https://gitee.com/weak0001/easy-radio-host) by `weak0001`; original attribution and copyright ownership are retained.
 - [Claudio](https://github.com/hllqkb/Claudio) by `hllqkb`, MIT; the Tingjian frontend independently implements interaction ideas from its immersive playback, light/dark themes, favorites/history, and system media controls. See [third-party sources and licenses](THIRD_PARTY_NOTICES.md), including the source revision and complete license text.
 - [Qiaomu Music Player Web](https://github.com/joeseesun/qiaomu-music-player-web) by Qiaomu / 向阳乔木, MIT; common interactions such as lyric following, tap-to-seek, and playback animation informed an independent implementation. No source code or assets were copied.
+- [Embeat](https://github.com/gdstudio-org/Embeat/tree/7617a505ec42f109685802d1a3319e1957ac0a99) by GD Studio informed our independent implementation of general ideas around candidate fusion, deduplication, diversity controls, and explainable recommendations. Its reviewed README and root license differ in stated scope. No source code, models, data, or branding were copied; see the [license review record](THIRD_PARTY_NOTICES.md#embeat).
 - [lrc-kit 1.2.1](https://www.npmjs.com/package/lrc-kit/v/1.2.1), Copyright (c) 2016 Weirong Xu, MIT; used for LRC parsing with the [full license](backend/static/vendor/lrc-kit/LICENSE) and [source modification record](THIRD_PARTY_NOTICES.md#lrc-kit) retained.
 - [Lucide](https://lucide.dev) provides UI icons under ISC; [Unsplash](https://unsplash.com) provides theme photography. See [individual asset sources](backend/static/assets/SOURCES.md).
 - [Online music API](https://music-api.gdstudio.xyz/api.php) for multi-source search and URL resolution.

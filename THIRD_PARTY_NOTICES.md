@@ -26,6 +26,19 @@ Claudio's branding, screenshots, tracks, album artwork, account credentials, and
 
 Tingjian independently implements common player interactions informed by this project and familiar music players: synchronized lyric highlighting, line seeking, automatic following, and optional playback animation. No upstream source code, branding, visual skin, screenshots, songs, lyrics, or artwork were copied. Tingjian's CSS animation follows actual playback state; it is not a real-time spectrum and does not intercept audio output.
 
+## Embeat
+
+- 项目 / Project: [gdstudio-org/Embeat](https://github.com/gdstudio-org/Embeat)
+- 项目组织 / Project organization: **GD Studio**
+- 研究版本 / Reviewed revision: [`7617a505ec42f109685802d1a3319e1957ac0a99`](https://github.com/gdstudio-org/Embeat/tree/7617a505ec42f109685802d1a3319e1957ac0a99)，2026-09-09 核查。
+- 许可核查 / License review: 该版本 [README_zh.md](https://github.com/gdstudio-org/Embeat/blob/7617a505ec42f109685802d1a3319e1957ac0a99/README_zh.md) 将代码与模型权重声明为 MIT、数据集与数据库声明为 CC BY-NC 4.0；根目录 [LICENSE](https://github.com/gdstudio-org/Embeat/blob/7617a505ec42f109685802d1a3319e1957ac0a99/LICENSE) 是 CC BY-NC 4.0。两者适用范围存在歧义，本项目不将 Embeat 整体标注为 MIT。
+
+听间借鉴多路候选融合、去重、歌手多样性控制及保留候选来源等通用推荐思路，在当前在线曲库上独立实现。未复制、改编或分发 Embeat 的源代码、模型权重、训练数据、向量数据库、品牌或媒体资产；未接入其 Spotify 数据，也未使用其训练链路。听间的主题匹配来自本项目策划标签，不声称具备 Embeat 的声学向量、歌单协同过滤或关联歌手模型能力。具体对应关系见[推荐设计](docs/EMBEAT-ADAPTATION.md)。
+
+Tingjian independently implements general recommendation ideas informed by Embeat: candidate fusion, deduplication, artist diversity controls, and retained candidate sources. No Embeat source code, model weights, training data, vector databases, branding, or media assets were copied, adapted, or redistributed, and its Spotify data and training pipeline are not used. Tingjian's theme matching uses project-curated tags; it does not claim acoustic embeddings, playlist collaborative filtering, or a related-artist model.
+
+At the reviewed revision, the Chinese README describes code and model weights as MIT, and datasets and databases as CC BY-NC 4.0, while the root LICENSE contains CC BY-NC 4.0. The scope is ambiguous; this notice does not label the entire Embeat project as MIT. Any future direct reuse requires resolving the applicable permissions and retaining the required notices. This reference grants no music or dataset redistribution rights and does not imply endorsement by GD Studio.
+
 ## lrc-kit
 
 - 项目与版本 / Project and version: [lrc-kit 1.2.1](https://www.npmjs.com/package/lrc-kit/v/1.2.1)
