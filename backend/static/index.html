@@ -34,11 +34,7 @@
   </aside>
 
   <main>
-    <header class="page-header"><div class="page-greeting"><p class="eyebrow" id="today"></p><h1>留一点时间，给音乐。</h1></div><a class="focus-brand" href="#listening"><img src="assets/brand.svg" alt="" width="36" height="36"><strong>听间</strong></a><span class="demo-badge" id="demo-badge" hidden>演示节目</span><div class="view-actions"><button class="icon-button" id="lyrics-toggle" aria-label="查看歌词" data-tip="查看歌词"><span class="icon" style="--icon:url(assets/Captions.svg)"></span></button><button class="icon-button" id="appearance" aria-label="切换深色模式" data-tip="切换深色模式"><span class="icon" id="appearance-icon" style="--icon:url(assets/Moon.svg)"></span></button><button class="icon-button" id="focus-toggle" aria-label="进入沉浸模式" aria-pressed="false" data-tip="进入沉浸模式"><span class="icon" id="focus-icon" style="--icon:url(assets/Maximize.svg)"></span></button><a class="icon-button" href="https://github.com/HachikoJ/easy-radio-host" target="_blank" rel="noopener noreferrer" aria-label="GitHub 项目" data-tip="GitHub 项目"><span class="icon" style="--icon:url(assets/ArrowUpRight.svg)"></span></a></div></header>
-    <section class="focus-stage" id="focus-stage" aria-label="沉浸收听" hidden>
-      <figure class="focus-art"><img id="focus-cover" src="assets/coffee.jpg" alt="午后咖啡主题封面" width="600" height="600"><figcaption id="focus-caption">午后咖啡 · 主题封面</figcaption></figure>
-      <div class="focus-copy"><p class="eyebrow" id="focus-status">准备就绪</p><h1 id="focus-title" tabindex="-1">午后咖啡</h1><p class="focus-subtitle" id="focus-subtitle">小蓝 · 主题电台</p><div class="song-actions"><button class="icon-button favorite-action" id="focus-favorite" aria-label="收藏当前歌曲" aria-pressed="false" data-tip="收藏当前歌曲" disabled><span class="icon" style="--icon:url(assets/Heart.svg)"></span></button><button class="icon-button" id="focus-related" aria-label="生成同歌手延伸节目" data-tip="同歌手延伸" disabled><span class="icon" style="--icon:url(assets/Radio.svg)"></span></button><button class="icon-button" id="focus-dislike" aria-label="少推荐这首" aria-pressed="false" data-tip="少推荐这首" disabled><span class="icon" style="--icon:url(assets/ThumbsDown.svg)"></span></button></div><p class="recommendation-reason" id="focus-recommendation-reason" hidden></p><div class="focus-note" id="focus-note" hidden><p class="tiny-label">小蓝 · 此刻口播</p><p id="focus-text"></p></div><div class="up-next"><span>接下来</span><p id="focus-next">节目单尚未生成</p></div></div>
-    </section>
+    <header class="page-header"><div class="page-greeting"><p class="eyebrow" id="today"></p><h1>留一点时间，给音乐。</h1></div><span class="demo-badge" id="demo-badge" hidden>演示节目</span><div class="view-actions"><button class="icon-button" id="lyrics-toggle" aria-label="查看歌词" data-tip="查看歌词"><span class="icon" style="--icon:url(assets/Captions.svg)"></span></button><button class="icon-button" id="appearance" aria-label="切换深色模式" data-tip="切换深色模式"><span class="icon" id="appearance-icon" style="--icon:url(assets/Moon.svg)"></span></button><a class="icon-button" href="https://github.com/HachikoJ/easy-radio-host" target="_blank" rel="noopener noreferrer" aria-label="GitHub 项目" data-tip="GitHub 项目"><span class="icon" style="--icon:url(assets/ArrowUpRight.svg)"></span></a></div></header>
     <div class="workspace">
       <div class="listen-column">
         <section class="listening" id="listening" aria-label="正在收听">
@@ -69,6 +65,7 @@
             <div class="lyrics-heading"><h2>歌词</h2><label><input id="motion-enabled" type="checkbox" role="switch" checked>播放动效</label></div>
             <p class="motion-status" id="motion-status">等待播放</p>
             <div class="lyrics-status-row"><p id="lyrics-status" role="status">选择歌曲后显示歌词</p><button id="lyrics-retry" class="icon-button" aria-label="重新获取歌词" data-tip="重新获取歌词" hidden><span class="icon" style="--icon:url(assets/RefreshCw.svg)"></span></button></div>
+            <div class="focus-note" id="focus-note" hidden><p class="tiny-label">小蓝 · 此刻口播</p><p id="focus-text"></p></div>
             <div id="lyrics-lines" class="lyrics-lines" role="region" aria-label="歌词内容" tabindex="0"></div>
             <div class="lyrics-timing" id="lyrics-timing" hidden><label><input id="lyrics-follow" type="checkbox" checked>跟随播放</label><label id="translation-control" hidden><input id="lyrics-translation" type="checkbox" checked>译文</label><label for="lyrics-offset">歌词延后（秒）<input id="lyrics-offset" type="number" min="-10" max="10" step="0.5" value="0"></label></div>
             <p id="lyrics-source" class="lyrics-source"></p>
@@ -88,7 +85,7 @@
         <div class="transcript" id="transcript" hidden><span class="tiny-label">此刻口播</span><p id="transcript-text"></p></div>
       </aside>
     </div>
-    <footer class="page-footer"><span>TINGJIAN / 听间</span><a href="credits.html">开源致谢</a><a href="mailto:946106011@qq.com">联系作者 <span aria-hidden="true">↗</span></a><a class="icon-button" href="#top" aria-label="返回顶部" data-tip="返回顶部"><span class="icon" style="--icon:url(assets/ChevronDown.svg);transform:rotate(180deg)"></span></a></footer>
+    <footer class="page-footer"><span>TINGJIAN / 听间</span><a id="credits-link" href="credits.html" target="_blank" rel="noopener noreferrer">开源致谢</a><a id="author-link" href="https://github.com/HachikoJ" target="_blank" rel="noopener noreferrer">联系作者 · GitHub</a><a class="icon-button" href="#top" aria-label="返回顶部" data-tip="返回顶部"><span class="icon" style="--icon:url(assets/ChevronDown.svg);transform:rotate(180deg)"></span></a></footer>
   </main>
 
   <footer class="player-bar" aria-label="播放控制">

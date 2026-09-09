@@ -3,7 +3,7 @@ function createListeningExperience(actions) {
   const get = id => document.getElementById(id);
   const storageKey = actions.demo ? 'tingjian.demo.library.v1' : 'tingjian.library.v1';
   let storageAvailable = true, library = { favorites: [], history: [] };
-  let lastRecordedItem = null, metadataKey = '', focused = false;
+  let lastRecordedItem = null, metadataKey = '';
   const validEntry = entry => entry && typeof entry.title === 'string' && entry.title.trim() && entry.title.length <= 500 && typeof entry.theme === 'string' && entry.theme.length <= 100 && Number.isFinite(entry.at) && Number.isFinite(new Date(entry.at).getTime());
   const cleanEntries = (entries, limit) => Array.isArray(entries) ? entries.filter(validEntry).slice(0, limit).map(({ title, theme, at }) => ({ title, theme, at })) : [];
   try {
@@ -85,7 +85,6 @@ function createListeningExperience(actions) {
   }
   document.querySelector('a[href="#queue-section"]').addEventListener('click', () => selectTab('queue'));
   get('favorite').addEventListener('click', toggleFavorite);
-  get('focus-favorite').addEventListener('click', toggleFavorite);
 
   function setAppearance(appearance) {
     document.documentElement.dataset.appearance = appearance;
@@ -101,35 +100,9 @@ function createListeningExperience(actions) {
     appearance = appearance === 'dark' ? 'light' : 'dark'; setAppearance(appearance);
     try { localStorage.setItem('tingjian.appearance.v1', appearance); } catch { actions.notify('当前浏览器无法记住配色，下次打开将使用浅色。'); }
   });
-  let layoutTransition = null;
-  function setFocus(on) {
-    if (focused === on) return;
-    focused = on;
-    const update = () => {
-      document.body.classList.toggle('focus-mode', on);
-      get('focus-stage').hidden = !on;
-      const label = on ? '退出沉浸模式' : '进入沉浸模式';
-      get('focus-toggle').setAttribute('aria-label', label); get('focus-toggle').dataset.tip = label;
-      get('focus-toggle').setAttribute('aria-pressed', String(on));
-      get('focus-icon').style.setProperty('--icon', `url(assets/${on ? 'Minimize' : 'Maximize'}.svg)`);
-      render(); window.scrollTo(0, 0);
-      window.dispatchEvent(new Event('tingjian:layout'));
-      if (on) get('focus-title').focus({ preventScroll: true }); else get('focus-toggle').focus();
-    };
-    if (document.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      layoutTransition?.skipTransition();
-      layoutTransition = document.startViewTransition(update);
-      layoutTransition.ready.catch(() => { /* A newer toggle can skip this animation. */ });
-      return layoutTransition.updateCallbackDone;
-    } else update();
-  }
-  get('focus-toggle').addEventListener('click', () => setFocus(!focused));
-  document.querySelector('.focus-brand').addEventListener('click', () => setFocus(false));
-
   function seekBy(delta) { actions.seek((document.getElementById('audio').currentTime || 0) + delta); }
   document.addEventListener('keydown', event => {
     if (event.defaultPrevented) return;
-    if (event.key === 'Escape' && focused) { setFocus(false); return; }
     if (event.isComposing || event.repeat || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || event.target.closest('input,textarea,button,a,select,[contenteditable="true"],[role="tab"]')) return;
     if (event.code === 'Space') { event.preventDefault(); actions.state().playing ? actions.pause() : actions.play(); }
     if (event.key === 'ArrowLeft') { event.preventDefault(); seekBy(-5); }
@@ -151,25 +124,16 @@ function createListeningExperience(actions) {
     } catch { /* Position reporting varies by browser. */ }
   }
   function render() {
-    const { item, theme, playing, next } = actions.state();
+    const { item, theme, playing } = actions.state();
     const title = item?.title || theme.name;
     const artwork = `assets/${theme.image}.jpg`;
-    for (const id of ['favorite', 'focus-favorite']) {
-      const button = get(id), saved = isFavorite(item);
-      button.disabled = item?.kind !== 'song';
-      button.setAttribute('aria-pressed', String(saved));
-      const label = saved ? '取消收藏当前歌曲' : '收藏当前歌曲';
-      button.setAttribute('aria-label', label); button.dataset.tip = label;
-    }
-    get('focus-title').textContent = title;
-    get('focus-status').textContent = item ? playing ? '正在播放' : '已暂停' : '准备就绪';
-    get('focus-subtitle').textContent = `${theme.name} · ${item?.kind === 'song' ? '歌曲' : '小蓝主持'}`;
-    if (get('focus-cover').getAttribute('src') !== artwork) get('focus-cover').src = artwork;
-    get('focus-cover').alt = `${theme.name}主题封面`;
-    get('focus-caption').textContent = `${theme.name} · 主题封面`;
+    const button = get('favorite'), saved = isFavorite(item);
+    button.disabled = item?.kind !== 'song';
+    button.setAttribute('aria-pressed', String(saved));
+    const label = saved ? '取消收藏当前歌曲' : '收藏当前歌曲';
+    button.setAttribute('aria-label', label); button.dataset.tip = label;
     get('focus-note').hidden = !item?.text || item.kind === 'song';
     get('focus-text').textContent = item?.kind === 'song' ? '' : item?.text || '';
-    get('focus-next').textContent = next?.title || (item ? '本期最后一个片段' : '节目单尚未生成');
     if (session) {
       const key = item ? `${title}|${artwork}` : '';
       try {
@@ -182,7 +146,7 @@ function createListeningExperience(actions) {
     }
   }
   renderLibrary();
-  return { render, recordPlay, updatePosition, setFocus,
+  return { render, recordPlay, updatePosition,
     recommendationSignals: () => ({ favorites: library.favorites.map(entry => entry.title), history: library.history.map(entry => entry.title).reverse() })
   };
 }

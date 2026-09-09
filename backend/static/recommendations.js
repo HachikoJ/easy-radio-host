@@ -35,16 +35,14 @@ export function createRecommendationExperience(actions) {
     get('recommendation-state').textContent = enabled ? '偏好选歌已开启' : '主题选歌';
     get('recommendation-storage').textContent = available ? '' : '浏览器无法保存偏好，本次设置仅在当前页面保留。';
     const isDisliked = song && disliked.includes(item.title);
-    for (const prefix of ['', 'focus-']) {
-      const related = get(`${prefix}related`), dislike = get(`${prefix}dislike`);
-      related.disabled = !song || busy;
-      dislike.disabled = !song || busy;
-      const label = isDisliked ? '恢复推荐这首' : '少推荐这首';
-      dislike.setAttribute('aria-label', label); dislike.dataset.tip = label; dislike.setAttribute('aria-pressed', String(Boolean(isDisliked)));
-      const reason = get(`${prefix}recommendation-reason`);
-      reason.textContent = song ? item.recommendation?.reason || '' : '';
-      reason.hidden = !reason.textContent;
-    }
+    const related = get('related'), dislike = get('dislike');
+    related.disabled = !song || busy;
+    dislike.disabled = !song || busy;
+    const label = isDisliked ? '恢复推荐这首' : '少推荐这首';
+    dislike.setAttribute('aria-label', label); dislike.dataset.tip = label; dislike.setAttribute('aria-pressed', String(Boolean(isDisliked)));
+    const reason = get('recommendation-reason');
+    reason.textContent = song ? item.recommendation?.reason || '' : '';
+    reason.hidden = !reason.textContent;
     const notices = [];
     if (summary?.recent_relaxed) notices.push('近期可选歌曲不足，已优先回补较早听过的歌曲');
     if (summary?.artist_limit_relaxed) notices.push('可选歌手较少，本期包含同歌手曲目');
@@ -76,13 +74,11 @@ export function createRecommendationExperience(actions) {
     enabled = event.target.checked; persist(); render();
     actions.notify(enabled ? '偏好选歌已开启，从下一期生效。' : '偏好选歌已关闭，后续节目不发送本地偏好记录。');
   });
-  for (const prefix of ['', 'focus-']) {
-    get(`${prefix}dislike`).addEventListener('click', toggleDislike);
-    get(`${prefix}related`).addEventListener('click', () => {
-      const { item } = actions.state();
-      if (item?.kind === 'song') actions.related(item.title);
-    });
-  }
+  get('dislike').addEventListener('click', toggleDislike);
+  get('related').addEventListener('click', () => {
+    const { item } = actions.state();
+    if (item?.kind === 'song') actions.related(item.title);
+  });
   renderList(); render();
   return {
     render,

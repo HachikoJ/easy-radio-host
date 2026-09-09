@@ -1,5 +1,6 @@
 """Exercise the real ASGI app without calling AI, TTS, or music services."""
 import importlib.util
+from html.parser import HTMLParser
 import json
 import os
 from pathlib import Path
@@ -46,10 +47,31 @@ class FrontendContract(unittest.IsolatedAsyncioTestCase):
             status, content = await request(path)
             self.assertEqual(status, 200, path)
             self.assertTrue(content, path)
+        for path in ("/assets/BookOpen.svg", "/assets/Github.svg"):
+            status, content = await request(path)
+            self.assertEqual(status, 200, path)
+            self.assertTrue(content, path)
         status, content = await request("/assets/demo-chimes.wav", headers=[(b"range", b"bytes=0-43")])
         self.assertEqual(status, 206)
         self.assertEqual(content[:4], b"RIFF")
         self.assertEqual(len(content), 44)
+
+    async def test_resource_links_preserve_the_player_tab(self):
+        class Links(HTMLParser):
+            def handle_starttag(self, tag, attrs):
+                values = dict(attrs)
+                if tag == "a" and values.get("id") in ("credits-link", "author-link"):
+                    links[values["id"]] = values
+
+        links = {}
+        status, content = await request("/")
+        self.assertEqual(status, 200)
+        Links().feed(content.decode("utf-8"))
+        self.assertEqual(links["author-link"]["href"], "https://github.com/HachikoJ")
+        self.assertEqual(links["credits-link"]["href"], "credits.html")
+        for link in links.values():
+            self.assertEqual(link["target"], "_blank")
+            self.assertTrue({"noopener", "noreferrer"} <= set(link["rel"].split()))
 
     async def test_show_keeps_theme_and_song_text_contract_when_tts_unavailable(self):
         library = [{"title": "Contract Song", "rel": "s/netease/123.mp3"}]

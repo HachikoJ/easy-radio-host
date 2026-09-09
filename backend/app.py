@@ -19,8 +19,10 @@ from typing import Annotated
 
 try:
     from recommendations import select_songs
+    from speech_audio import normalize_speech
 except ModuleNotFoundError:
     from backend.recommendations import select_songs
+    from backend.speech_audio import normalize_speech
 
 # ---------------- 配置 ----------------
 DEEPSEEK_KEY = os.getenv("DEEPSEEK_KEY", "").strip()
@@ -30,7 +32,7 @@ MINIMAX_KEY = os.getenv("MINIMAX_KEY", "").strip()
 MINIMAX_GROUP = os.getenv("MINIMAX_GROUP", "").strip()
 MINIMAX_BASE = os.getenv("MINIMAX_BASE", "https://api.minimaxi.com").rstrip("/")
 MINIMAX_MODEL = os.getenv("MINIMAX_MODEL", "speech-02-turbo")
-MINIMAX_VOICE = os.getenv("MINIMAX_VOICE", "female-chengshu")
+MINIMAX_VOICE = os.getenv("MINIMAX_VOICE", "Chinese (Mandarin)_Warm_Girl")
 NAS_LIST_URL = os.getenv("NAS_LIST_URL", "http://127.0.0.1:8001/songs.txt")
 NAS_BASE_URL = os.getenv("NAS_BASE_URL", "http://127.0.0.1:8001")
 HOST_NAME = os.getenv("HOST_NAME", "小蓝")
@@ -197,7 +199,7 @@ def minimax_synth(text, path):
         hexaudio = j.get("data", {}).get("audio", "")
         if not hexaudio:
             print("MiniMax 无 audio:", str(j)[:200]); return False
-        Path(path).write_bytes(bytes.fromhex(hexaudio))
+        Path(path).write_bytes(normalize_speech(bytes.fromhex(hexaudio)))
         return True
     except Exception as e:
         print("MiniMax 解析失败:", e, str(data[:160])); return False
@@ -214,6 +216,8 @@ async def tts_to_mp3(text, path):
     try:
         import edge_tts
         await edge_tts.Communicate(text, "zh-CN-XiaoxiaoNeural").save(str(path))
+        normalized = await asyncio.to_thread(normalize_speech, Path(path).read_bytes())
+        Path(path).write_bytes(normalized)
         return True
     except Exception as e:
         print("TTS 失败:", e)

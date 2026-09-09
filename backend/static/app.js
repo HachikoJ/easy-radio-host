@@ -123,16 +123,17 @@ function renderQueue() {
 }
 function renderPlayback() {
   const item = current(), busy = Boolean(generation);
-  document.body.classList.toggle('has-programme', queue.length > 0);
+  document.body.classList.toggle('has-programme', queue.length > 0 || Boolean(item));
+  document.body.classList.toggle('has-song', item?.kind === 'song');
   document.body.classList.toggle('preparing-programme', busy);
   $('generate').disabled = busy;
   document.querySelectorAll('.theme-card').forEach(button => { button.disabled = busy; });
   $('cancel-generate').hidden = !busy;
   $('listening').classList.toggle('loading', busy);
-  $('generate-label').textContent = busy ? '正在编排…' : queue.length ? '生成新一期' : '开始收听';
+  $('generate-label').textContent = busy ? '正在编排…' : queue.length || item ? '生成新一期' : '开始收听';
   $('generate').dataset.tip = $('generate-label').textContent;
   $('generate').setAttribute('aria-label', $('generate-label').textContent);
-  $('generate').querySelector('.icon').style.setProperty('--icon', `url(assets/${busy ? 'LoaderCircle' : queue.length ? 'RefreshCw' : 'Play'}.svg)`);
+  $('generate').querySelector('.icon').style.setProperty('--icon', `url(assets/${busy ? 'LoaderCircle' : queue.length || item ? 'RefreshCw' : 'Play'}.svg)`);
   $('play').disabled = busy && !item;
   const playLabel = item ? playing ? '暂停' : '继续播放' : '开始收听';
   $('play').setAttribute('aria-label', playLabel); $('play').dataset.tip = playLabel;
@@ -148,6 +149,7 @@ function renderPlayback() {
   $('show-status').textContent = busy ? '小蓝正在准备节目' : item && selected !== activeTheme ? `待切换 · 正在收听${activeTheme.name}` : item ? playing ? interrupt ? '互动插播中' : '正在播放' : '已暂停' : queue.length ? '本期已播完' : '准备就绪';
   $('status-dot').classList.toggle('playing', playing);
   $('now-title').textContent = item?.title || selected.name;
+  $('now-title').title = $('now-title').textContent;
   listening?.render();
   lyrics?.render();
   recommendations?.render();
@@ -188,7 +190,7 @@ function activate(offset = 0, autoplay = true, recovering = false) {
     else audio.removeAttribute('crossorigin');
     if (recovering) { url.searchParams.set('refresh', '1'); url.searchParams.set('_retry', String(Date.now())); }
     mode = 'media'; nextSeek = offset; audio.src = url.href;
-    audio.volume = volume; audio.muted = muted;
+    updateVolume();
     if (autoplay) playMedia();
   }
   renderPlayback();
@@ -338,7 +340,7 @@ async function sendChat(event, requestedMessage) {
     label.textContent = controller.signal.aborted && controller.signal.reason !== 'timeout' ? '你 · 已取消' : '你 · 未发送';
     if (controller.signal.aborted && controller.signal.reason !== 'timeout') return;
     $('chat-error').textContent = error.message || '消息发送失败，请重试。'; $('chat-error').hidden = false;
-    if (requestedMessage || document.body.classList.contains('focus-mode') || document.body.classList.contains('quiet-ui')) notify(error.message || '点播失败，请重试。');
+    notify(error.message || '点播失败，请重试。');
   } finally { if (chatRequest === controller) chatRequest = null; $('send').disabled = false; $('chat-status').textContent = ''; if (requestedMessage) $('library-status').textContent = ''; }
 }
 
@@ -352,7 +354,6 @@ $('next').addEventListener('click', advance);
 $('stop').addEventListener('click', stop);
 function showLyrics() {
   window.dispatchEvent(new Event('tingjian:show-lyrics'));
-  if (!document.body.classList.contains('quiet-ui')) listening?.setFocus(true);
   $('lyrics-lines').focus({ preventScroll: true });
   $('lyrics-follow').checked = true;
   $('lyrics-follow').dispatchEvent(new Event('change'));
@@ -368,7 +369,8 @@ $('message').addEventListener('input', () => { $('message-count').textContent = 
 $('volume').addEventListener('input', event => { volume = Number(event.target.value) / 100; muted = volume === 0; updateVolume(); });
 $('mute').addEventListener('click', () => { muted = !muted; if (!muted && !volume) volume = .75; updateVolume(); });
 function updateVolume() {
-  audio.volume = volume; audio.muted = muted;
+  // Narration is mastered to -14 LUFS; trim the louder online music sources.
+  audio.volume = volume * (current()?.kind === 'song' ? .85 : 1); audio.muted = muted;
   $('volume').value = muted ? 0 : volume * 100;
   $('volume-value').textContent = `${Math.round(muted ? 0 : volume * 100)}%`;
   const label = muted ? '取消静音' : '静音'; $('mute').setAttribute('aria-label', label); $('mute').dataset.tip = label;
@@ -408,5 +410,5 @@ recommendations = createRecommendationExperience({ demo, icon, notify,
   signals: () => listening.recommendationSignals(),
   related: seed => generateShow({ seed })
 });
-createQuietLayout({ icon, setFocus: listening.setFocus });
+createQuietLayout({ icon });
 updateVolume(); renderThemes(); renderPlayback();

@@ -5,9 +5,7 @@ export function createLyricsExperience({ audio, state, seek, demo }) {
   const get = id => document.getElementById(id);
   const panel = get('lyrics-panel'), viewport = get('lyrics-lines');
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
-  const focusMount = document.createElement('div'); focusMount.id = 'lyrics-focus';
-  document.querySelector('.focus-copy').insertBefore(focusMount, document.querySelector('.up-next'));
-  for (const target of document.querySelectorAll('.cover-wrap,.focus-art')) {
+  for (const target of document.querySelectorAll('.cover-wrap')) {
     const artwork = target.querySelector('img');
     const stage = document.createElement('div'); stage.className = 'record-stage';
     const disc = document.createElement('div'); disc.className = 'record-disc';
@@ -130,8 +128,6 @@ export function createLyricsExperience({ audio, state, seek, demo }) {
     } finally { clearTimeout(timeout); }
   }
   function place() {
-    const target = get(document.body.classList.contains('focus-mode') ? 'lyrics-focus' : 'lyrics-home');
-    if (panel.parentElement !== target) target.append(panel);
     requestAnimationFrame(() => center(true));
   }
   function render() {

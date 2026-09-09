@@ -55,7 +55,7 @@ scp /tmp/tingjian-release.tar.gz <SSH_TARGET>:/tmp/tingjian-release.tar.gz
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y python3-venv nginx certbot
+sudo apt-get install -y python3-venv nginx certbot ffmpeg
 sudo useradd --system --home-dir /var/lib/tingjian --shell /usr/sbin/nologin tingjian
 sudo install -d -o root -g root -m 755 /opt/easy-radio-host
 sudo install -d -o root -g root -m 700 /etc/tingjian
@@ -88,10 +88,14 @@ DEEPSEEK_BASE=https://api.deepseek.com
 DEEPSEEK_MODEL=deepseek-chat
 MINIMAX_BASE=https://api.minimaxi.com
 MINIMAX_MODEL=speech-02-turbo
-MINIMAX_VOICE=female-chengshu
+MINIMAX_VOICE="Chinese (Mandarin)_Warm_Girl"
 ```
 
 `MINIMAX_GROUP` 按账号接口要求填写，可为空。密钥仅放服务器运行配置，不放入 Git、前端或命令行参数。systemd 管理器读取 root 所有的环境文件后，以 `tingjian` 用户启动主服务；曲库服务不读取带密钥的配置。
+
+`MINIMAX_VOICE` 未配置时使用上述普通话音色；已有环境文件中的显式值优先于代码默认值，更新代码不会自动覆盖它。修改音色后重启主服务，新生成的口播才使用新音色，旧口播文件保持原样。
+
+新生成的 MiniMax 或 edge-tts 口播通过 `backend/speech_audio.py` 做两遍 ffmpeg `loudnorm`：目标 -14 LUFS、真峰值上限 -1.5 dBTP、LRA 7，启用 `dual_mono`，每遍最长 20 秒。输出为 32 kHz、单声道、128 kbps MP3；缺少 ffmpeg、分析值无效、超时或编码失败时保留原音。处理不改写旧口播，也不下载或归一化第三方歌曲。前端歌曲播放音量为主音量乘以 0.85，口播使用主音量，滑杆数值仍表示主音量。
 
 供应商调用可能产生费用。缺少配置或调用失败时可能走模板节目、edge-tts 或纯文字降级，HTTP 200 不能单独证明 DeepSeek 和 MiniMax 调用成功。
 
@@ -161,6 +165,16 @@ curl --fail --silent --show-error --max-time 360 \
 
 在桌面和手机浏览器打开正式入口，验证主题生成、口播到歌曲连续播放、暂停与恢复、下一首、点歌、聊天、收藏和历史。检查布局无横向溢出、控制台无混合内容错误。`?demo=1` 只能验证演示交互，不能作为真实 API 验收。
 
+确认服务器 `ffmpeg -version` 可运行。生成新口播后，可用下面的只读命令检查实际文件的响度；将 `<VOICE_FILE>` 换成本次生成的本地口播文件路径：
+
+```bash
+ffmpeg -hide_banner -nostdin -i '<VOICE_FILE>' \
+  -af 'loudnorm=I=-14:TP=-1.5:LRA=7:dual_mono=true:print_format=json' \
+  -f null -
+```
+
+核对输出 `input_i`、`input_tp` 与目标是否接近，再以同一主音量实听口播到歌曲的切换。MP3 编码与歌曲来源可能造成差异，HTTP 200 或文件存在不能单独证明响度处理成功。前端验证同时覆盖首屏随视口高度适配、歌词独立滚动、右上角链接在新标签页打开，以及致谢默认中文、手动切换英文。
+
 ## 7. 更新与恢复
 
 保留上次发布的代码包和提交 SHA。每次更新前备份配置、代码与用户数据，备份只允许管理员访问，不上传仓库：
@@ -186,6 +200,8 @@ sudo systemctl start tingjian-musiclib tingjian
 
 如果更新涉及 `deploy/`，审阅后重新安装对应配置，再执行 `systemctl daemon-reload` 或 `nginx -t` 与 reload。保留真实 `radio.env`，只补齐必要变量。重新执行第 6 节验收。
 
+从未安装 ffmpeg 的版本更新时，安装系统包 `ffmpeg` 后可启用新口播响度处理；暂未安装仍会保留原音播放。需要采用新的默认音色时，应同时审阅现有 `MINIMAX_VOICE`，不能只依赖更新代码。音色配置恢复使用更新前的环境文件备份；代码回退不会自动改变已显式配置的音色。
+
 若新版未通过验收，停止本项目两项服务，将当前代码目录改名保留，然后从 `code.tar.gz` 恢复 `/opt/easy-radio-host`，按旧版 requirements 重建 venv。必要时恢复备份中的 systemd/Nginx 配置，校验后启动服务并复验。改名后的目录保留到恢复确认完成，不直接删除。用户口播等数据独立存放，普通代码回退无需回退数据；涉及数据迁移时先核对兼容性再恢复备份。
 
 ## 8. 歌单维护与排障
@@ -206,6 +222,7 @@ sudo certbot certificates
 | 歌曲不播放 | 公网 `NAS_BASE_URL`、`/music/` 映射、歌曲源与最终音频 HTTPS |
 | 曲库为空 | `playlist.tsv` 路径、权限、TSV 格式 |
 | 口播 404 | `DATA_DIR`、服务写权限、`/voice/` 转发 |
+| 新口播仍明显偏轻或偏响 | ffmpeg 可用性、`TTS loudness normalization` 日志、实际新文件的响度；旧口播不会重新处理 |
 | HTTP 429 | API 请求频率和并发限制，稍后重试 |
 | 证书续期失败 | DNS、80 端口、ACME 目录、timer 和 reload hook |
 

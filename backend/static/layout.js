@@ -1,12 +1,27 @@
-export function createQuietLayout({ icon, setFocus }) {
+export function createQuietLayout({ icon }) {
   const get = id => document.getElementById(id);
   const header = document.querySelector('.page-header');
   const nav = document.querySelector('.sidebar nav');
   header.prepend(document.querySelector('.sidebar .brand'), nav);
+  const viewActions = document.querySelector('.view-actions');
+  for (const [id, label, symbol] of [
+    ['credits-link', '开源致谢', 'BookOpen'],
+    ['author-link', '联系作者 · GitHub', 'Github']
+  ]) {
+    const link = get(id);
+    link.className = 'icon-button header-resource'; link.dataset.tip = label;
+    link.setAttribute('aria-label', `${label}（新标签页）`);
+    link.replaceChildren(icon(symbol)); viewActions.append(link);
+  }
   get('lyrics-home').classList.add('lyric-column');
   get('listening').append(get('lyrics-home'));
 
-  const heading = document.querySelector('.lyrics-heading');
+  const recordColumn = document.createElement('div'); recordColumn.className = 'record-column';
+  const trackHeading = document.createElement('div'); trackHeading.className = 'track-heading';
+  recordColumn.append(document.querySelector('.cover-wrap'), document.querySelector('.show-summary'));
+  trackHeading.append(recordColumn.querySelector('#now-title'));
+  get('listening').prepend(trackHeading, recordColumn);
+  document.querySelector('.show-actions').append(document.querySelector('.now-heading .song-actions'));
   const controls = document.createElement('div'); controls.className = 'listening-tools';
   const follow = get('lyrics-follow').closest('label');
   const motion = get('motion-enabled').closest('label');
@@ -22,7 +37,16 @@ export function createQuietLayout({ icon, setFocus }) {
   const preferencesTitle = document.createElement('h3'); preferencesTitle.textContent = '选歌偏好';
   options.prepend(playbackTitle, get('auto').closest('label'), get('lyrics-timing'), preferencesTitle);
   options.append(get('recommendation-summary'));
-  controls.append(settings); heading.append(controls);
+  controls.append(settings); trackHeading.append(controls);
+  const viewport = get('lyrics-lines');
+  new ResizeObserver(() => {
+    viewport.style.setProperty('--lyrics-height', `${viewport.clientHeight}px`);
+  }).observe(viewport);
+  const sizeRecord = new ResizeObserver(() => {
+    recordColumn.style.setProperty('--record-room', `${Math.max(0, recordColumn.clientHeight - document.querySelector('.show-summary').offsetHeight)}px`);
+  });
+  sizeRecord.observe(recordColumn);
+  sizeRecord.observe(document.querySelector('.show-summary'));
   const sizeSettings = () => {
     if (!settings.open) return;
     const bottom = Math.min(innerHeight, document.querySelector('.player-bar').getBoundingClientRect().top);
@@ -53,13 +77,13 @@ export function createQuietLayout({ icon, setFocus }) {
   function closeDrawer(restore = true) {
     if (!drawer.open) return;
     drawer.close(); shade.hidden = true; activePanel = null;
-    for (const node of document.querySelectorAll('.listening,.focus-stage,.page-footer')) node.inert = false;
+    get('listening').inert = false;
     nav.querySelectorAll('a').forEach(link => link.classList.toggle('active', link.hash === '#listening'));
     if (restore) opener?.focus({ preventScroll: true });
   }
   function openDrawer(id, trigger) {
     const selected = sections.get(id);
-    if (!selected) { closeDrawer(false); setFocus(false); return; }
+    if (!selected) { closeDrawer(false); return; }
     if (drawer.open && activePanel === id) { closeDrawer(); return; }
     settings.open = false;
     opener = trigger; activePanel = id;
@@ -67,7 +91,7 @@ export function createQuietLayout({ icon, setFocus }) {
     title.textContent = selected.title;
     if (!drawer.open) drawer.show();
     shade.hidden = false;
-    for (const node of document.querySelectorAll('.listening,.focus-stage,.page-footer')) node.inert = true;
+    get('listening').inert = true;
     nav.querySelectorAll('a').forEach(link => link.classList.toggle('active', link.hash === `#${id}`));
     if (!reduced.matches) content.animate([{ opacity: .2, transform: 'translateX(14px)' }, { opacity: 1, transform: 'none' }], { duration: 220, easing: 'ease-out' });
     (id === 'conversation' ? get('message') : close).focus({ preventScroll: true });
@@ -75,13 +99,12 @@ export function createQuietLayout({ icon, setFocus }) {
   nav.querySelectorAll('a').forEach(link => link.addEventListener('click', event => {
     event.preventDefault(); openDrawer(link.hash.slice(1), link);
   }));
-  document.querySelector('.brand').addEventListener('click', event => { event.preventDefault(); closeDrawer(false); setFocus(false); });
+  document.querySelector('.brand').addEventListener('click', event => { event.preventDefault(); closeDrawer(false); });
   close.addEventListener('click', () => closeDrawer());
   shade.addEventListener('click', () => closeDrawer());
-  get('theme-list').addEventListener('click', async event => {
+  get('theme-list').addEventListener('click', event => {
     if (!event.target.closest('.theme-card')) return;
     closeDrawer(false);
-    await setFocus(false);
     get('generate').focus({ preventScroll: true });
   });
   get('queue').addEventListener('click', event => { if (event.target.closest('button')) closeDrawer(); });
@@ -100,10 +123,10 @@ export function createQuietLayout({ icon, setFocus }) {
   window.addEventListener('tingjian:layout', () => { settings.open = false; closeDrawer(false); });
 
   const updateBackdrop = () => {
-    const image = get(document.body.classList.contains('focus-mode') ? 'focus-cover' : 'cover');
+    const image = get('cover');
     get('lyrics-panel').style.setProperty('--lyric-image', `url("${image.src}")`);
   };
-  for (const id of ['cover', 'focus-cover']) new MutationObserver(updateBackdrop).observe(get(id), { attributes: true, attributeFilter: ['src'] });
+  new MutationObserver(updateBackdrop).observe(get('cover'), { attributes: true, attributeFilter: ['src'] });
   window.addEventListener('tingjian:layout', updateBackdrop);
   document.body.classList.add('quiet-ui');
   updateBackdrop();

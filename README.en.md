@@ -27,13 +27,13 @@ Tingjian is an AI music radio for listeners who enjoy themed listening and are c
 - **Multiple recommendation sources:** Combine themes, favorite tracks, favorite artists, artist preferences configured by the deployment owner, and exploration candidates. Extend a current track with more works by the same artist and see the actual selection reasons.
 - **Deduplication and variety:** No repeated tracks within a show; recent tracks are avoided where possible and artists are spread out. Shows shorten when candidates are scarce, and any recent-track reuse or relaxed artist limits are disclosed.
 - **Optional preferences:** Listening settings bring together continuous playback, translations, lyric timing, and song preferences. "按我的偏好选歌" (Use my preferences) is off by default. Enabling it allows local favorites, history, and "Recommend less" titles to inform the current recommendation, with privacy details available before opting in. "Recommend less" can be undone; ordinary skips and playback failures are not treated as dislikes, and explicit song requests remain available.
-- **Host narration:** MiniMax synthesizes the voice, with edge-tts fallback support.
+- **Host narration:** MiniMax uses `Chinese (Mandarin)_Warm_Girl` by default, with edge-tts fallback support. ffmpeg balances newly generated narration, while songs play at 85% of the master volume to reduce level differences between speech and music. Original narration is retained when ffmpeg is unavailable or processing fails.
 - **Continuous playback:** A show queue, previous/next segments, seeking and volume, automatic continuation, and stop controls.
-- **Focused listening:** The first screen centers on the disc, current track, and a spacious lyric view. Compact track details leave more room for lyrics on mobile. Theme stations, the queue/favorites/history, and chat open on demand while the bottom player stays available. Light/dark appearance, smooth transitions into immersive mode, keyboard controls, and system media controls in supported browsers are included.
+- **Focused listening:** A single listening view adapts the disc and lyrics to viewport height to keep the main experience on one screen. The track title shares a row with right-aligned following, animation, and settings controls. Theme stations, the queue/favorites/history, and chat open on demand while the bottom player stays available. Light/dark appearance, keyboard controls, and system media controls in supported browsers are included. Credits and the author's GitHub open in new tabs from the top right; credits display Chinese by default, with English shown after selecting English.
 - **Favorites and history:** Store up to 100 favorites and 50 recent tracks locally in your browser, deduplicated by title; history records songs only once playback actually starts.
 - **Song requests:** Chat with Xiaolan, request tracks, or control playback; cancel generation, retry failures, and keep your draft when a request fails.
 - **Online library:** Store track names, artists, sources, and IDs; resolve playback URLs on demand. Unavailable URLs can fall back to an available bitrate for the same track ID. Playback failures trigger one automatic refresh, followed by retry and next-segment controls if playback still fails.
-- **Synchronized lyrics:** A spacious lyric view is visible by default, with faded theme photography behind highlighted text and following and animation toggles together in one row. The fixed player shows the current line; tapping its lyric preview focuses the lyric view and resumes following. LRC lyrics follow playback by default, with tap-to-seek including 0 seconds. Following resumes 3 seconds after manual browsing; only explicitly switching it off keeps it disabled. Delay adjustment from -10 to +10 seconds and optional timestamped translations are available. Loading, missing lyrics, failure, and timeout have distinct states; plain text stays untimed.
+- **Synchronized lyrics:** A spacious lyric view is visible by default, with faded theme photography behind highlighted text and independent scrolling inside the lyric area; the same area shows the transcript during host narration. The fixed player shows the current line; tapping its lyric preview focuses the lyric view and resumes following. LRC lyrics follow playback by default, with tap-to-seek including 0 seconds. Following resumes 3 seconds after manual browsing; only explicitly switching it off keeps it disabled. Delay adjustment from -10 to +10 seconds and optional timestamped translations are available. Loading, missing lyrics, failure, and timeout have distinct states; plain text stays untimed.
 - **Playback animation:** A rotating disc displays a theme image at its center, surrounded by a black ring supporting colorful glowing edges and layered translucent 3D waves. When the browser and audio source support analysis, the waves flow with actual frequency bands, bass, and volume; otherwise, a smooth playback animation takes over. A 2D ripple fallback is available without WebGL. Motion stops during buffering, pauses, or when the page is hidden. The animation toggle is remembered and system reduced-motion preferences are respected. The theme image is not the track's album artwork.
 
 ## Product preview
@@ -50,10 +50,10 @@ Tingjian is an AI music radio for listeners who enjoy themed listening and are c
   <img src="docs/radio-mobile.png" alt="Tingjian mobile: compact disc area, lyrics, and bottom playback controls" width="375">
 </p>
 
-### Immersive mode
+### Dark appearance
 
 <p>
-  <img src="docs/radio-focus.png" alt="Tingjian immersive mode: rotating disc, current track, lyrics, and playback controls" width="100%">
+  <img src="docs/radio-focus.png" alt="Tingjian dark appearance: rotating disc, current track, lyrics, and playback controls" width="100%">
 </p>
 
 Screenshots show the actual interface in the explicitly labeled demo mode, using original instrumental audio and original sample text without reproducing third-party song lyrics. Theme photos represent listening settings, not actual album artwork. Online tracks and availability on the [live site](https://audio.deline.top) depend on third-party services.
@@ -93,7 +93,7 @@ Recommendations use the current catalog and available metadata without connectin
 
 ## Quick start
 
-Requires Python 3.10+. See the [deployment guide](DEPLOY-HANDOFF.md) for Linux setup, systemd configuration, and troubleshooting. The detailed guide is currently in Chinese.
+Requires Python 3.10+; install ffmpeg to normalize newly generated narration. See the [deployment guide](DEPLOY-HANDOFF.md) for Linux setup, systemd configuration, and troubleshooting. The detailed guide is currently in Chinese.
 
 ```bash
 git clone https://github.com/HachikoJ/easy-radio-host.git
@@ -125,12 +125,15 @@ The demo uses original synthesized instrumental music and clearly labeled origin
 | --- | --- |
 | `DEEPSEEK_KEY` | API key for show planning and chat |
 | `MINIMAX_KEY` | API key for host narration |
+| `MINIMAX_VOICE` | Host voice, defaulting to `Chinese (Mandarin)_Warm_Girl` |
 | `NAS_LIST_URL` | Playlist URL, typically `http://127.0.0.1:8001/songs.txt` |
 | `NAS_BASE_URL` | Online library proxy URL accessible from the browser |
 | `RADIO_BASE` | Main app URL accessible from the browser |
 | `DATA_DIR` | Narration and runtime data directory |
 
 The `NAS_*` names are retained for compatibility and point to the online library proxy. A remote browser cannot reach the server through the server's own `127.0.0.1`; use reachable server URLs for playback.
+
+Normalization uses two-pass ffmpeg `loudnorm`, targeting -14 LUFS with a -1.5 dBTP true-peak limit and `dual_mono` enabled. Missing ffmpeg, timeouts, or processing failures retain the original audio without blocking narration playback. This applies only to newly generated narration, without reprocessing existing narration or third-party songs. The 0.85 song volume factor leaves the displayed master volume unchanged and does not guarantee identical perceived loudness across all sources.
 
 ## API
 
