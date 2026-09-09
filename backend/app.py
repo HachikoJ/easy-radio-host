@@ -1000,4 +1000,13 @@ def voice_file(name: str):
 def favicon():
     return Response(status_code=204)   # 浏览器请求站点图标, 返回空即可
 
-app.mount("/", StaticFiles(directory=str(Path(__file__).parent / "static"), html=True), name="web")
+class RevalidatingStaticFiles(StaticFiles):
+    async def get_response(self, path, scope):
+        response = await super().get_response(path, scope)
+        # Unversioned imports must revalidate too, including conditional 304s.
+        if path in (".", "", "/") or Path(path).suffix in {".html", ".js", ".css"}:
+            response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
+app.mount("/", RevalidatingStaticFiles(directory=str(Path(__file__).parent / "static"), html=True), name="web")

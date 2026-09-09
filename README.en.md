@@ -1,19 +1,27 @@
 <a id="top"></a>
 
-# Tingjian · 听间
-
 <p align="center">
   <img src="assets/brand/tingjian-logo.png" alt="Tingjian logo: a blue sound-wave speech bubble with a coral on-air signal" width="144">
 </p>
 
-![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB)
-![FastAPI](https://img.shields.io/badge/FastAPI-009688)
-![DeepSeek](https://img.shields.io/badge/DeepSeek-AI-1677E8)
-[![GitHub stars](https://img.shields.io/github/stars/HachikoJ/easy-radio-host?style=flat)](https://github.com/HachikoJ/easy-radio-host)
+<h1 align="center">Tingjian · 听间</h1>
 
-[中文](README.md) · [Listen online](https://audio.deline.top) · [Personal site](https://www.deline.top) · [Features](#features) · [Preview](#product-preview) · [Quick start](#quick-start) · [Resources](#project-resources) · [Contact](#contact)
+<p align="center"><strong>Choose a theme. Let music take it from here.</strong></p>
 
-**Choose a theme. Let music take it from here.**
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.10%2B-3776AB" alt="Python 3.10+">
+  <img src="https://img.shields.io/badge/FastAPI-009688" alt="FastAPI">
+  <img src="https://img.shields.io/badge/DeepSeek-AI-1677E8" alt="DeepSeek AI">
+  <a href="https://github.com/HachikoJ/easy-radio-host"><img src="https://img.shields.io/github/stars/HachikoJ/easy-radio-host?style=flat" alt="GitHub stars"></a>
+</p>
+
+<p align="center">
+  <a href="https://audio.deline.top">Listen online</a> · <a href="README.md">中文</a> · <a href="https://www.deline.top">Personal site</a>
+</p>
+
+<p align="center">
+  <a href="#features">Features</a> · <a href="#product-preview">Preview</a> · <a href="#quick-start">Quick start</a> · <a href="#project-resources">Resources</a> · <a href="#contact">Contact</a>
+</p>
 
 Tingjian is an AI music radio for listeners who enjoy themed listening and are comfortable hosting their own service. Its recommendation engine selects tracks using themes and optional preferences; the host, Xiaolan, connects them with commentary and synthesizes narration. Your browser plays narration and songs in sequence. Tracks come from an online music API, so no local music collection is required.
 
@@ -40,39 +48,49 @@ Tingjian is an AI music radio for listeners who enjoy themed listening and are c
 
 ### Desktop
 
-<p>
-  <img src="docs/radio-desktop.png" alt="Tingjian desktop: disc and current track, spacious lyrics, and bottom player" width="100%">
+<p align="center">
+  <a href="docs/radio-desktop.png"><img src="docs/radio-desktop.png" alt="Tingjian desktop: disc and current track, spacious lyrics, and bottom player" width="100%"></a>
 </p>
 
 ### Mobile
 
-<p>
-  <img src="docs/radio-mobile.png" alt="Tingjian mobile: compact disc area, lyrics, and bottom playback controls" width="375">
+<table>
+  <tr>
+    <th width="33%">Listening</th>
+    <th width="33%">Lyrics and animation</th>
+    <th width="33%">Listening settings</th>
+  </tr>
+  <tr>
+    <td align="center" valign="top"><a href="docs/radio-mobile.png"><img src="docs/radio-mobile.png" alt="Tingjian mobile: compact disc area, lyrics, and bottom playback controls" width="100%"></a></td>
+    <td align="center" valign="top"><a href="docs/radio-lyrics-mobile.png"><img src="docs/radio-lyrics-mobile.png" alt="Tingjian mobile lyrics view: compact track details, lyrics, and bottom playback controls" width="100%"></a></td>
+    <td align="center" valign="top"><a href="docs/radio-recommendations-mobile.png"><img src="docs/radio-recommendations-mobile.png" alt="Tingjian mobile listening settings: playback options, lyric timing, and local song preferences" width="100%"></a></td>
+  </tr>
+</table>
+
+<details>
+<summary>More desktop screenshots: dark appearance, lyrics and animation, listening settings</summary>
+
+#### Dark appearance
+
+<p align="center">
+  <a href="docs/radio-focus.png"><img src="docs/radio-focus.png" alt="Tingjian dark appearance: rotating disc, current track, lyrics, and playback controls" width="100%"></a>
 </p>
 
-### Dark appearance
+#### Lyrics and animation
 
-<p>
-  <img src="docs/radio-focus.png" alt="Tingjian dark appearance: rotating disc, current track, lyrics, and playback controls" width="100%">
+<p align="center">
+  <a href="docs/radio-lyrics.png"><img src="docs/radio-lyrics.png" alt="Tingjian desktop lyrics: soft theme background, highlighted text, and compact following and animation toggles" width="100%"></a>
 </p>
 
-Screenshots show the actual interface in the explicitly labeled demo mode, using original instrumental audio and original sample text without reproducing third-party song lyrics. Theme photos represent listening settings, not actual album artwork. Online tracks and availability on the [live site](https://audio.deline.top) depend on third-party services.
+#### Listening settings
 
-### Lyrics and animation
+<p align="center">
+  <a href="docs/radio-recommendations.png"><img src="docs/radio-recommendations.png" alt="Tingjian desktop listening settings: preference toggle, privacy details, and Recommend less management" width="100%"></a>
+</p>
 
-<img src="docs/radio-lyrics.png" alt="Tingjian desktop lyrics: soft theme background, highlighted text, and compact following and animation toggles" width="100%">
+</details>
 
-<img src="docs/radio-lyrics-mobile.png" alt="Tingjian mobile lyrics view: compact track details, lyrics, and bottom playback controls" width="375">
-
-These two screenshots use the explicitly labeled demo mode with original instrumental audio and original sample text, without reproducing third-party song lyrics.
-
-### Recommendations and preferences
-
-<img src="docs/radio-recommendations.png" alt="Tingjian desktop listening settings: preference toggle, privacy details, and Recommend less management" width="100%">
-
-<img src="docs/radio-recommendations-mobile.png" alt="Tingjian mobile listening settings: playback options, lyric timing, and local song preferences" width="375">
-
-Recommendation screenshots show the actual interface. Fixed demo tracks and reasons are previews and do not establish recommendation quality in the live service.
+Screenshots show the actual interface in the explicitly labeled demo mode, using original instrumental audio and original sample text without reproducing third-party song lyrics. Theme photos represent listening settings, not actual album artwork. Fixed demo tracks and reasons are previews and do not establish recommendation quality; online tracks and availability on the [live site](https://audio.deline.top) depend on third-party services. Click any screenshot to view the full-size image.
 
 ## How it works
 

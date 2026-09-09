@@ -15,7 +15,7 @@ with patch.dict(os.environ, {"DATA_DIR": tempfile.mkdtemp(prefix="tingjian-contr
     spec.loader.exec_module(radio)
 
 
-async def request(path, body=None, headers=()):
+async def request(path, body=None, headers=(), include_headers=False):
     payload = json.dumps(body).encode() if body is not None else b""
     messages = []
 
@@ -32,12 +32,28 @@ async def request(path, body=None, headers=()):
         "server": ("testserver", 80), "client": ("127.0.0.1", 1234),
         "headers": [(b"content-type", b"application/json"), *headers],
     }, receive, send)
-    status = next(message["status"] for message in messages if message["type"] == "http.response.start")
+    start = next(message for message in messages if message["type"] == "http.response.start")
+    status = start["status"]
     content = b"".join(message.get("body", b"") for message in messages if message["type"] == "http.response.body")
+    if include_headers:
+        return status, content, dict(start["headers"])
     return status, content
 
 
 class FrontendContract(unittest.IsolatedAsyncioTestCase):
+    async def test_frontend_revalidates_cached_resources(self):
+        for path in ("/", "/index.html", "/credits.html", "/quiet.css", "/app.js", "/layout.js", "/record-scene.js"):
+            status, content, headers = await request(path, include_headers=True)
+            self.assertEqual(status, 200, path)
+            self.assertEqual(headers[b"cache-control"], b"no-cache", path)
+            status, body, cached = await request(path, headers=[(b"if-none-match", headers[b"etag"])], include_headers=True)
+            self.assertEqual(status, 304, path)
+            self.assertEqual(body, b"", path)
+            self.assertEqual(cached[b"cache-control"], b"no-cache", path)
+            status, updated = await request(path, headers=[(b"if-none-match", b'"older-release"')])
+            self.assertEqual(status, 200, path)
+            self.assertEqual(updated, content, path)
+
     async def test_static_assets_and_license(self):
         for path in ("/", "/app.js", "/listening.js", "/style.css", "/listening.css", "/layout.js", "/quiet.css", "/assets/SlidersHorizontal.svg", "/recommendations.js", "/recommendations.css", "/assets/ThumbsDown.svg", "/lyrics.js", "/lyrics-data.js", "/lyrics.css", "/vendor/lrc-kit/lrc.js", "/vendor/lrc-kit/line-parser.js", "/vendor/lrc-kit/LICENSE", "/credits.html", "/assets/brand.svg", "/licenses/Claudio-MIT.txt"):
             status, content = await request(path)

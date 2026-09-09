@@ -1,19 +1,27 @@
 <a id="top"></a>
 
-# 听间 · Tingjian
-
 <p align="center">
   <img src="assets/brand/tingjian-logo.png" alt="听间 Logo：蓝色对话声波与珊瑚红播出信号" width="144">
 </p>
 
-![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB)
-![FastAPI](https://img.shields.io/badge/FastAPI-009688)
-![DeepSeek](https://img.shields.io/badge/DeepSeek-AI-1677E8)
-[![GitHub stars](https://img.shields.io/github/stars/HachikoJ/easy-radio-host?style=flat)](https://github.com/HachikoJ/easy-radio-host)
+<h1 align="center">听间 · Tingjian</h1>
 
-[English](README.en.md) · [在线收听](https://audio.deline.top) · [个人官网](https://www.deline.top) · [核心体验](#核心体验) · [产品预览](#产品预览) · [如何运行](#如何运行) · [项目资料](#项目资料) · [联系作者](#联系作者)
+<p align="center"><strong>选一个主题，把接下来的时间交给音乐。</strong></p>
 
-**选一个主题，把接下来的时间交给音乐。**
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.10%2B-3776AB" alt="Python 3.10+">
+  <img src="https://img.shields.io/badge/FastAPI-009688" alt="FastAPI">
+  <img src="https://img.shields.io/badge/DeepSeek-AI-1677E8" alt="DeepSeek AI">
+  <a href="https://github.com/HachikoJ/easy-radio-host"><img src="https://img.shields.io/github/stars/HachikoJ/easy-radio-host?style=flat" alt="GitHub stars"></a>
+</p>
+
+<p align="center">
+  <a href="https://audio.deline.top">在线收听</a> · <a href="README.en.md">English</a> · <a href="https://www.deline.top">个人官网</a>
+</p>
+
+<p align="center">
+  <a href="#核心体验">核心体验</a> · <a href="#产品预览">产品预览</a> · <a href="#如何运行">如何运行</a> · <a href="#项目资料">项目资料</a> · <a href="#联系作者">联系作者</a>
+</p>
 
 听间是一个面向喜欢主题听歌、愿意自行部署的听众的 AI 音乐电台。推荐引擎结合主题和可选偏好选歌，主持人「小蓝」串联话题并合成口播，浏览器连续播放「口播 → 歌曲 → 口播」。歌曲来自在线音乐 API，无需准备本地音乐文件。
 
@@ -40,39 +48,49 @@
 
 ### 桌面端
 
-<p>
-  <img src="docs/radio-desktop.png" alt="听间桌面端：唱片与当前曲目、大面积歌词和底部播放器" width="100%">
+<p align="center">
+  <a href="docs/radio-desktop.png"><img src="docs/radio-desktop.png" alt="听间桌面端：唱片与当前曲目、大面积歌词和底部播放器" width="100%"></a>
 </p>
 
 ### 移动端
 
-<p>
-  <img src="docs/radio-mobile.png" alt="听间移动端：紧凑唱片区、歌词和底部播放控制" width="375">
+<table>
+  <tr>
+    <th width="33%">收听</th>
+    <th width="33%">歌词与动效</th>
+    <th width="33%">收听设置</th>
+  </tr>
+  <tr>
+    <td align="center" valign="top"><a href="docs/radio-mobile.png"><img src="docs/radio-mobile.png" alt="听间移动端：紧凑唱片区、歌词和底部播放控制" width="100%"></a></td>
+    <td align="center" valign="top"><a href="docs/radio-lyrics-mobile.png"><img src="docs/radio-lyrics-mobile.png" alt="听间手机歌词界面：紧凑曲目信息、歌词与底部播放控制" width="100%"></a></td>
+    <td align="center" valign="top"><a href="docs/radio-recommendations-mobile.png"><img src="docs/radio-recommendations-mobile.png" alt="听间手机收听设置：播放选项、歌词时差和本地选歌偏好" width="100%"></a></td>
+  </tr>
+</table>
+
+<details>
+<summary>更多桌面截图：深色模式、歌词与动效、收听设置</summary>
+
+#### 深色模式
+
+<p align="center">
+  <a href="docs/radio-focus.png"><img src="docs/radio-focus.png" alt="听间深色模式：旋转唱片、当前曲目、歌词和播放控制" width="100%"></a>
 </p>
 
-### 深色模式
+#### 歌词与动效
 
-<p>
-  <img src="docs/radio-focus.png" alt="听间深色模式：旋转唱片、当前曲目、歌词和播放控制" width="100%">
+<p align="center">
+  <a href="docs/radio-lyrics.png"><img src="docs/radio-lyrics.png" alt="听间桌面歌词：柔和主题背景、文字高亮及紧凑的跟随与动效开关" width="100%"></a>
 </p>
 
-截图来自明确标注的演示模式，展示实际界面，使用原创器乐与原创演示文案，不收录第三方歌曲原词。主题摄影用于表达收听场景，并非歌曲的真实唱片封面。[正式站点](https://audio.deline.top) 的在线曲目和可用性由第三方服务决定。
+#### 收听设置
 
-### 歌词与动效
+<p align="center">
+  <a href="docs/radio-recommendations.png"><img src="docs/radio-recommendations.png" alt="听间桌面收听设置：偏好开关、隐私说明与少推荐管理" width="100%"></a>
+</p>
 
-<img src="docs/radio-lyrics.png" alt="听间桌面歌词：柔和主题背景、文字高亮及紧凑的跟随与动效开关" width="100%">
+</details>
 
-<img src="docs/radio-lyrics-mobile.png" alt="听间手机歌词界面：紧凑曲目信息、歌词与底部播放控制" width="375">
-
-这两张截图来自明确标注的演示模式，使用原创器乐与原创演示文案，不收录第三方歌曲原词。
-
-### 推荐与偏好
-
-<img src="docs/radio-recommendations.png" alt="听间桌面收听设置：偏好开关、隐私说明与少推荐管理" width="100%">
-
-<img src="docs/radio-recommendations-mobile.png" alt="听间手机收听设置：播放选项、歌词时差和本地选歌偏好" width="375">
-
-推荐截图展示实际界面；演示模式中的固定曲目和理由仅用于预览，不代表真实服务的推荐效果。
+截图来自明确标注的演示模式，展示实际界面，使用原创器乐与原创演示文案，不收录第三方歌曲原词。主题摄影用于表达收听场景，并非歌曲的真实唱片封面。演示中的固定曲目和理由仅用于预览，不代表真实服务的推荐效果；[正式站点](https://audio.deline.top) 的在线曲目和可用性由第三方服务决定。点击截图可查看原图。
 
 ## 工作原理
 

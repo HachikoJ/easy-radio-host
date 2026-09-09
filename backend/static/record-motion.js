@@ -139,7 +139,7 @@ export function createRecordMotion(stages, audio) {
   });
   surfaces.forEach(({ canvas }) => observer.observe(canvas));
   new MutationObserver(paint).observe(document.documentElement, { attributes: true, attributeFilter: ['data-appearance'] });
-  import('./record-scene.js').then(({ createRecordScene }) => {
+  import('./record-scene.js?v=20260909-2').then(({ createRecordScene }) => {
     for (const surface of surfaces) {
       const canvas = surface.canvas.cloneNode(false);
       try {
