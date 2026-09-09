@@ -27,21 +27,32 @@ LYRIC_CACHE_TTL = 300
 LYRIC_CACHE_SIZE = 128
 _lyric_cache = OrderedDict()
 _lyric_cache_lock = Lock()
+PLAY_MAX_BYTES = 64 * 1024
+PLAY_PROBE_BYTES = 512
+PLAY_TIMEOUT = 5
+PLAY_BUDGET = 20
+PLAY_CACHE_TTL = 45
+PLAY_CACHE_SIZE = 128
+PLAY_CDN_DOMAINS = ("joox.com", "126.net", "163.com", "qq.com")
+_play_cache = OrderedDict()
+_play_cache_lock = Lock()
 
 
-def http_get(url, tries=3):
+def http_get(url, tries=1, timeout=PLAY_TIMEOUT):
     for n in range(tries):
         req = urllib.request.Request(
             url, headers={"User-Agent": UA,
                           "Referer": "https://music.gdstudio.xyz/"})
         try:
-            with urllib.request.urlopen(req, timeout=15) as r:
-                return r.status, r.read()
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                body = r.read(PLAY_MAX_BYTES + 1)
+                return (r.status, body) if len(body) <= PLAY_MAX_BYTES else (502, b"")
         except urllib.error.HTTPError as e:
-            if e.code in (403, 503, 429):
-                time.sleep(1.0 * (n + 1))
+            code = e.code
+            e.close()
+            if code in (403, 503, 429) and n + 1 < tries:
                 continue
-            return e.code, e.read()
+            return code, b""
         except Exception:
             return 0, b""
     return 503, b"limit"
@@ -126,37 +137,109 @@ def lyrics(source: str, song_id: str):
     return result
 
 
-def _resolve_play_url(source, sid):
-    # 逐档取真实播放直链
+def _allowed_media_url(url):
+    if not isinstance(url, str):
+        return False
+    try:
+        parts = urllib.parse.urlsplit(url)
+        host = (parts.hostname or "").lower()
+        return (parts.scheme in ("https", "http") and not parts.username and not parts.password
+                and parts.port in (None, 80, 443)
+                and any(host == domain or host.endswith("." + domain) for domain in PLAY_CDN_DOMAINS))
+    except ValueError:
+        return False
+
+
+class _MediaRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if not _allowed_media_url(newurl):
+            raise urllib.error.URLError("unsupported media host")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+def _has_audio_header(body):
+    return (body.startswith((b"ID3", b"fLaC", b"OggS"))
+            or (len(body) >= 2 and body[0] == 0xff and body[1] & 0xe0 == 0xe0)
+            or (len(body) >= 12 and body[4:8] == b"ftyp")
+            or (body.startswith(b"RIFF") and body[8:12] == b"WAVE"))
+
+
+def _media_available(url, timeout):
+    if not _allowed_media_url(url):
+        return False
+    request = urllib.request.Request(url, headers={
+        "User-Agent": UA, "Referer": "https://music.gdstudio.xyz/",
+        "Range": f"bytes=0-{PLAY_PROBE_BYTES - 1}",
+    })
+    try:
+        opener = urllib.request.build_opener(_MediaRedirectHandler())
+        with opener.open(request, timeout=timeout) as response:
+            return (response.status in (200, 206)
+                    and _has_audio_header(response.read(PLAY_PROBE_BYTES)))
+    except urllib.error.HTTPError as error:
+        error.close()
+    except (OSError, ValueError):
+        pass
+    return False
+
+
+def _resolve_play_url(source, sid, refresh=False):
+    key = (source, sid)
+    with _play_cache_lock:
+        cached = _play_cache.get(key)
+        if not refresh and cached and cached[0] > time.monotonic():
+            _play_cache.move_to_end(key)
+            return cached[1]
+        _play_cache.pop(key, None)
+
+    deadline = time.monotonic() + PLAY_BUDGET
+    checked = set()
+    # A nonempty signed URL can still return a CDN 404. Check a small range
+    # before redirecting, keeping every fallback on the same recording ID.
     for br in ("320", "192", "128"):
-        u = f"{API}?types=url&source={source}&id={sid}&br={br}"
-        code, body = http_get(u)
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
+        query = urllib.parse.urlencode({"types": "url", "source": source, "id": sid, "br": br})
+        code, body = http_get(f"{API}?{query}", timeout=min(PLAY_TIMEOUT, remaining))
         if code == 200:
             try:
                 d = json.loads(body)
-                url = (d or {}).get("url") or ""
-                if url:
-                    return url
-            except Exception:
-                pass
+                url = d.get("url") if isinstance(d, dict) else None
+            except (ValueError, TypeError):
+                continue
+            remaining = deadline - time.monotonic()
+            if not _allowed_media_url(url) or url in checked or remaining <= 0:
+                continue
+            checked.add(url)
+            if _media_available(url, min(PLAY_TIMEOUT, remaining)):
+                with _play_cache_lock:
+                    _play_cache[key] = (time.monotonic() + PLAY_CACHE_TTL, url)
+                    _play_cache.move_to_end(key)
+                    while len(_play_cache) > PLAY_CACHE_SIZE:
+                        _play_cache.popitem(last=False)
+                return url
     return None
 
 
 @app.get("/s/{source}/{song_id}.mp3")
-def play(source: str, song_id: str):
-    url = _resolve_play_url(source, song_id)
+def play(source: str, song_id: str, refresh: bool = False):
+    # FastAPI already decodes the path once; the library URLs may encode IDs twice.
+    song_id = urllib.parse.unquote(song_id)
+    source = "netease" if source == "id" else source
+    if source not in LYRIC_SOURCES or not re.fullmatch(r"[A-Za-z0-9_+=.-]{1,200}", song_id):
+        raise HTTPException(status_code=400, detail="invalid song identifier")
+    url = _resolve_play_url(source, song_id, refresh=refresh)
     if url:
-        return RedirectResponse(url)
-    return Response(status_code=404, content="audio unavailable")
+        return RedirectResponse(url, headers={"Cache-Control": "no-store"})
+    return Response(status_code=502, content="audio temporarily unavailable",
+                    headers={"Cache-Control": "no-store"})
 
 
 # 兼容旧路径: /s/id/<id>.mp3  -> netease
 @app.get("/s/id/{song_id}.mp3")
-def play_legacy(song_id: str):
-    url = _resolve_play_url("netease", song_id)
-    if url:
-        return RedirectResponse(url)
-    return Response(status_code=404, content="audio unavailable")
+def play_legacy(song_id: str, refresh: bool = False):
+    return play("netease", song_id, refresh=refresh)
 
 
 @app.get("/_health")

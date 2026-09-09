@@ -26,6 +26,12 @@ Claudio's branding, screenshots, tracks, album artwork, account credentials, and
 
 Tingjian independently implements common player interactions informed by this project and familiar music players: synchronized lyric highlighting, line seeking, automatic following, and optional playback animation. No upstream source code, branding, visual skin, screenshots, songs, lyrics, or artwork were copied. Tingjian's CSS animation follows actual playback state; it is not a real-time spectrum and does not intercept audio output.
 
+## 唱片交互参考 / Disc Interaction Reference
+
+旋转唱片、中心图片和外围律动借鉴网易云音乐等常见播放器的通用交互意象。听间独立实现唱片几何、样式和 CSS 动画，未复制网易云音乐的代码、品牌、界面皮肤或媒体资产，也不表示与其存在关联或获得背书。中心图片使用本项目已注明来源的主题摄影，不代表歌曲的实际专辑封面；外围律动随播放状态启停，不是实时音频频谱。
+
+The rotating disc, center image, and radial motion draw on common interaction ideas seen in NetEase Cloud Music and other music players. Tingjian independently implements the disc geometry, styling, and CSS animation. No NetEase Cloud Music code, branding, visual skin, or media assets were copied, and this reference implies no affiliation or endorsement. The center image uses this project's attributed theme photography rather than the track's actual album artwork. Radial motion follows playback state and is not a real-time audio spectrum.
+
 ## Embeat
 
 - 项目 / Project: [gdstudio-org/Embeat](https://github.com/gdstudio-org/Embeat)

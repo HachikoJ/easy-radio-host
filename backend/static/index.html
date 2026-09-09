@@ -66,7 +66,6 @@
         <div id="lyrics-home">
           <section class="lyrics-panel" id="lyrics-panel" aria-label="歌词">
             <div class="lyrics-heading"><h2>歌词</h2><label><input id="motion-enabled" type="checkbox" role="switch" checked>播放动效</label></div>
-            <div class="lyrics-visualizer" id="lyrics-visualizer" aria-hidden="true"></div>
             <p class="motion-status" id="motion-status">等待播放</p>
             <div class="lyrics-status-row"><p id="lyrics-status" role="status">选择歌曲后显示歌词</p><button id="lyrics-retry" class="icon-button" aria-label="重新获取歌词" data-tip="重新获取歌词" hidden><span class="icon" style="--icon:url(assets/RefreshCw.svg)"></span></button></div>
             <div id="lyrics-lines" class="lyrics-lines" role="region" aria-label="歌词内容" tabindex="0"></div>
@@ -92,7 +91,7 @@
   </main>
 
   <footer class="player-bar" aria-label="播放控制">
-    <div class="track-summary"><img id="mini-cover" src="assets/coffee.jpg" alt="" width="48" height="48"><div><strong id="track-title">还没有开始播放</strong><span id="track-kind">午后咖啡 · 小蓝</span><button class="player-lyric" id="player-lyric" aria-label="查看歌词" disabled><span id="player-motion" aria-hidden="true"></span><span id="player-lyric-text">选择歌曲后显示歌词</span></button></div></div>
+    <div class="track-summary"><img id="mini-cover" src="assets/coffee.jpg" alt="" width="48" height="48"><div><strong id="track-title">还没有开始播放</strong><span id="track-kind">午后咖啡 · 小蓝</span><button class="player-lyric" id="player-lyric" aria-label="查看歌词" disabled><span id="player-lyric-text">选择歌曲后显示歌词</span></button></div></div>
     <div class="transport"><div class="transport-buttons"><button class="icon-button" id="previous" aria-label="上一段" data-tip="上一段" disabled><span class="icon" style="--icon:url(assets/SkipBack.svg)"></span></button><button class="play-button" id="play" aria-label="开始收听" data-tip="开始收听"><span class="icon" id="play-icon" style="--icon:url(assets/Play.svg)"></span></button><button class="icon-button" id="next" aria-label="下一段" data-tip="下一段" disabled><span class="icon" style="--icon:url(assets/SkipForward.svg)"></span></button><button class="icon-button stop-button" id="stop" aria-label="停止播放" data-tip="停止播放" disabled><span class="icon" style="--icon:url(assets/Square.svg)"></span></button></div><div class="progress"><time id="elapsed">0:00</time><input id="seek" type="range" min="0" max="1000" value="0" aria-label="播放进度" disabled><time id="duration">0:00</time></div></div>
     <div class="volume"><button class="icon-button" id="mute" aria-label="静音" data-tip="静音"><span class="icon" id="volume-icon" style="--icon:url(assets/Volume2.svg)"></span></button><input id="volume" type="range" min="0" max="100" value="75" aria-label="音量"><span id="volume-value">75%</span></div>
   </footer>

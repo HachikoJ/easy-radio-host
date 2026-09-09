@@ -6,22 +6,24 @@ export function createLyricsExperience({ audio, state, seek, demo }) {
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   const focusMount = document.createElement('div'); focusMount.id = 'lyrics-focus';
   document.querySelector('.focus-copy').insertBefore(focusMount, document.querySelector('.up-next'));
-  const summaryMotion = document.createElement('div'); summaryMotion.className = 'summary-motion';
-  document.querySelector('.show-summary').insertBefore(summaryMotion, document.querySelector('.show-actions'));
-  for (const target of [...document.querySelectorAll('.cover-wrap,.focus-art'), summaryMotion, get('lyrics-visualizer'), get('player-motion')]) {
-    const bars = document.createElement('span'); bars.className = 'playback-motion'; bars.setAttribute('aria-hidden', 'true');
-    const count = target === get('lyrics-visualizer') ? 32 : target === get('player-motion') ? 5 : 15;
-    for (let i = 0; i < count; i++) {
-      const bar = document.createElement('i');
-      bar.style.setProperty('--beat-delay', `${-(i % 7) * .17}s`);
-      bar.style.setProperty('--beat-duration', `${.55 + (i % 5) * .13}s`);
-      bar.style.setProperty('--beat-height', `${40 + (i * 17 % 60)}%`);
-      bars.append(bar);
+  for (const target of document.querySelectorAll('.cover-wrap,.focus-art')) {
+    const artwork = target.querySelector('img');
+    const stage = document.createElement('div'); stage.className = 'record-stage';
+    const disc = document.createElement('div'); disc.className = 'record-disc';
+    target.insertBefore(stage, artwork); disc.append(artwork); stage.append(disc);
+    const ring = document.createElement('div'); ring.className = 'record-rhythm'; ring.setAttribute('aria-hidden', 'true');
+    for (let i = 0; i < 72; i++) {
+      const spoke = document.createElement('span'), pulse = document.createElement('i');
+      spoke.style.setProperty('--angle', `${i * 5}deg`);
+      pulse.style.setProperty('--beat-delay', `${-i * .137}s`);
+      pulse.style.setProperty('--beat-duration', `${.7 + (i % 7) * .11}s`);
+      spoke.append(pulse); ring.append(spoke);
     }
-    target.append(bars);
+    stage.append(ring);
   }
   let itemKey = null, controller = null, lines = [], timed = false, active = -2;
   let translations = [], offset = 0, ready = false, motion = true;
+  let browseTimer = null;
   try { motion = localStorage.getItem('tingjian.motion.v1') !== 'off'; } catch { /* Optional preference. */ }
   get('motion-enabled').checked = motion;
 
@@ -44,7 +46,7 @@ export function createLyricsExperience({ audio, state, seek, demo }) {
   });
 
   function center(force = false) {
-    if (!get('lyrics-follow').checked || active < 0 || !viewport.children[active]) return;
+    if (browseTimer || !get('lyrics-follow').checked || active < 0 || !viewport.children[active]) return;
     const line = viewport.children[active];
     viewport.scrollTo({ top: line.offsetTop - viewport.clientHeight / 2 + line.offsetHeight / 2, behavior: force || reduced.matches ? 'instant' : 'smooth' });
   }
@@ -66,7 +68,7 @@ export function createLyricsExperience({ audio, state, seek, demo }) {
       node.className = 'lyric-line';
       if (timed) {
         node.type = 'button';
-        node.addEventListener('click', () => { if (!Number.isFinite(audio.duration) || audio.duration <= 0) return; get('lyrics-follow').checked = true; seek(Math.max(0, line.time + offset)); update(true); });
+        node.addEventListener('click', () => { if (!Number.isFinite(audio.duration) || audio.duration <= 0) return; resumeFollow(); get('lyrics-follow').checked = true; seek(Math.max(0, line.time + offset)); update(true); });
       }
       const original = document.createElement('span'); original.textContent = line.text || '· · ·'; node.append(original);
       if (timed && get('lyrics-translation').checked) {
@@ -89,6 +91,7 @@ export function createLyricsExperience({ audio, state, seek, demo }) {
   }
   async function load(item) {
     controller?.abort();
+    clearTimeout(browseTimer); browseTimer = null;
     const request = new AbortController(); controller = request;
     lines = []; translations = []; timed = false; active = -2; offset = 0;
     viewport.replaceChildren(); viewport.scrollTop = 0;
@@ -138,13 +141,17 @@ export function createLyricsExperience({ audio, state, seek, demo }) {
     place(); motionState();
     if (key !== itemKey) { itemKey = key; load(item); }
   }
-  const manualScroll = () => { if (timed) get('lyrics-follow').checked = false; };
+  function resumeFollow() { clearTimeout(browseTimer); browseTimer = null; center(true); }
+  const manualScroll = () => {
+    if (!timed || !get('lyrics-follow').checked) return;
+    clearTimeout(browseTimer);
+    browseTimer = setTimeout(resumeFollow, 3000);
+  };
   viewport.addEventListener('wheel', manualScroll, { passive: true });
   viewport.addEventListener('touchmove', manualScroll, { passive: true });
   viewport.addEventListener('pointerdown', event => { if (event.target === viewport) manualScroll(); });
-  viewport.addEventListener('focusin', manualScroll);
   viewport.addEventListener('keydown', event => { if (['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End'].includes(event.key)) manualScroll(); });
-  get('lyrics-follow').addEventListener('change', () => center(true));
+  get('lyrics-follow').addEventListener('change', resumeFollow);
   get('lyrics-offset').addEventListener('input', () => { offset = Math.max(-10, Math.min(10, Number(get('lyrics-offset').value) || 0)); update(true); });
   get('lyrics-offset').addEventListener('change', () => { get('lyrics-offset').value = String(offset); });
   get('lyrics-translation').addEventListener('change', draw);

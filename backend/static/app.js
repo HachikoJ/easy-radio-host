@@ -16,6 +16,7 @@ let selected = themes[0], activeTheme = themes[0];
 let queue = [], index = -1, interrupt = null, recent = [];
 let playing = false, mode = 'none', textPosition = 0, textDuration = 0;
 let timer = null, lastTick = 0, nextSeek = 0, mediaGeneration = 0;
+let mediaRetryUsed = false, mediaRetryTimer = null, failedGeneration = -1;
 let generation = null, chatRequest = null, retryAction = null;
 let programmeVersion = 0;
 let muted = false, volume = .75;
@@ -158,6 +159,7 @@ function renderProgress() {
 }
 function resetMedia() {
   mediaGeneration++;
+  clearTimeout(mediaRetryTimer); mediaRetryTimer = null;
   clearInterval(timer); timer = null; mode = 'none'; playing = false;
   audio.pause(); audio.removeAttribute('src'); audio.load();
 }
@@ -166,8 +168,9 @@ function startText(item, offset, autoplay) {
   lastTick = performance.now();
   timer = setInterval(() => { const now = performance.now(); if (playing) textPosition += (now - lastTick) / 1000; lastTick = now; renderProgress(); if (playing && textPosition >= textDuration) advance(); }, 100);
 }
-function activate(offset = 0, autoplay = true) {
+function activate(offset = 0, autoplay = true, recovering = false) {
   resetMedia();
+  if (!recovering) mediaRetryUsed = false;
   const item = current();
   if (!item) { renderPlayback(); return; }
   if (item.kind === 'text' || (!item.url && item.kind === 'talk')) {
@@ -176,6 +179,7 @@ function activate(offset = 0, autoplay = true) {
     let url;
     try { url = new URL(item.url, location.href); if (!['http:', 'https:', 'blob:'].includes(url.protocol)) throw new Error(); }
     catch { notify('歌曲地址无效，请切换其他片段。'); renderPlayback(); return; }
+    if (recovering) { url.searchParams.set('refresh', '1'); url.searchParams.set('_retry', String(Date.now())); }
     mode = 'media'; nextSeek = offset; audio.src = url.href;
     audio.volume = volume; audio.muted = muted;
     if (autoplay) playMedia();
@@ -239,14 +243,25 @@ function insert(items, after) {
   activate();
 }
 function handleMediaError() {
-  if (mode !== 'media' || !current()) return;
+  if (mode !== 'media' || !current() || failedGeneration === mediaGeneration) return;
+  failedGeneration = mediaGeneration;
   const item = current();
   if (item.kind === 'talk' && item.text) {
     resetMedia(); startText(item, 0, true);
     notify('口播音频暂时不可用，正在显示文稿。');
   } else {
+    const url = new URL(item.url, location.href);
+    if (!mediaRetryUsed && url.origin === location.origin && /\/s\/(joox|netease|id)\/[^/]+\.mp3$/.test(url.pathname)) {
+      const offset = position();
+      mediaRetryUsed = true;
+      resetMedia();
+      notify('音源连接中断，正在重新获取可用地址…');
+      mediaRetryTimer = setTimeout(() => activate(offset, true, true), 500);
+      renderPlayback();
+      return;
+    }
     audio.pause(); playing = false;
-    notify('这段音频暂时无法播放，可重试或切换下一段。', () => activate());
+    notify('此音源暂时不可用，已尝试重新连接。可重试或切换下一段。', () => activate(position(), true, true));
   }
   renderPlayback();
 }
@@ -361,6 +376,7 @@ audio.addEventListener('pause', () => { if (mode === 'media' && audio.paused) { 
 audio.addEventListener('playing', () => {
   if (mode !== 'media' || audio.paused) return;
   playing = true;
+  if (mediaRetryUsed && $('notice-text').textContent === '音源连接中断，正在重新获取可用地址…') clearNotice();
   const item = current();
   if (item?.kind === 'song' && item !== lastRecentItem) {
     recent = [...recent.filter(title => title !== item.title), item.title].slice(-30);
