@@ -90,15 +90,26 @@ function createListeningExperience(actions) {
     document.documentElement.dataset.appearance = appearance;
     const label = appearance === 'dark' ? '切换浅色模式' : '切换深色模式';
     get('appearance').setAttribute('aria-label', label); get('appearance').dataset.tip = label;
+    get('appearance').setAttribute('aria-pressed', String(appearance === 'dark'));
     get('appearance-icon').style.setProperty('--icon', `url(assets/${appearance === 'dark' ? 'Sun' : 'Moon'}.svg)`);
     document.querySelector('meta[name="theme-color"]').content = appearance === 'dark' ? '#17191c' : '#f6f7f9';
   }
-  let appearance = 'light';
-  try { if (localStorage.getItem('tingjian.appearance.v1') === 'dark') appearance = 'dark'; } catch { /* Storage is optional. */ }
+  const systemAppearance = matchMedia('(prefers-color-scheme: dark)');
+  let storedAppearance = null;
+  try {
+    const saved = localStorage.getItem('tingjian.appearance.v1');
+    if (saved === 'light' || saved === 'dark') storedAppearance = saved;
+  } catch { /* Storage is optional. */ }
+  let appearance = storedAppearance || (systemAppearance.matches ? 'dark' : 'light');
   setAppearance(appearance);
+  systemAppearance.addEventListener('change', event => {
+    if (storedAppearance) return;
+    appearance = event.matches ? 'dark' : 'light';
+    setAppearance(appearance);
+  });
   get('appearance').addEventListener('click', () => {
-    appearance = appearance === 'dark' ? 'light' : 'dark'; setAppearance(appearance);
-    try { localStorage.setItem('tingjian.appearance.v1', appearance); } catch { actions.notify('当前浏览器无法记住配色，下次打开将使用浅色。'); }
+    appearance = appearance === 'dark' ? 'light' : 'dark'; storedAppearance = appearance; setAppearance(appearance);
+    try { localStorage.setItem('tingjian.appearance.v1', appearance); } catch { actions.notify('当前浏览器无法记住配色，下次打开将跟随系统设置。'); }
   });
   function seekBy(delta) { actions.seek((document.getElementById('audio').currentTime || 0) + delta); }
   document.addEventListener('keydown', event => {
@@ -107,6 +118,8 @@ function createListeningExperience(actions) {
     if (event.code === 'Space') { event.preventDefault(); actions.state().playing ? actions.pause() : actions.play(); }
     if (event.key === 'ArrowLeft') { event.preventDefault(); seekBy(-5); }
     if (event.key === 'ArrowRight') { event.preventDefault(); seekBy(5); }
+    if (event.key === 'ArrowUp') { event.preventDefault(); actions.adjustVolume(.05); }
+    if (event.key === 'ArrowDown') { event.preventDefault(); actions.adjustVolume(-.05); }
   });
 
   const session = navigator.mediaSession;

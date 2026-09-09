@@ -1,6 +1,6 @@
-import { createLyricsExperience } from './lyrics.js?v=20260909-2';
-import { createRecommendationExperience } from './recommendations.js?v=20260909-2';
-import { createQuietLayout } from './layout.js?v=20260909-2';
+import { createLyricsExperience } from './lyrics.js?v=20260909-3';
+import { createRecommendationExperience } from './recommendations.js?v=20260909-3';
+import { createQuietLayout } from './layout.js?v=20260909-3';
 
 const $ = id => document.getElementById(id);
 const audio = $('audio');
@@ -71,7 +71,7 @@ async function request(path, body, controller) {
   const timeout = setTimeout(() => controller.abort('timeout'), path === '/api/playback/resolve' ? 60000 : 240000);
   try {
     if (demo) {
-      const { respond } = await import('./demo.js?v=20260909-2');
+      const { respond } = await import('./demo.js?v=20260909-3');
       return await respond(path, body, controller.signal);
     }
     const response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: controller.signal });
@@ -141,7 +141,9 @@ function renderPlayback() {
   const item = current(), busy = Boolean(generation);
   document.body.classList.toggle('has-programme', queue.length > 0 || Boolean(item));
   document.body.classList.toggle('has-song', item?.kind === 'song');
+  document.body.classList.toggle('has-current', Boolean(item));
   document.body.classList.toggle('preparing-programme', busy);
+  document.body.dataset.playbackState = busy && !item ? 'preparing' : mode === 'waiting' || pausedWaiting ? 'waiting' : ['recovering', 'announcement', 'cooldown'].includes(mode) ? 'recovering' : item && playing ? 'playing' : item ? 'paused' : queue.length ? 'complete' : 'idle';
   $('generate').disabled = busy;
   document.querySelectorAll('.theme-card').forEach(button => { button.disabled = busy; });
   $('cancel-generate').hidden = !busy;
@@ -158,11 +160,12 @@ function renderPlayback() {
   $('next').disabled = !item;
   $('stop').disabled = !item && !busy && !playing && !pausedWaiting;
   $('track-title').textContent = item ? item.title : queue.length ? '本期已播完' : '还没有开始播放';
-  $('track-kind').textContent = item ? `${interrupt ? '互动插播' : item.kind === 'song' ? '歌曲' : '主持人口播'} · ${activeTheme.name}` : `${selected.name} · 小蓝`;
+  $('track-kind').textContent = item ? item.kind === 'song' ? `${item.artist || '在线音乐'} · ${activeTheme.name}` : `小蓝 · ${activeTheme.name}` : queue.length ? `小蓝 · 本期已播完` : '小蓝 · 等待开播';
   $('mini-cover').src = `assets/${(item ? activeTheme : selected).image}.jpg`;
   $('transcript').hidden = !item || item.kind === 'song' || !item.text;
   $('transcript-text').textContent = item && item.kind !== 'song' ? item.text : '';
   $('show-status').textContent = busy ? '小蓝正在准备节目' : mode === 'cooldown' ? '小蓝陪你聊一会儿' : mode === 'waiting' ? '等待自动续播' : mode === 'announcement' ? '小蓝正在提醒' : item && selected !== activeTheme ? `待切换 · 正在收听${activeTheme.name}` : item ? playing ? interrupt ? '互动插播中' : '正在播放' : '已暂停' : pausedWaiting ? '已暂停自动续播' : queue.length ? '本期已播完' : '准备就绪';
+  $('show-theme').textContent = (item ? activeTheme : selected).detail;
   $('status-dot').classList.toggle('playing', playing);
   $('now-title').textContent = item?.title || selected.name;
   $('now-title').title = $('now-title').textContent;
@@ -696,6 +699,12 @@ function updateVolume() {
   const label = muted ? '取消静音' : '静音'; $('mute').setAttribute('aria-label', label); $('mute').dataset.tip = label;
   setIcon('volume-icon', muted ? 'VolumeX' : 'Volume2');
 }
+function adjustVolume(delta) {
+  if (muted && delta > 0) muted = false;
+  else if (!muted) volume = Math.max(0, Math.min(1, volume + delta));
+  muted = volume === 0;
+  updateVolume();
+}
 $('seek').addEventListener('input', event => { if (mode === 'media' && Number.isFinite(audio.duration)) { audio.currentTime = audio.duration * Number(event.target.value) / 1000; renderProgress(); } });
 audio.addEventListener('loadedmetadata', () => { if (mode !== 'media') return; if (nextSeek && Number.isFinite(audio.duration)) audio.currentTime = Math.min(nextSeek, Math.max(0, audio.duration - .1)); nextSeek = 0; renderProgress(); });
 audio.addEventListener('timeupdate', renderProgress);
@@ -722,7 +731,7 @@ listening = createListeningExperience({
   play: () => { if (!playing) togglePlay(); }, pause: pausePlayback, next: advance, previous, stop,
   seek: seconds => { if (mode === 'media' && Number.isFinite(audio.duration)) { audio.currentTime = Math.max(0, Math.min(audio.duration, seconds)); renderProgress(); } },
   replay: title => { if (chatRequest) { notify('小蓝正在回应，请稍后再点播。'); return; } sendChat(undefined, `请播放《${title}》`); },
-  notify
+  notify, adjustVolume
 });
 lyrics = createLyricsExperience({ audio, state: current, demo,
   seek: seconds => { if (mode === 'media' && Number.isFinite(audio.duration)) { audio.currentTime = Math.max(0, Math.min(audio.duration, seconds)); renderProgress(); } }

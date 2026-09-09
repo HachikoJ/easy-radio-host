@@ -12,20 +12,20 @@
   <meta name="twitter:card" content="summary_large_image">
   <title>听间 Tingjian · 你的 AI 音乐电台</title>
   <link rel="icon" href="assets/brand.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=20260909-2">
-  <link rel="stylesheet" href="listening.css?v=20260909-2">
-  <link rel="stylesheet" href="lyrics.css?v=20260909-2">
-  <link rel="stylesheet" href="recommendations.css?v=20260909-2">
-  <link rel="stylesheet" href="quiet.css?v=20260909-2">
-  <script src="listening.js?v=20260909-2" defer></script>
-  <script src="app.js?v=20260909-2" type="module"></script>
+  <link rel="stylesheet" href="style.css?v=20260909-3">
+  <link rel="stylesheet" href="listening.css?v=20260909-3">
+  <link rel="stylesheet" href="lyrics.css?v=20260909-3">
+  <link rel="stylesheet" href="recommendations.css?v=20260909-3">
+  <link rel="stylesheet" href="quiet.css?v=20260909-3">
+  <script src="listening.js?v=20260909-3" defer></script>
+  <script src="app.js?v=20260909-3" type="module"></script>
 </head>
 <body id="top">
   <a class="skip-link" href="#listening">跳到播放器</a>
   <aside class="sidebar">
     <a class="brand" href="#listening" aria-label="听间首页"><img src="assets/brand.svg" alt="" width="40" height="40"><span><strong>听间</strong><small>TINGJIAN RADIO</small></span></a>
     <nav aria-label="主导航">
-      <a class="nav-link active" href="#listening" aria-label="正在收听"><span class="icon" style="--icon:url(assets/Radio.svg)"></span><span>收听</span></a>
+      <a class="nav-link active" href="#listening" aria-label="正在收听" aria-current="page"><span class="icon" style="--icon:url(assets/Radio.svg)"></span><span>收听</span></a>
       <a class="nav-link" href="#themes" aria-label="主题电台"><span class="icon" style="--icon:url(assets/Compass.svg)"></span><span>电台</span></a>
       <a class="nav-link" href="#queue-section" aria-label="节目、收藏与历史"><span class="icon" style="--icon:url(assets/ListMusic.svg)"></span><span>节目</span></a>
       <a class="nav-link" href="#conversation" aria-label="点歌互动"><span class="icon" style="--icon:url(assets/MessageCircle.svg)"></span><span>点歌</span></a>
@@ -34,14 +34,14 @@
   </aside>
 
   <main>
-    <header class="page-header"><div class="page-greeting"><p class="eyebrow" id="today"></p><h1>留一点时间，给音乐。</h1></div><span class="demo-badge" id="demo-badge" hidden>演示节目</span><div class="view-actions"><button class="icon-button" id="lyrics-toggle" aria-label="查看歌词" data-tip="查看歌词"><span class="icon" style="--icon:url(assets/Captions.svg)"></span></button><button class="icon-button" id="appearance" aria-label="切换深色模式" data-tip="切换深色模式"><span class="icon" id="appearance-icon" style="--icon:url(assets/Moon.svg)"></span></button><a class="icon-button" href="https://github.com/HachikoJ/easy-radio-host" target="_blank" rel="noopener noreferrer" aria-label="GitHub 项目" data-tip="GitHub 项目"><span class="icon" style="--icon:url(assets/ArrowUpRight.svg)"></span></a></div></header>
+    <header class="page-header"><div class="page-greeting"><p class="eyebrow" id="today"></p><h1>留一点时间，给音乐。</h1></div><span class="demo-badge" id="demo-badge" hidden>演示节目</span><div class="view-actions"><button class="icon-button" id="lyrics-toggle" aria-label="查看歌词" aria-controls="lyrics-lines" data-tip="查看歌词"><span class="icon" style="--icon:url(assets/Captions.svg)"></span></button><button class="icon-button" id="appearance" aria-label="切换深色模式" aria-pressed="false" data-tip="切换深色模式"><span class="icon" id="appearance-icon" style="--icon:url(assets/Moon.svg)"></span></button><a class="icon-button" href="https://github.com/HachikoJ/easy-radio-host" target="_blank" rel="noopener noreferrer" aria-label="GitHub 项目" data-tip="GitHub 项目"><span class="icon" style="--icon:url(assets/ArrowUpRight.svg)"></span></a></div></header>
     <div class="workspace">
       <div class="listen-column">
         <section class="listening" id="listening" aria-label="正在收听">
           <div class="cover-wrap"><img id="cover" src="assets/coffee.jpg" alt="午后咖啡主题封面" width="480" height="480"><span class="cover-caption"><span class="icon" style="--icon:url(assets/Headphones.svg)"></span>听间主题电台</span></div>
           <div class="show-summary">
             <p class="show-status"><span class="status-dot" id="status-dot"></span><span id="show-status" aria-live="polite">准备就绪</span></p>
-            <p class="selected-theme" id="show-theme">午后咖啡</p>
+            <p class="selected-theme" id="show-theme">轻松 · 慢一点</p>
             <div class="now-heading"><h2 id="now-title">午后咖啡</h2><div class="song-actions"><button class="icon-button favorite-action" id="favorite" aria-label="收藏当前歌曲" aria-pressed="false" data-tip="收藏当前歌曲" disabled><span class="icon" style="--icon:url(assets/Heart.svg)"></span></button><button class="icon-button" id="related" aria-label="生成同歌手延伸节目" data-tip="同歌手延伸" disabled><span class="icon" style="--icon:url(assets/Radio.svg)"></span></button><button class="icon-button" id="dislike" aria-label="少推荐这首" aria-pressed="false" data-tip="少推荐这首" disabled><span class="icon" style="--icon:url(assets/ThumbsDown.svg)"></span></button></div></div>
             <p class="recommendation-reason" id="recommendation-reason" hidden></p>
             <p class="show-slogan" id="show-slogan">忙里偷闲的一杯歌</p>
@@ -83,7 +83,7 @@
         </div>
         <div class="chat-composer">
           <p class="chat-error" id="chat-error" role="alert" hidden></p>
-          <form class="chat-form" id="chat-form" aria-busy="false"><label class="sr-only" for="message">点歌或与主持人聊天</label><textarea id="message" placeholder="想听什么，说给小蓝…" rows="2" maxlength="1000" aria-describedby="chat-error"></textarea><div class="composer-footer"><div class="composer-meta"><span class="chat-status" id="chat-status" role="status"></span><span id="message-count">0 / 1000</span></div><button class="send-button" id="send" type="submit" aria-label="发送给小蓝" data-tip="发送给小蓝" disabled><span class="icon" id="send-icon" style="--icon:url(assets/Send.svg)"></span></button></div></form>
+          <form class="chat-form" id="chat-form" aria-busy="false"><label class="sr-only" for="message">点歌或与主持人聊天</label><textarea id="message" placeholder="例如：想听陈奕迅的《十年》" rows="2" maxlength="1000" aria-describedby="chat-error"></textarea><div class="composer-footer"><div class="composer-meta"><span class="chat-status" id="chat-status" role="status"></span><span id="message-count">0 / 1000</span></div><button class="send-button" id="send" type="submit" aria-label="发送给小蓝" data-tip="发送给小蓝" disabled><span class="icon" id="send-icon" style="--icon:url(assets/Send.svg)"></span></button></div></form>
         </div>
       </aside>
     </div>
@@ -91,7 +91,7 @@
   </main>
 
   <footer class="player-bar" aria-label="播放控制">
-    <div class="track-summary"><img id="mini-cover" src="assets/coffee.jpg" alt="" width="48" height="48"><div><strong id="track-title">还没有开始播放</strong><span id="track-kind">午后咖啡 · 小蓝</span><button class="player-lyric" id="player-lyric" aria-label="查看歌词" disabled><span id="player-lyric-text">选择歌曲后显示歌词</span></button></div></div>
+    <div class="track-summary"><img id="mini-cover" src="assets/coffee.jpg" alt="" width="48" height="48"><div><strong id="track-title">还没有开始播放</strong><span id="track-kind">小蓝 · 等待开播</span><button class="player-lyric" id="player-lyric" aria-label="查看歌词" aria-controls="lyrics-lines" disabled><span id="player-lyric-text">选择歌曲后显示歌词</span></button></div></div>
     <div class="transport"><div class="transport-buttons"><button class="icon-button" id="previous" aria-label="上一段" data-tip="上一段" disabled><span class="icon" style="--icon:url(assets/SkipBack.svg)"></span></button><button class="play-button" id="play" aria-label="开始收听" data-tip="开始收听"><span class="icon" id="play-icon" style="--icon:url(assets/Play.svg)"></span></button><button class="icon-button" id="next" aria-label="下一段" data-tip="下一段" disabled><span class="icon" style="--icon:url(assets/SkipForward.svg)"></span></button><button class="icon-button stop-button" id="stop" aria-label="停止播放" data-tip="停止播放" disabled><span class="icon" style="--icon:url(assets/Square.svg)"></span></button></div><div class="progress"><time id="elapsed">0:00</time><input id="seek" type="range" min="0" max="1000" value="0" aria-label="播放进度" disabled><time id="duration">0:00</time></div></div>
     <div class="volume"><button class="icon-button" id="mute" aria-label="静音" data-tip="静音"><span class="icon" id="volume-icon" style="--icon:url(assets/Volume2.svg)"></span></button><input id="volume" type="range" min="0" max="100" value="75" aria-label="音量"><span id="volume-value">75%</span></div>
   </footer>

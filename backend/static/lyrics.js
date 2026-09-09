@@ -1,5 +1,5 @@
-import { parseLyrics, activeLine, lyricEndpoint, lyricRetryAfter } from './lyrics-data.js?v=20260909-2';
-import { createRecordMotion } from './record-motion.js?v=20260909-2';
+import { parseLyrics, activeLine, lyricEndpoint, lyricRetryAfter } from './lyrics-data.js?v=20260909-3';
+import { createRecordMotion } from './record-motion.js?v=20260909-3';
 
 export function createLyricsExperience({ audio, state, seek, demo }) {
   const get = id => document.getElementById(id);

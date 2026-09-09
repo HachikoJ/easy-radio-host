@@ -56,7 +56,7 @@ export function createQuietLayout({ icon }) {
   window.addEventListener('resize', sizeSettings);
   window.addEventListener('scroll', sizeSettings, { passive: true });
 
-  const drawer = document.createElement('dialog'); drawer.className = 'utility-drawer';
+  const drawer = document.createElement('dialog'); drawer.className = 'utility-drawer'; drawer.id = 'utility-drawer';
   drawer.setAttribute('aria-modal', 'false'); drawer.setAttribute('aria-labelledby', 'drawer-title');
   const drawerHeader = document.createElement('div'); drawerHeader.className = 'drawer-heading';
   const title = document.createElement('h2'); title.id = 'drawer-title';
@@ -70,9 +70,22 @@ export function createQuietLayout({ icon }) {
     ['conversation', { title: '点歌互动', node: get('conversation') }]
   ]);
   for (const { node } of sections.values()) { node.hidden = true; content.append(node); }
-  const shade = document.createElement('div'); shade.className = 'drawer-shade'; shade.hidden = true;
+  const shade = document.createElement('div'); shade.className = 'drawer-shade'; shade.hidden = true; shade.setAttribute('aria-hidden', 'true');
   document.body.append(shade, drawer);
   let opener = null, activePanel = null;
+  const navLinks = [...nav.querySelectorAll('a')];
+  for (const link of navLinks) {
+    link.setAttribute('aria-controls', link.hash === '#listening' ? 'listening' : drawer.id);
+    if (link.hash !== '#listening') link.setAttribute('aria-expanded', 'false');
+  }
+  const updateNavigation = id => {
+    for (const link of navLinks) {
+      const active = link.hash === `#${id}`;
+      link.classList.toggle('active', active);
+      if (link.hash !== '#listening') link.setAttribute('aria-expanded', String(active));
+      if (active) link.setAttribute('aria-current', 'page'); else link.removeAttribute('aria-current');
+    }
+  };
   const fitChatViewport = () => {
     drawer.classList.remove('compact-chat');
     drawer.style.removeProperty('--chat-top');
@@ -92,9 +105,9 @@ export function createQuietLayout({ icon }) {
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   function closeDrawer(restore = true) {
     if (!drawer.open) return;
-    drawer.close(); shade.hidden = true; activePanel = null;
+    drawer.close(); shade.hidden = true; document.body.classList.remove('drawer-open'); activePanel = null;
     get('listening').inert = false;
-    nav.querySelectorAll('a').forEach(link => link.classList.toggle('active', link.hash === '#listening'));
+    updateNavigation('listening');
     if (restore) opener?.focus({ preventScroll: true });
   }
   function openDrawer(id, trigger) {
@@ -108,13 +121,13 @@ export function createQuietLayout({ icon }) {
     title.textContent = selected.title;
     if (!drawer.open) drawer.show();
     fitChatViewport();
-    shade.hidden = false;
+    shade.hidden = false; document.body.classList.add('drawer-open');
     get('listening').inert = true;
-    nav.querySelectorAll('a').forEach(link => link.classList.toggle('active', link.hash === `#${id}`));
+    updateNavigation(id);
     if (!reduced.matches) content.animate([{ opacity: .2, transform: 'translateX(14px)' }, { opacity: 1, transform: 'none' }], { duration: 220, easing: 'ease-out' });
     (id === 'conversation' ? get('message') : close).focus({ preventScroll: true });
   }
-  nav.querySelectorAll('a').forEach(link => link.addEventListener('click', event => {
+  navLinks.forEach(link => link.addEventListener('click', event => {
     event.preventDefault(); openDrawer(link.hash.slice(1), link);
   }));
   document.querySelector('.brand').addEventListener('click', event => { event.preventDefault(); closeDrawer(false); });
@@ -130,6 +143,14 @@ export function createQuietLayout({ icon }) {
     if (event.target.closest('button') && !event.target.closest('.favorite-remove')) closeDrawer();
   });
   document.addEventListener('keydown', event => {
+    if (event.key === 'Tab' && drawer.open) {
+      const focusable = [...drawer.querySelectorAll('button:not(:disabled),a[href],input:not(:disabled),textarea:not(:disabled),select:not(:disabled),summary,[tabindex]:not([tabindex="-1"])')].filter(node => !node.hidden && node.getClientRects().length);
+      if (!focusable.length) { event.preventDefault(); drawer.focus(); return; }
+      const first = focusable[0], last = focusable.at(-1);
+      if (event.shiftKey && (document.activeElement === first || !drawer.contains(document.activeElement))) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+      return;
+    }
     if (event.key !== 'Escape') return;
     if (settings.open) { settings.open = false; summary.focus(); }
     else if (drawer.open) closeDrawer();
