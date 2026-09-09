@@ -1,3 +1,5 @@
+import { createLyricsExperience } from './lyrics.js';
+
 const $ = id => document.getElementById(id);
 const audio = $('audio');
 const demo = new URLSearchParams(location.search).get('demo') === '1';
@@ -16,7 +18,7 @@ let timer = null, lastTick = 0, nextSeek = 0, mediaGeneration = 0;
 let generation = null, chatRequest = null, retryAction = null;
 let programmeVersion = 0;
 let muted = false, volume = .75;
-let listening;
+let listening, lyrics;
 
 function icon(name) {
   const span = document.createElement('span');
@@ -135,6 +137,7 @@ function renderPlayback() {
   $('status-dot').classList.toggle('playing', playing);
   $('now-title').textContent = item?.title || selected.name;
   listening?.render();
+  lyrics?.render();
   renderQueue(); renderProgress();
 }
 function renderProgress() {
@@ -348,5 +351,8 @@ listening = createListeningExperience({
   seek: seconds => { if (mode === 'media' && Number.isFinite(audio.duration)) { audio.currentTime = Math.max(0, Math.min(audio.duration, seconds)); renderProgress(); } },
   replay: title => { if (chatRequest) { notify('小蓝正在回应，请稍后再点播。'); return; } sendChat(undefined, `请播放《${title}》`); },
   notify
+});
+lyrics = createLyricsExperience({ audio, state: current, demo,
+  seek: seconds => { if (mode === 'media' && Number.isFinite(audio.duration)) { audio.currentTime = Math.max(0, Math.min(audio.duration, seconds)); renderProgress(); } }
 });
 updateVolume(); renderThemes(); renderPlayback();

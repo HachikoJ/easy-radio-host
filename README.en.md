@@ -30,6 +30,8 @@ Tingjian is an AI music radio for listeners who enjoy themed listening and are c
 - **Favorites and history:** Store up to 100 favorites and 50 recent tracks locally in your browser, deduplicated by title; history records songs only once playback actually starts.
 - **Song requests:** Chat with Xiaolan, request tracks, or control playback; cancel generation, retry failures, and keep your draft when a request fails.
 - **Online library:** Store track names, artists, sources, and IDs; resolve playback URLs on demand.
+- **Synchronized lyrics:** LRC line highlighting, tap-to-seek including 0 seconds, a follow toggle, and lyric delay adjustments from -10 to +10 seconds. Manual scrolling stops following; timestamped translations are optional. Plain text lyrics are not assigned guessed timings, and empty or failed results can be retried.
+- **Playback animation:** Lightweight CSS animation follows actual playback and stops during buffering, pauses, or when the page is hidden. It remembers the toggle and respects reduced-motion preferences; it is not a real-time spectrum.
 
 ## Product preview
 
@@ -52,6 +54,14 @@ Tingjian is an AI music radio for listeners who enjoy themed listening and are c
 </p>
 
 Screenshots show real generated shows and online music playback on the [live site](https://audio.deline.top). Theme photos represent listening settings, not actual album artwork. Track availability depends on third-party services.
+
+### Lyrics and animation
+
+<img src="docs/radio-lyrics.png" alt="Tingjian desktop focus mode: synchronized lyric highlighting, following, timing adjustment, and playback animation" width="100%">
+
+<img src="docs/radio-lyrics-mobile.png" alt="Tingjian mobile lyrics view: compact track details, lyrics, and bottom playback controls" width="375">
+
+These two screenshots use the explicitly labeled demo mode with original instrumental audio and original sample text, without reproducing third-party song lyrics.
 
 ## How it works
 
@@ -93,6 +103,8 @@ node scripts/serve-demo.mjs
 
 Open the [local demo](http://127.0.0.1:8131/?demo=1). Fixed demo shows are enabled only with an explicit `?demo=1`; the demo does not call AI or music APIs and does not establish online service availability. Follow the deployment steps above for real listening.
 
+The demo uses original synthesized instrumental music and clearly labeled original demo copy. Text in the demo lyrics view is not the song's lyrics.
+
 ### Key configuration
 
 | Variable | Purpose |
@@ -116,6 +128,7 @@ The `NAS_*` names are retained for compatibility and point to the online library
 | Main app :8100 | GET | `/voice/*.mp3` | Host narration |
 | Library proxy :8001 | GET | `/songs.txt` | Online playlist metadata |
 | Library proxy :8001 | GET | `/s/<source>/<id>.mp3` | Resolve a track URL and redirect |
+| Same-origin `/music/` → library proxy :8001 | GET | `/music/lyrics/{source}/{song_id}.json` | Fetch lyrics and available translations for the current song; the direct proxy path is `/lyrics/{source}/{song_id}.json` |
 
 ## Playlist maintenance
 
@@ -135,6 +148,7 @@ The script rewrites the resolved playlist, searches multiple sources, filters ve
 - Replaying a saved title requests a fresh match and playback URL. Favorites do not retain exact track IDs or permanent audio links, so a different version may be selected.
 - DeepSeek, MiniMax, and other services may incur charges. Pricing and quotas are set by each provider.
 - AI narration is not guaranteed to be factual. Track availability, version matching, and response times depend on third-party services.
+- Lyrics and translations come from the existing GD music API and may be unavailable or differ from the audio version. Only timestamped lyrics are synchronized; plain text is not assigned estimated timings. The proxy caches up to 128 responses in memory for 300 seconds each, without saving lyric files or distributing a lyric library in the repository. Lyrics belong to their respective rights holders.
 - The project is for personal learning and experimentation. Song rights belong to their respective owners; follow platform rules.
 - The project is experimental. The full upstream licensing terms have not been confirmed, and the repository does not yet declare a unified open-source license.
 
@@ -151,6 +165,8 @@ The script rewrites the resolved playlist, searches multiple sources, filters ve
 
 - [Original easy-radio-host project](https://gitee.com/weak0001/easy-radio-host) by `weak0001`; original attribution and copyright ownership are retained.
 - [Claudio](https://github.com/hllqkb/Claudio) by `hllqkb`, MIT; the Tingjian frontend independently implements interaction ideas from its immersive playback, light/dark themes, favorites/history, and system media controls. See [third-party sources and licenses](THIRD_PARTY_NOTICES.md), including the source revision and complete license text.
+- [Qiaomu Music Player Web](https://github.com/joeseesun/qiaomu-music-player-web) by Qiaomu / 向阳乔木, MIT; common interactions such as lyric following, tap-to-seek, and playback animation informed an independent implementation. No source code or assets were copied.
+- [lrc-kit 1.2.1](https://www.npmjs.com/package/lrc-kit/v/1.2.1), Copyright (c) 2016 Weirong Xu, MIT; used for LRC parsing with the [full license](backend/static/vendor/lrc-kit/LICENSE) and [source modification record](THIRD_PARTY_NOTICES.md#lrc-kit) retained.
 - [Lucide](https://lucide.dev) provides UI icons under ISC; [Unsplash](https://unsplash.com) provides theme photography. See [individual asset sources](backend/static/assets/SOURCES.md).
 - [Online music API](https://music-api.gdstudio.xyz/api.php) for multi-source search and URL resolution.
 - DeepSeek, MiniMax, edge-tts, and other dependencies; their rights and terms remain with their respective owners.

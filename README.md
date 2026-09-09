@@ -30,6 +30,8 @@
 - **收藏与历史**：浏览器本地保存最多 100 首收藏、50 条按标题去重的收听历史；歌曲实际开始播放后才记入历史。
 - **点歌互动**：与小蓝聊天、点歌或控制播放；支持生成取消、失败重试和失败时保留输入草稿。
 - **在线曲库**：歌单保存歌名、歌手、音源和 ID，播放时动态获取歌曲直链。
+- **同步歌词**：LRC 逐行高亮、点按歌词跳播（含 0 秒）、跟随开关和 -10 至 +10 秒歌词延后调整；手动滚动停止跟随，有时间戳的译文可选择显示。纯文本歌词不猜测时间，空结果或获取失败可重试。
+- **播放动效**：轻量 CSS 动画随实际播放启停，等待、暂停或页面隐藏时停止；支持记住开关和系统减少动态效果偏好，不是实时频谱。
 
 ## 产品预览
 
@@ -52,6 +54,14 @@
 </p>
 
 截图来自 [正式站点](https://audio.deline.top) 的真实节目与在线歌曲播放。主题摄影用于表达收听场景，并非歌曲的真实唱片封面。在线音源的曲目和可用性由第三方服务决定。
+
+### 歌词与动效
+
+<img src="docs/radio-lyrics.png" alt="听间桌面沉浸模式：歌词高亮、跟随开关、时间调整与播放动效" width="100%">
+
+<img src="docs/radio-lyrics-mobile.png" alt="听间手机歌词界面：紧凑曲目信息、歌词与底部播放控制" width="375">
+
+这两张截图来自明确标注的演示模式，使用原创器乐与原创演示文案，不收录第三方歌曲原词。
 
 ## 工作原理
 
@@ -93,6 +103,8 @@ node scripts/serve-demo.mjs
 
 打开 [本地演示](http://127.0.0.1:8131/?demo=1)。只有显式添加 `?demo=1` 才启用固定演示节目；演示不会调用 AI 或音乐 API，也不代表在线服务可用性。正式使用仍按上述步骤部署主应用。
 
+演示使用原创合成器乐与明确标注的原创演示文案，歌词区域展示的文案不是歌曲原词。
+
 ### 主要配置
 
 | 变量 | 用途 |
@@ -116,6 +128,7 @@ node scripts/serve-demo.mjs
 | 主应用 :8100 | GET | `/voice/*.mp3` | 主持人口播 |
 | 曲库代理 :8001 | GET | `/songs.txt` | 在线歌单元数据 |
 | 曲库代理 :8001 | GET | `/s/<source>/<id>.mp3` | 获取直链并跳转 |
+| 同域 `/music/` → 曲库代理 :8001 | GET | `/music/lyrics/{source}/{song_id}.json` | 获取当前歌曲歌词及可用译文；代理直连路径为 `/lyrics/{source}/{song_id}.json` |
 
 ## 歌单维护
 
@@ -135,6 +148,7 @@ node scripts/serve-demo.mjs
 - 再次点播会按标题重新请求匹配与播放地址；收藏不保存精确歌曲 ID 或永久音频链接，可能匹配到不同版本。
 - DeepSeek、MiniMax 等服务可能产生费用，价格与额度以各服务商为准。
 - AI 生成的口播不保证事实准确；歌曲可用性、版本匹配和响应时间依赖第三方服务。
+- 歌词与译文来自现有 GD 音乐 API，可能缺失或与音频版本不匹配；有时间戳才启用同步，不推算纯文本歌词时间。代理只在内存中缓存最多 128 条、每条 300 秒，不保存歌词文件或随仓库再分发歌词库；歌词版权归原权利人。
 - 本项目用于个人学习与体验，歌曲版权归相应权利人，使用时须遵守平台规则。
 - 项目处于实验阶段，目前未确认上游代码的完整授权条款，仓库尚未声明统一开源许可证。
 
@@ -151,6 +165,8 @@ node scripts/serve-demo.mjs
 
 - [easy-radio-host 原始项目](https://gitee.com/weak0001/easy-radio-host)，作者 `weak0001`；保留原作者署名与版权归属。
 - [Claudio](https://github.com/hllqkb/Claudio)，作者 `hllqkb`，MIT；听间前端参考其沉浸播放、明暗主题、收藏/历史和系统媒体控制交互，采用独立实现。详见[第三方来源与授权](THIRD_PARTY_NOTICES.md)，含来源版本与完整许可文本。
+- [Qiaomu Music Player Web](https://github.com/joeseesun/qiaomu-music-player-web)，作者 Qiaomu / 向阳乔木，MIT；参考歌词跟随、点按跳播和播放动效等通用交互并独立实现，未复制源码或资产。
+- [lrc-kit 1.2.1](https://www.npmjs.com/package/lrc-kit/v/1.2.1)，Copyright (c) 2016 Weirong Xu，MIT；用于解析 LRC，保留[完整许可](backend/static/vendor/lrc-kit/LICENSE)和[源码改动记录](THIRD_PARTY_NOTICES.md#lrc-kit)。
 - [Lucide](https://lucide.dev) 提供 ISC 授权的界面图标；[Unsplash](https://unsplash.com) 提供主题摄影，逐图来源见[资产来源](backend/static/assets/SOURCES.md)。
 - [在线音乐 API](https://music-api.gdstudio.xyz/api.php)，提供多音源搜索与取链。
 - DeepSeek、MiniMax、edge-tts 及其他第三方依赖；其权利和使用条款归各自权利人。

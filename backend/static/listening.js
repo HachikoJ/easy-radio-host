@@ -110,6 +110,7 @@ function createListeningExperience(actions) {
     get('focus-toggle').setAttribute('aria-pressed', String(on));
     get('focus-icon').style.setProperty('--icon', `url(assets/${on ? 'Minimize' : 'Maximize'}.svg)`);
     render(); window.scrollTo(0, 0);
+    window.dispatchEvent(new Event('tingjian:layout'));
     if (on) get('focus-title').focus({ preventScroll: true }); else get('focus-toggle').focus();
   }
   get('focus-toggle').addEventListener('click', () => setFocus(!focused));

@@ -14,8 +14,9 @@
   <link rel="icon" href="assets/brand.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="listening.css">
+  <link rel="stylesheet" href="lyrics.css">
   <script src="listening.js" defer></script>
-  <script src="app.js" defer></script>
+  <script src="app.js" type="module"></script>
 </head>
 <body id="top">
   <a class="skip-link" href="#listening">跳到播放器</a>
@@ -50,6 +51,15 @@
             <label class="toggle-label"><input id="auto" type="checkbox" role="switch" checked><span class="switch" aria-hidden="true"></span><span>连续播放下一期</span></label>
           </div>
         </section>
+        <div id="lyrics-home">
+          <section class="lyrics-panel" id="lyrics-panel" aria-label="歌词">
+            <div class="lyrics-heading"><h2>歌词</h2><label><input id="motion-enabled" type="checkbox" role="switch" checked>播放动效</label></div>
+            <div class="lyrics-status-row"><p id="lyrics-status" role="status">选择歌曲后显示歌词</p><button id="lyrics-retry" class="icon-button" aria-label="重新获取歌词" data-tip="重新获取歌词" hidden><span class="icon" style="--icon:url(assets/RefreshCw.svg)"></span></button></div>
+            <div id="lyrics-lines" class="lyrics-lines" role="region" aria-label="歌词内容" tabindex="0"></div>
+            <div class="lyrics-timing" id="lyrics-timing" hidden><label><input id="lyrics-follow" type="checkbox" checked>跟随播放</label><label id="translation-control" hidden><input id="lyrics-translation" type="checkbox" checked>译文</label><label for="lyrics-offset">歌词延后（秒）<input id="lyrics-offset" type="number" min="-10" max="10" step="0.5" value="0"></label></div>
+            <p id="lyrics-source" class="lyrics-source"></p>
+          </section>
+        </div>
         <div class="notice" id="notice" role="status" hidden><span id="notice-text"></span><button class="text-button" id="retry" hidden>重试</button><button class="icon-button" id="dismiss-notice" aria-label="关闭提示" data-tip="关闭提示"><span class="icon" style="--icon:url(assets/X.svg)"></span></button></div>
         <section class="theme-section" id="themes"><div class="section-heading"><h2>换一种心情</h2><span>主题电台</span></div><div class="theme-grid" id="theme-list" aria-label="选择节目主题"></div></section>
         <section class="queue-section" id="queue-section"><div class="library-tabs" role="tablist" aria-label="收听记录"><button id="tab-queue" role="tab" aria-selected="true" aria-controls="panel-queue">本期节目</button><button id="tab-favorites" role="tab" aria-selected="false" aria-controls="panel-favorites" tabindex="-1">我的收藏</button><button id="tab-history" role="tab" aria-selected="false" aria-controls="panel-history" tabindex="-1">最近听过</button></div><div id="panel-queue" role="tabpanel" aria-labelledby="tab-queue"><div class="section-heading"><span id="queue-count">尚未开播</span></div><div class="queue-empty" id="queue-empty"><span class="icon" style="--icon:url(assets/ListMusic.svg)"></span><p>节目单尚未生成</p></div><ol class="queue" id="queue" aria-label="节目片段"></ol></div><div id="panel-favorites" role="tabpanel" aria-labelledby="tab-favorites" hidden><p class="library-meta">此浏览器 · 收藏</p><p class="library-empty" id="favorites-empty">还没有收藏的歌曲</p><ol class="library-list" id="favorites-list" aria-label="收藏的歌曲"></ol></div><div id="panel-history" role="tabpanel" aria-labelledby="tab-history" hidden><p class="library-meta">此浏览器 · 最近 50 首</p><p class="library-empty" id="history-empty">还没有收听记录</p><ol class="library-list" id="history-list" aria-label="最近听过的歌曲"></ol></div><p class="library-status" id="library-status" role="status"></p></section>
