@@ -179,6 +179,8 @@ function activate(offset = 0, autoplay = true, recovering = false) {
     let url;
     try { url = new URL(item.url, location.href); if (!['http:', 'https:', 'blob:'].includes(url.protocol)) throw new Error(); }
     catch { notify('歌曲地址无效，请切换其他片段。'); renderPlayback(); return; }
+    if (item.kind === 'song' && !recovering && (audio.captureStream || audio.mozCaptureStream)) audio.crossOrigin = 'anonymous';
+    else audio.removeAttribute('crossorigin');
     if (recovering) { url.searchParams.set('refresh', '1'); url.searchParams.set('_retry', String(Date.now())); }
     mode = 'media'; nextSeek = offset; audio.src = url.href;
     audio.volume = volume; audio.muted = muted;

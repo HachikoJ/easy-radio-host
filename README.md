@@ -34,7 +34,7 @@
 - **点歌互动**：与小蓝聊天、点歌或控制播放；支持生成取消、失败重试和失败时保留输入草稿。
 - **在线曲库**：歌单保存歌名、歌手、音源和 ID，播放时动态获取歌曲直链；失效地址可回退到同一歌曲 ID 的可用码率，播放失败自动刷新一次，仍失败时提供重试与切换下一段。
 - **同步歌词**：底部播放器显示当前歌词，顶部歌词入口或底部歌词可直接打开沉浸视图。LRC 默认跟随播放并逐行高亮，点按可跳播（含 0 秒）；手动浏览后 3 秒恢复跟随，只有主动关闭跟随开关才持续停止。支持 -10 至 +10 秒延后调整和可选的时间戳译文。加载、无歌词、请求失败及超时分别提示，纯文本不猜测时间。
-- **播放动效**：旋转唱片中央展示主题图片，外围呈现环形律动；随实际播放启停，等待、暂停或页面隐藏时停止。记住动效开关并尊重系统减少动态效果设置；图片不是歌曲专辑封面，CSS 律动不是实时音频频谱。
+- **播放动效**：旋转唱片中央展示主题图片，外围黑色圆环承托彩色发光沿线与多层半透明立体波幕。浏览器与音源支持时，波幕随实际频段、低频和音量延绵起伏；无法分析时使用平滑播放动画，不支持 WebGL 时显示二维涟漪。等待、暂停或页面隐藏时停止，记住动效开关并尊重系统减少动态效果设置；主题图片不是歌曲专辑封面。
 
 ## 产品预览
 
@@ -203,6 +203,7 @@ node scripts/serve-demo.mjs
 - [Qiaomu Music Player Web](https://github.com/joeseesun/qiaomu-music-player-web)，作者 Qiaomu / 向阳乔木，MIT；参考歌词跟随、点按跳播和播放动效等通用交互并独立实现，未复制源码或资产。
 - [Embeat](https://github.com/gdstudio-org/Embeat/tree/7617a505ec42f109685802d1a3319e1957ac0a99)，GD Studio；借鉴多路候选融合、去重、多样性控制及可解释推荐的通用思路，独立实现。参考版本的 README 与根许可证存在适用范围差异，未复制其源码、模型、数据或品牌；详见[许可核查记录](THIRD_PARTY_NOTICES.md#embeat)。
 - [lrc-kit 1.2.1](https://www.npmjs.com/package/lrc-kit/v/1.2.1)，Copyright (c) 2016 Weirong Xu，MIT；用于解析 LRC，保留[完整许可](backend/static/vendor/lrc-kit/LICENSE)和[源码改动记录](THIRD_PARTY_NOTICES.md#lrc-kit)。
+- [Three.js 0.170.0](https://github.com/mrdoob/three.js/tree/r170)，Copyright © 2010-2024 three.js authors，MIT；本地模块用于渲染立体唱片与波幕，保留[完整许可](backend/static/vendor/three/LICENSE)。
 - [Lucide](https://lucide.dev) 提供 ISC 授权的界面图标；[Unsplash](https://unsplash.com) 提供主题摄影，逐图来源见[资产来源](backend/static/assets/SOURCES.md)。
 - [在线音乐 API](https://music-api.gdstudio.xyz/api.php)，提供多音源搜索与取链。
 - DeepSeek、MiniMax、edge-tts 及其他第三方依赖；其权利和使用条款归各自权利人。

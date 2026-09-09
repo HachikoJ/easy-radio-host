@@ -1,4 +1,5 @@
 import { parseLyrics, activeLine, lyricEndpoint } from './lyrics-data.js';
+import { createRecordMotion } from './record-motion.js';
 
 export function createLyricsExperience({ audio, state, seek, demo }) {
   const get = id => document.getElementById(id);
@@ -11,16 +12,8 @@ export function createLyricsExperience({ audio, state, seek, demo }) {
     const stage = document.createElement('div'); stage.className = 'record-stage';
     const disc = document.createElement('div'); disc.className = 'record-disc';
     target.insertBefore(stage, artwork); disc.append(artwork); stage.append(disc);
-    const ring = document.createElement('div'); ring.className = 'record-rhythm'; ring.setAttribute('aria-hidden', 'true');
-    for (let i = 0; i < 72; i++) {
-      const spoke = document.createElement('span'), pulse = document.createElement('i');
-      spoke.style.setProperty('--angle', `${i * 5}deg`);
-      pulse.style.setProperty('--beat-delay', `${-i * .137}s`);
-      pulse.style.setProperty('--beat-duration', `${.7 + (i % 7) * .11}s`);
-      spoke.append(pulse); ring.append(spoke);
-    }
-    stage.append(ring);
   }
+  const recordMotion = createRecordMotion([...document.querySelectorAll('.record-stage')], audio);
   let itemKey = null, controller = null, lines = [], timed = false, active = -2;
   let translations = [], offset = 0, ready = false, motion = true;
   let browseTimer = null;
@@ -31,6 +24,7 @@ export function createLyricsExperience({ audio, state, seek, demo }) {
     const song = state()?.kind === 'song';
     const moving = motion && !reduced.matches && !document.hidden && ready && !audio.paused && !audio.ended && !audio.seeking && song;
     document.body.classList.toggle('motion-playing', moving);
+    recordMotion.setPlaying(moving);
     document.body.classList.toggle('motion-disabled', !motion || reduced.matches);
     get('motion-status').textContent = !motion ? '动效已关闭' : reduced.matches ? '系统已减少动态效果' : !song ? state() ? '主持人口播中' : '等待播放' : audio.error ? '音频暂不可用' : audio.paused ? '已暂停' : !ready || audio.seeking ? '缓冲中' : '正在播放';
   }

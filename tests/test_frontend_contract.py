@@ -42,6 +42,10 @@ class FrontendContract(unittest.IsolatedAsyncioTestCase):
             status, content = await request(path)
             self.assertEqual(status, 200, path)
             self.assertTrue(content, path)
+        for path in ("/record-motion.js", "/record-scene.js", "/vendor/three/three.module.min.js", "/vendor/three/LICENSE"):
+            status, content = await request(path)
+            self.assertEqual(status, 200, path)
+            self.assertTrue(content, path)
         status, content = await request("/assets/demo-chimes.wav", headers=[(b"range", b"bytes=0-43")])
         self.assertEqual(status, 206)
         self.assertEqual(content[:4], b"RIFF")

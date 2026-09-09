@@ -22,15 +22,26 @@ Claudio's branding, screenshots, tracks, album artwork, account credentials, and
 - 许可证 / License: [MIT 原文 / Full MIT text](https://github.com/joeseesun/qiaomu-music-player-web/blob/a8519a23e0038a49cfa9495cc0b420a3b4e4825d/LICENSE)
 - 研究版本 / Reviewed revision: [`a8519a23e0038a49cfa9495cc0b420a3b4e4825d`](https://github.com/joeseesun/qiaomu-music-player-web/tree/a8519a23e0038a49cfa9495cc0b420a3b4e4825d)
 
-听间参考该项目及常见音乐播放器的歌词逐行高亮、点按跳播、自动跟随和可关闭播放动效等通用交互，围绕现有播放器独立实现。未复制其源码、品牌、视觉皮肤、截图、歌曲、歌词或封面。听间的播放动效是随真实播放状态启停的 CSS 动画，不是实时音频频谱，也不接管音频输出。
+听间参考该项目及常见音乐播放器的歌词逐行高亮、点按跳播、自动跟随和可关闭播放动效等通用交互，围绕现有播放器独立实现。未复制其源码、品牌、视觉皮肤、截图、歌曲、歌词或封面。听间的旋转唱片与立体波幕随真实播放状态启停；浏览器与音源支持时旁路分析频段、低频和音量，否则使用平滑播放动画，始终保留原生音频输出。
 
-Tingjian independently implements common player interactions informed by this project and familiar music players: synchronized lyric highlighting, line seeking, automatic following, and optional playback animation. No upstream source code, branding, visual skin, screenshots, songs, lyrics, or artwork were copied. Tingjian's CSS animation follows actual playback state; it is not a real-time spectrum and does not intercept audio output.
+Tingjian independently implements common player interactions informed by this project and familiar music players: synchronized lyric highlighting, line seeking, automatic following, and optional playback animation. No upstream source code, branding, visual skin, screenshots, songs, lyrics, or artwork were copied. Tingjian's rotating disc and 3D waves follow actual playback state. Where supported by the browser and audio source, a separate analysis branch measures frequency bands, bass, and volume; otherwise, smooth playback animation is used. Native audio output is preserved throughout.
 
 ## 唱片交互参考 / Disc Interaction Reference
 
-旋转唱片、中心图片和外围律动借鉴网易云音乐等常见播放器的通用交互意象。听间独立实现唱片几何、样式和 CSS 动画，未复制网易云音乐的代码、品牌、界面皮肤或媒体资产，也不表示与其存在关联或获得背书。中心图片使用本项目已注明来源的主题摄影，不代表歌曲的实际专辑封面；外围律动随播放状态启停，不是实时音频频谱。
+旋转唱片、中心图片和外围律动借鉴网易云音乐等常见播放器的通用交互意象。听间独立实现唱片、黑色圆环、彩色发光沿线和半透明立体波幕的几何、样式与 Shader，未复制网易云音乐的代码、品牌、界面皮肤或媒体资产，也不表示与其存在关联或获得背书。用户提供的参考图只用于理解空间造型，不随项目分发。中心图片使用本项目已注明来源的主题摄影，不代表歌曲的实际专辑封面。波幕通过浏览器原生 `captureStream` 与 Web Audio 旁路分析响应频段、低频和音量；无法分析时使用平滑时间动画，WebGL 不可用时使用二维涟漪，不宣称全设备真实频谱。
 
-The rotating disc, center image, and radial motion draw on common interaction ideas seen in NetEase Cloud Music and other music players. Tingjian independently implements the disc geometry, styling, and CSS animation. No NetEase Cloud Music code, branding, visual skin, or media assets were copied, and this reference implies no affiliation or endorsement. The center image uses this project's attributed theme photography rather than the track's actual album artwork. Radial motion follows playback state and is not a real-time audio spectrum.
+The rotating disc, center image, and surrounding motion draw on common interaction ideas seen in NetEase Cloud Music and other music players. Tingjian independently implements the geometry, styling, and shaders for the disc, black ring, colorful glowing edges, and translucent 3D waves. No NetEase Cloud Music code, branding, visual skin, or media assets were copied, and this reference implies no affiliation or endorsement. User-provided reference imagery informs the spatial design and is not redistributed. The center image uses this project's attributed theme photography rather than the track's actual album artwork. Waves respond to frequency bands, bass, and volume through native browser `captureStream` and a separate Web Audio analysis branch. Smooth time-based animation is used when analysis is unavailable, and 2D ripples are used without WebGL; a real-time spectrum is not claimed on every device.
+
+## Three.js
+
+- 项目与版本 / Project and version: [Three.js 0.170.0](https://github.com/mrdoob/three.js/tree/r170)
+- 作者与版权 / Author and copyright: **Copyright © 2010-2024 three.js authors**
+- 许可证 / License: [完整 MIT 文本 / Full MIT text](backend/static/vendor/three/LICENSE)
+- 本地模块 / Local module: `backend/static/vendor/three/three.module.min.js`
+
+Three.js 用于渲染旋转唱片与立体波幕，完整 MIT 许可随模块保留。唱片与波幕几何、Shader、音频分析接入和 Canvas 2D 回退由本项目实现；该依赖的 MIT 许可不改变整个仓库的授权状态。
+
+Three.js renders the rotating disc and 3D waves, with its complete MIT license retained alongside the module. This project implements the disc and wave geometry, shaders, audio-analysis integration, and Canvas 2D fallback. The dependency's MIT license does not relicense the repository as a whole.
 
 ## Embeat
 
