@@ -31,8 +31,6 @@
   </main>
   <script>
     const link = (url, label) => '<a href="' + url + '" target="_blank" rel="noopener noreferrer">' + label + '</a>';
-    const claudioRevision = 'c2eb8111dfba34437c047315ab827cbc58e33761';
-    const qiaomuRevision = 'a8519a23e0038a49cfa9495cc0b420a3b4e4825d';
     const embeatRevision = '7617a505ec42f109685802d1a3319e1957ac0a99';
     const embeatRoot = 'https://github.com/gdstudio-org/Embeat/blob/' + embeatRevision + '/';
     const credits = [
@@ -45,27 +43,11 @@
         }
       },
       {
-        name: 'Claudio', url: 'https://github.com/hllqkb/Claudio',
-        by: {zh: 'hllqkb · 交互参考', en: 'hllqkb · Interaction reference'},
+        name: 'GD Studio', url: 'https://github.com/gdstudio-org',
+        by: {zh: '核心在线音乐 API · 推荐思路', en: 'Core Music API · Recommendation Ideas'},
         text: {
-          zh: '为专注播放、明暗主题、收藏、收听历史与系统媒体控制提供交互启发。听间围绕自己的队列与接口独立实现。',
-          en: 'Interaction ideas for focused listening, light and dark themes, favorites, listening history, and system media controls. Tingjian implements them independently for its own queue and APIs.'
-        }
-      },
-      {
-        name: 'Qiaomu Music Player Web', url: 'https://github.com/joeseesun/qiaomu-music-player-web',
-        by: {zh: '向阳乔木 · 播放体验参考', en: 'Qiaomu · Playback reference'},
-        text: {
-          zh: '逐行歌词、点按跳播与动效开关的交互参考。旋转唱片和外围律动也参考了常见音乐播放器的通用交互，由听间独立实现。',
-          en: 'Interaction ideas for line-by-line lyrics, lyric seeking, and motion controls. The rotating disc and surrounding motion also draw on common music-player interactions, independently implemented by Tingjian.'
-        }
-      },
-      {
-        name: 'Embeat', url: 'https://github.com/gdstudio-org/Embeat/tree/' + embeatRevision,
-        by: {zh: 'GD Studio · 推荐思路参考', en: 'GD Studio · Recommendation reference'},
-        text: {
-          zh: '借鉴候选融合、去重、歌手多样性与推荐来源记录等通用思路。未复制其源码、模型或数据；参考版本的许可范围存在歧义，详见下方说明。',
-          en: 'General ideas for candidate fusion, deduplication, artist diversity, and recording recommendation sources. No source, models, or data were copied. The reference revision has an ambiguous license scope, detailed below.'
+          zh: link('https://music-api.gdstudio.xyz/api.php', '在线音乐 API') + ' 提供多音源搜索、播放地址解析与歌词获取，是听间在线播放的核心服务。</p><p>' + link('https://github.com/gdstudio-org/Embeat/tree/' + embeatRevision, 'Embeat') + ' 提供候选融合、去重、歌手多样性与推荐来源记录等思路，由听间独立实现。未复制其源码、模型或数据；参考版本的许可范围说明见下方。',
+          en: 'The ' + link('https://music-api.gdstudio.xyz/api.php', 'online music API') + ' provides multi-source search, playback URL resolution, and lyrics, serving as the core service for online playback.</p><p>' + link('https://github.com/gdstudio-org/Embeat/tree/' + embeatRevision, 'Embeat') + ' informed candidate fusion, deduplication, artist diversity, and recommendation-source records, independently implemented in Tingjian. No source, models, or data were copied; details on the reference revision\'s license scope appear below.'
         }
       },
       {
@@ -78,20 +60,6 @@
       }
     ];
     const licenseNotes = [
-      {
-        name: 'Claudio',
-        text: {
-          zh: 'Copyright (c) 2026 hllqkb · ' + link('licenses/Claudio-MIT.txt', '完整 MIT 许可证') + ' · 参考版本 ' + link('https://github.com/hllqkb/Claudio/tree/' + claudioRevision, '<code>' + claudioRevision + '</code>') + '。未复制其源码文件、品牌、截图、音乐或唱片封面。',
-          en: 'Copyright (c) 2026 hllqkb · ' + link('licenses/Claudio-MIT.txt', 'Full MIT license') + ' · Reference revision ' + link('https://github.com/hllqkb/Claudio/tree/' + claudioRevision, '<code>' + claudioRevision + '</code>') + '. No source files, branding, screenshots, music, or album artwork were copied.'
-        }
-      },
-      {
-        name: 'Qiaomu Music Player Web',
-        text: {
-          zh: 'Copyright (c) 2026 Qiaomu · ' + link('https://github.com/joeseesun/qiaomu-music-player-web/blob/' + qiaomuRevision + '/LICENSE', 'MIT 许可证') + ' · 参考版本 <code>' + qiaomuRevision + '</code>。未复制其源码、品牌或媒体资产。',
-          en: 'Copyright (c) 2026 Qiaomu · ' + link('https://github.com/joeseesun/qiaomu-music-player-web/blob/' + qiaomuRevision + '/LICENSE', 'MIT license') + ' · Reference revision <code>' + qiaomuRevision + '</code>. No source code, branding, or media assets were copied.'
-        }
-      },
       {
         name: 'Embeat',
         text: {

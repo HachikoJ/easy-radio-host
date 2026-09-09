@@ -213,20 +213,17 @@ node scripts/serve-demo.mjs
 - [贡献指南](CONTRIBUTING.md)：验证命令与 Pull Request 规范。
 - [行为准则](CODE_OF_CONDUCT.md) · [安全政策](SECURITY.md)。
 - [更新记录](CHANGELOG.md) · [协作约定](AGENTS.md)。
-- [设计约定](DESIGN.md) · [Claudio 能力适配与后续路线](docs/CLAUDIO-ADAPTATION.md)。
+- [设计约定](DESIGN.md) · [第三方来源与许可记录](THIRD_PARTY_NOTICES.md)。
 - [推荐设计与 Embeat 参考说明](docs/EMBEAT-ADAPTATION.md)：候选融合、边界、降级规则与评测。
 - [持续集成](https://github.com/HachikoJ/easy-radio-host/actions)：Python 语法、接口契约及前端静态服务检查。
 
 ## 致谢
 
 - [easy-radio-host 原始项目](https://gitee.com/weak0001/easy-radio-host)，作者 `weak0001`；保留原作者署名与版权归属。
-- [Claudio](https://github.com/hllqkb/Claudio)，作者 `hllqkb`，MIT；听间前端参考其沉浸播放、明暗主题、收藏/历史和系统媒体控制交互，采用独立实现。详见[第三方来源与授权](THIRD_PARTY_NOTICES.md)，含来源版本与完整许可文本。
-- [Qiaomu Music Player Web](https://github.com/joeseesun/qiaomu-music-player-web)，作者 Qiaomu / 向阳乔木，MIT；参考歌词跟随、点按跳播和播放动效等通用交互并独立实现，未复制源码或资产。
-- [Embeat](https://github.com/gdstudio-org/Embeat/tree/7617a505ec42f109685802d1a3319e1957ac0a99)，GD Studio；借鉴多路候选融合、去重、多样性控制及可解释推荐的通用思路，独立实现。参考版本的 README 与根许可证存在适用范围差异，未复制其源码、模型、数据或品牌；详见[许可核查记录](THIRD_PARTY_NOTICES.md#embeat)。
+- [GD Studio](https://github.com/gdstudio-org)：提供核心[在线音乐 API](https://music-api.gdstudio.xyz/api.php)，用于多音源搜索、播放地址解析与歌词获取；其 [Embeat](https://github.com/gdstudio-org/Embeat/tree/7617a505ec42f109685802d1a3319e1957ac0a99) 为多路候选融合、去重、多样性控制及可解释推荐提供思路。推荐逻辑由听间独立实现，未复制其源码、模型、数据或品牌；许可范围差异详见[参考记录](THIRD_PARTY_NOTICES.md#embeat)。
 - [lrc-kit 1.2.1](https://www.npmjs.com/package/lrc-kit/v/1.2.1)，Copyright (c) 2016 Weirong Xu，MIT；用于解析 LRC，保留[完整许可](backend/static/vendor/lrc-kit/LICENSE)和[源码改动记录](THIRD_PARTY_NOTICES.md#lrc-kit)。
 - [Three.js 0.170.0](https://github.com/mrdoob/three.js/tree/r170)，Copyright © 2010-2024 three.js authors，MIT；本地模块用于渲染立体唱片与波幕，保留[完整许可](backend/static/vendor/three/LICENSE)。
 - [Lucide](https://lucide.dev) 提供 ISC 授权的界面图标；[Unsplash](https://unsplash.com) 提供主题摄影，逐图来源见[资产来源](backend/static/assets/SOURCES.md)。
-- [在线音乐 API](https://music-api.gdstudio.xyz/api.php)，提供多音源搜索与取链。
 - DeepSeek、MiniMax、edge-tts 及其他第三方依赖；其权利和使用条款归各自权利人。
 
 ## GitHub 关注度

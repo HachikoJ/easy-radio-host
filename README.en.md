@@ -213,20 +213,17 @@ The script rewrites the resolved playlist, searches multiple sources, filters ve
 - [Contributing](CONTRIBUTING.md): validation commands and Pull Request guidelines.
 - [Code of Conduct](CODE_OF_CONDUCT.md) · [Security Policy](SECURITY.md).
 - [Changelog](CHANGELOG.md) · [Collaboration guidelines](AGENTS.md).
-- [Design guidelines](DESIGN.md) · [Claudio adaptation and roadmap](docs/CLAUDIO-ADAPTATION.md).
+- [Design guidelines](DESIGN.md) · [Third-party sources and license records](THIRD_PARTY_NOTICES.md).
 - [Recommendation design and Embeat reference record](docs/EMBEAT-ADAPTATION.md): candidate fusion, boundaries, fallback rules, and evaluation.
 - [Continuous integration](https://github.com/HachikoJ/easy-radio-host/actions): Python syntax, API contracts, and frontend static-server checks.
 
 ## Credits
 
 - [Original easy-radio-host project](https://gitee.com/weak0001/easy-radio-host) by `weak0001`; original attribution and copyright ownership are retained.
-- [Claudio](https://github.com/hllqkb/Claudio) by `hllqkb`, MIT; the Tingjian frontend independently implements interaction ideas from its immersive playback, light/dark themes, favorites/history, and system media controls. See [third-party sources and licenses](THIRD_PARTY_NOTICES.md), including the source revision and complete license text.
-- [Qiaomu Music Player Web](https://github.com/joeseesun/qiaomu-music-player-web) by Qiaomu / 向阳乔木, MIT; common interactions such as lyric following, tap-to-seek, and playback animation informed an independent implementation. No source code or assets were copied.
-- [Embeat](https://github.com/gdstudio-org/Embeat/tree/7617a505ec42f109685802d1a3319e1957ac0a99) by GD Studio informed our independent implementation of general ideas around candidate fusion, deduplication, diversity controls, and explainable recommendations. Its reviewed README and root license differ in stated scope. No source code, models, data, or branding were copied; see the [license review record](THIRD_PARTY_NOTICES.md#embeat).
+- [GD Studio](https://github.com/gdstudio-org) provides the core [online music API](https://music-api.gdstudio.xyz/api.php) for multi-source search, playback URL resolution, and lyrics. Its [Embeat](https://github.com/gdstudio-org/Embeat/tree/7617a505ec42f109685802d1a3319e1957ac0a99) informed candidate fusion, deduplication, diversity controls, and explainable recommendations. Tingjian implements the recommendation logic independently without copying source code, models, data, or branding; see the [reference record](THIRD_PARTY_NOTICES.md#embeat) for differences in the stated license scope.
 - [lrc-kit 1.2.1](https://www.npmjs.com/package/lrc-kit/v/1.2.1), Copyright (c) 2016 Weirong Xu, MIT; used for LRC parsing with the [full license](backend/static/vendor/lrc-kit/LICENSE) and [source modification record](THIRD_PARTY_NOTICES.md#lrc-kit) retained.
 - [Three.js 0.170.0](https://github.com/mrdoob/three.js/tree/r170), Copyright © 2010-2024 three.js authors, MIT; a local module renders the 3D disc and waves, with the [full license](backend/static/vendor/three/LICENSE) retained.
 - [Lucide](https://lucide.dev) provides UI icons under ISC; [Unsplash](https://unsplash.com) provides theme photography. See [individual asset sources](backend/static/assets/SOURCES.md).
-- [Online music API](https://music-api.gdstudio.xyz/api.php) for multi-source search and URL resolution.
 - DeepSeek, MiniMax, edge-tts, and other dependencies; their rights and terms remain with their respective owners.
 
 ## GitHub activity
