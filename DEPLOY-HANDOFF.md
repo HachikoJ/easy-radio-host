@@ -10,7 +10,7 @@
            └─ /music/          → 127.0.0.1:8001 在线曲库代理
 
 主应用 → DeepSeek 编排节目 → MiniMax 合成口播
-曲库代理 → 在线音乐 API → 307 跳转到第三方音频地址
+曲库代理 → 在线音乐 API → 校验音频、同源流转发（旧 307 跳转兼容）
 ```
 
 | 资源 | 位置 |
@@ -136,7 +136,7 @@ sudo systemctl enable --now certbot.timer
 sudo certbot renew --dry-run --run-deploy-hooks
 ```
 
-模板保留 HTTP ACME 验证路径，其余 HTTP 请求跳转至 HTTPS。`/music/` 的 `proxy_pass` 末尾保留 `/`，将 `/music/s/...` 转发为曲库服务的 `/s/...`。Nginx API 读取超时为 300 秒；前端请求超时为 90 秒，浏览器不会等待满 300 秒。模板还提供每 IP 12 次/分钟、突发 8 次、每 IP 3 个并发及全站 8 个 API 并发的限制；超限返回 429。限流不能替代供应商预算管理。
+模板保留 HTTP ACME 验证路径，其余 HTTP 请求跳转至 HTTPS。`/music/` 的 `proxy_pass` 末尾保留 `/`，将 `/music/s/...` 转发为曲库服务的 `/s/...`。Nginx API 读取超时为 300 秒；前端节目/点歌请求超时为 240 秒，音源恢复为 60 秒。模板还提供每 IP 12 次/分钟、突发 8 次、每 IP 3 个并发及全站 8 个 API 并发的限制；超限返回 429。GD 搜索、取链与歌词在常驻曲库代理内共享 50 次/300 秒的滚动预算，其他进程的请求不计入该本地预算。
 
 `deploy/renew-nginx.sh` 会在证书续期成功后检查配置并重新加载 Nginx；已有同用途 hook 时复用。上述 dry-run 命令通过 `--run-deploy-hooks` 同时验证续期流程与 Nginx reload hook。
 
@@ -161,7 +161,7 @@ curl --fail --silent --show-error --max-time 360 \
   -d '{"theme":"午后咖啡","exclude":[]}'
 ```
 
-检查返回的 `items` 中有歌曲和口播；歌曲地址应以 `https://audio.deline.top/music/` 开头，口播使用本站 `/voice/`。跟随歌曲 307 跳转验证实际音频可访问，检查最终音频地址支持 HTTPS。结合供应商请求结果与服务日志确认真实模型、语音调用，不能用降级结果代替验证。
+检查返回的 `items` 中有歌曲和口播；歌曲地址应以 `https://audio.deline.top/music/` 开头并带 `stream=1`，口播使用本站 `/voice/`。对歌曲发送小范围 GET，验证 206、音频文件头及 Content-Range，并在浏览器确认实际播放时间前进与拖动。原不带 `stream` 的歌曲地址保留 307 兼容。结合供应商请求结果与服务日志确认真实模型、语音调用，不能用降级结果代替验证。音源状态与完整恢复规则见 [音源检索与恢复](docs/MUSIC-SOURCES.md)。
 
 在桌面和手机浏览器打开正式入口，验证主题生成、口播到歌曲连续播放、暂停与恢复、下一首、点歌、聊天、收藏和历史。检查布局无横向溢出、控制台无混合内容错误。`?demo=1` 只能验证演示交互，不能作为真实 API 验收。
 

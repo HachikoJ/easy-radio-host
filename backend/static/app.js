@@ -18,6 +18,8 @@ let queue = [], index = -1, interrupt = null, recent = [];
 let playing = false, mode = 'none', textPosition = 0, textDuration = 0;
 let timer = null, lastTick = 0, nextSeek = 0, mediaGeneration = 0;
 let mediaRetryUsed = false, mediaRetryTimer = null, failedGeneration = -1;
+let recoveryRequest = null, recoveryState = null, consecutiveUnavailable = 0;
+let intentAdvanceTimer = null;
 let generation = null, chatRequest = null, retryAction = null;
 let programmeVersion = 0;
 let muted = false, volume = .75;
@@ -52,11 +54,16 @@ function normalizeItems(items) {
     title: typeof item.title === 'string' && item.title.trim() ? item.title : item.kind === 'song' ? '未命名歌曲' : '小蓝的口播',
     text: typeof item.text === 'string' ? item.text : '',
     url: typeof item.url === 'string' ? item.url : '',
+    source: typeof item.source === 'string' ? item.source : '',
+    id: item.id == null ? '' : String(item.id),
+    artist: typeof item.artist === 'string' ? item.artist : '',
+    lyric_id: item.lyric_id == null ? '' : String(item.lyric_id),
+    requested: item.requested === true,
     recommendation: item.recommendation && typeof item.recommendation.reason === 'string' ? { reason: item.recommendation.reason.slice(0, 300) } : null
   })).filter(item => item.kind !== 'song' || item.url);
 }
 async function request(path, body, controller) {
-  const timeout = setTimeout(() => controller.abort('timeout'), 90000);
+  const timeout = setTimeout(() => controller.abort('timeout'), path === '/api/playback/resolve' ? 60000 : 240000);
   try {
     if (demo) {
       const { respond } = await import('./demo.js?v=20260909-2');
@@ -114,7 +121,7 @@ function renderQueue() {
     const type = document.createElement('span'); type.className = 'queue-kind'; type.append(icon(item.kind === 'song' ? 'Music2' : 'Mic2'));
     const copy = document.createElement('span'); copy.className = 'queue-copy';
     const title = document.createElement('strong'); title.textContent = item.title;
-    const subtitle = document.createElement('small'); subtitle.textContent = inserted ? '互动插播' : item.kind === 'song' ? item.recommendation?.reason || '歌曲' : '小蓝 · 主持人口播'; copy.append(title, subtitle);
+    const subtitle = document.createElement('small'); subtitle.textContent = item.unavailable ? '音源暂不可用 · 点击重新检索' : inserted ? '互动插播' : item.kind === 'song' ? item.recommendation?.reason || '歌曲' : '小蓝 · 主持人口播'; copy.append(title, subtitle);
     const tail = document.createElement('span'); tail.className = 'queue-tail'; tail.textContent = isCurrent ? playing ? '播放中' : '已暂停' : inserted ? '插播' : String(i + 1).padStart(2, '0');
     button.append(number, type, copy, tail);
     button.addEventListener('click', () => { if (inserted) { interrupt.index = i; } else { interrupt = null; index = i; } activate(); });
@@ -164,7 +171,15 @@ function renderProgress() {
   $('seek').setAttribute('aria-valuetext', `${formatTime(elapsed)} / ${formatTime(total)}`);
   listening?.updatePosition(total, elapsed);
 }
-function resetMedia() {
+function cancelRecovery() {
+  if (recoveryState && retryAction) clearNotice();
+  recoveryRequest?.abort(); recoveryRequest = null; recoveryState = null;
+  if (['音源连接中断，正在重新获取可用地址…', '正在检索其他渠道的匹配音源…', '已找到其他渠道音源，正在连接…'].includes($('notice-text').textContent)) clearNotice();
+  clearTimeout(mediaRetryTimer); mediaRetryTimer = null;
+  clearTimeout(intentAdvanceTimer); intentAdvanceTimer = null;
+}
+function resetMedia(preserveRecovery = false) {
+  if (!preserveRecovery) cancelRecovery();
   mediaGeneration++;
   clearTimeout(mediaRetryTimer); mediaRetryTimer = null;
   clearInterval(timer); timer = null; mode = 'none'; playing = false;
@@ -175,8 +190,8 @@ function startText(item, offset, autoplay) {
   lastTick = performance.now();
   timer = setInterval(() => { const now = performance.now(); if (playing) textPosition += (now - lastTick) / 1000; lastTick = now; renderProgress(); if (playing && textPosition >= textDuration) advance(); }, 100);
 }
-function activate(offset = 0, autoplay = true, recovering = false) {
-  resetMedia();
+function activate(offset = 0, autoplay = true, recovering = false, refresh = false) {
+  resetMedia(recovering);
   if (!recovering) mediaRetryUsed = false;
   const item = current();
   if (!item) { renderPlayback(); return; }
@@ -186,9 +201,10 @@ function activate(offset = 0, autoplay = true, recovering = false) {
     let url;
     try { url = new URL(item.url, location.href); if (!['http:', 'https:', 'blob:'].includes(url.protocol)) throw new Error(); }
     catch { notify('歌曲地址无效，请切换其他片段。'); renderPlayback(); return; }
-    if (item.kind === 'song' && !recovering && (audio.captureStream || audio.mozCaptureStream)) audio.crossOrigin = 'anonymous';
+    if (item.kind === 'song' && url.origin === location.origin && /\/s\/[^/]+\/[^/]+\.mp3$/.test(url.pathname)) url.searchParams.set('stream', '1');
+    if (item.kind === 'song' && (audio.captureStream || audio.mozCaptureStream)) audio.crossOrigin = 'anonymous';
     else audio.removeAttribute('crossorigin');
-    if (recovering) { url.searchParams.set('refresh', '1'); url.searchParams.set('_retry', String(Date.now())); }
+    if (refresh) { url.searchParams.set('refresh', '1'); url.searchParams.set('_retry', String(Date.now())); }
     mode = 'media'; nextSeek = offset; audio.src = url.href;
     updateVolume();
     if (autoplay) playMedia();
@@ -207,6 +223,7 @@ function playMedia() {
   });
 }
 function pausePlayback() {
+  cancelRecovery();
   if (mode === 'media') { mediaGeneration++; audio.pause(); }
   playing = false;
   renderPlayback();
@@ -218,7 +235,7 @@ function togglePlay() {
   else if (mode === 'media') { if (playing) pausePlayback(); else playMedia(); }
   else activate();
 }
-function advance() {
+function advance(allowAuto = true) {
   if (!current()) return;
   if (interrupt) {
     interrupt.index++;
@@ -232,7 +249,7 @@ function advance() {
   index++;
   if (index < queue.length) { activate(); return; }
   resetMedia(); renderPlayback();
-  if ($('auto').checked) generateShow();
+  if ($('auto').checked && allowAuto && consecutiveUnavailable < 3) generateShow();
 }
 function previous() {
   if (interrupt && !queue.length) { interrupt.index = Math.max(0, interrupt.index - 1); activate(); return; }
@@ -258,26 +275,77 @@ function handleMediaError() {
   if (item.kind === 'talk' && item.text) {
     resetMedia(); startText(item, 0, true);
     notify('口播音频暂时不可用，正在显示文稿。');
+  } else if (item.kind !== 'song') {
+    audio.pause(); playing = false;
+    notify('这段口播暂时无法播放，可重试或切换下一段。', () => activate());
   } else {
     const url = new URL(item.url, location.href);
-    if (!mediaRetryUsed && url.origin === location.origin && /\/s\/(joox|netease|id)\/[^/]+\.mp3$/.test(url.pathname)) {
+    if (!recoveryState || recoveryState.item !== item) recoveryState = { item, exclude: [], offset: position() };
+    else recoveryState.offset = Math.max(recoveryState.offset, position());
+    if (!mediaRetryUsed && url.origin === location.origin && /\/s\/[^/]+\/[^/]+\.mp3$/.test(url.pathname)) {
       const offset = position();
       mediaRetryUsed = true;
-      resetMedia();
+      resetMedia(true);
       notify('音源连接中断，正在重新获取可用地址…');
-      mediaRetryTimer = setTimeout(() => activate(offset, true, true), 500);
+      mediaRetryTimer = setTimeout(() => activate(offset, true, true, true), 500);
       renderPlayback();
       return;
     }
-    audio.pause(); playing = false;
-    notify('此音源暂时不可用，已尝试重新连接。可重试或切换下一段。', () => activate(position(), true, true));
+    recoverSong();
   }
   renderPlayback();
+}
+function songIdentity(item) {
+  if (item.source && item.id) return { source: item.source === 'id' ? 'netease' : item.source, id: item.id };
+  try {
+    const match = new URL(item.url, location.href).pathname.match(/\/s\/([^/]+)\/([^/]+)\.mp3$/);
+    if (match) return { source: match[1] === 'id' ? 'netease' : match[1], id: decodeURIComponent(decodeURIComponent(match[2])) };
+  } catch { /* A malformed address still permits recovery by song title. */ }
+  return null;
+}
+async function recoverSong() {
+  const item = current();
+  if (item?.kind !== 'song' || recoveryRequest) return;
+  const state = recoveryState?.item === item ? recoveryState : { item, exclude: [], offset: position() };
+  recoveryState = state;
+  const identity = songIdentity(item);
+  if (identity && !state.exclude.some(candidate => candidate.source === identity.source && candidate.id === identity.id)) state.exclude.push(identity);
+  resetMedia(true);
+  const token = mediaGeneration, controller = new AbortController(); recoveryRequest = controller;
+  notify('正在检索其他渠道的匹配音源…'); renderPlayback();
+  const retry = () => { if (current() === item) recoverSong(); };
+  try {
+    const data = await request('/api/playback/resolve', { title: item.title, artist: item.artist, ...identity, exclude: state.exclude }, controller);
+    if (controller.signal.aborted || token !== mediaGeneration || current() !== item) return;
+    if (data.status === 'available') {
+      const replacement = normalizeItems([data.item])[0], replacementId = replacement && songIdentity(replacement);
+      if (!replacement || replacement.kind !== 'song' || replacement.url === item.url || (replacementId && state.exclude.some(candidate => candidate.source === replacementId.source && candidate.id === replacementId.id))) {
+        notify('音源检索暂未完成，请重试或切换下一曲。', retry); return;
+      }
+      Object.assign(item, replacement, { requested: item.requested || replacement.requested, recommendation: replacement.recommendation || item.recommendation, unavailable: false });
+      mediaRetryUsed = true;
+      notify('已找到其他渠道音源，正在连接…');
+      activate(state.offset, true, true);
+    } else if (data.status === 'unavailable') {
+      item.unavailable = true; consecutiveUnavailable++;
+      const nextExists = interrupt ? Boolean(interrupt.items[interrupt.index + 1] || queue[interrupt.originalIndex]) : Boolean(queue[index + 1]);
+      const message = `《${item.title}》未找到可用的匹配音源。${nextExists ? '即将继续下一段。' : '当前没有下一曲，可重新选歌。'}`;
+      addMessage('小蓝', message); notify(message);
+      mediaRetryTimer = setTimeout(() => { if (token === mediaGeneration && current() === item) advance(false); }, 1500);
+    } else {
+      const message = data.status === 'limited' ? '音源服务暂时限流，尚未完成检索。请稍后重试，或切换下一曲。' : '音源服务暂时无法完成检索。请重试，或切换下一曲。';
+      notify(message, retry);
+    }
+  } catch (error) {
+    if (token !== mediaGeneration || current() !== item || (controller.signal.aborted && controller.signal.reason !== 'timeout')) return;
+    notify(`${error.message || '音源检索暂未完成。'}可重试或切换下一曲。`, retry);
+  } finally { if (recoveryRequest === controller) recoveryRequest = null; renderPlayback(); }
 }
 async function generateShow({ replace = false, seed = '' } = {}) {
   if (generation && !replace) return;
   generation?.abort();
   chatRequest?.abort();
+  cancelRecovery();
   programmeVersion++;
   clearNotice();
   const controller = new AbortController(), theme = selected;
@@ -293,6 +361,7 @@ async function generateShow({ replace = false, seed = '' } = {}) {
     recommendations?.setSummary(data.meta?.recommendation);
     activeTheme = themes.find(item => item.name === data.meta?.theme) || theme;
     selectTheme(activeTheme); activate();
+    if (typeof data.notice === 'string' && data.notice) notify(data.notice);
   } catch (error) {
     if (controller.signal.aborted && controller.signal.reason !== 'timeout') return;
     notify(error.message || '节目生成失败，请重试。', () => generateShow({ seed }));
@@ -345,12 +414,26 @@ async function sendChat(event, requestedMessage) {
     const data = await request('/api/intent', { message, exclude: recent, state: { playing, paused: !playing, current: current()?.title || '', theme: activeTheme.name, auto: $('auto').checked } }, controller);
     if (controller.signal.aborted || version !== programmeVersion) { label.textContent = '你 · 已取消'; return; }
     const items = normalizeItems(data.items), actions = Array.isArray(data.actions) ? data.actions.filter(action => action && typeof action.type === 'string') : [];
-    if (!items.length && !actions.length) throw new Error('小蓝暂时没有回应，请再试一次。');
+    const notice = typeof data.notice === 'string' ? data.notice.trim() : '';
+    if (!items.length && !actions.length && !notice) throw new Error('小蓝暂时没有回应，请再试一次。');
     if (!requestedMessage && $('message').value.trim() === message) $('message').value = '';
     updateChatComposer();
     for (const item of items) addMessage(item.kind === 'song' ? '点歌' : '小蓝', item.kind === 'song' ? item.title : item.text || item.title);
+    if (notice) {
+      if (!items.some(item => item.kind !== 'song' && item.text === notice)) addMessage('小蓝', notice);
+      notify(notice, ['limited', 'temporary'].includes(data.availability) ? () => sendChat(undefined, message) : null);
+    }
     for (const action of actions) if (action.type === 'set_auto') $('auto').checked = action.on === true;
-    insert(items, () => { if (version === programmeVersion) applyActions(actions); });
+    if (data.availability === 'unavailable') {
+      const token = mediaGeneration;
+      clearTimeout(intentAdvanceTimer);
+      intentAdvanceTimer = setTimeout(() => {
+        if (version !== programmeVersion || token !== mediaGeneration) return;
+        const nextExists = interrupt ? Boolean(interrupt.items[interrupt.index + 1] || queue[interrupt.originalIndex]) : Boolean(queue[index + 1]);
+        if (!nextExists) { notify(`${notice} 当前没有下一曲，可重新选歌。`); if (actions.some(action => action.type === 'next')) advance(false); }
+        else applyActions(actions);
+      }, 1500);
+    } else if (!['limited', 'temporary'].includes(data.availability)) insert(items, () => { if (version === programmeVersion) applyActions(actions); });
   } catch (error) {
     label.textContent = controller.signal.aborted && controller.signal.reason !== 'timeout' ? '你 · 已取消' : '你 · 未发送';
     if (controller.signal.aborted && controller.signal.reason !== 'timeout') return;
@@ -401,8 +484,9 @@ audio.addEventListener('pause', () => { if (mode === 'media' && audio.paused) { 
 audio.addEventListener('playing', () => {
   if (mode !== 'media' || audio.paused) return;
   playing = true;
-  if (mediaRetryUsed && $('notice-text').textContent === '音源连接中断，正在重新获取可用地址…') clearNotice();
+  if (mediaRetryUsed && ['音源连接中断，正在重新获取可用地址…', '已找到其他渠道音源，正在连接…'].includes($('notice-text').textContent)) clearNotice();
   const item = current();
+  if (item?.kind === 'song') { consecutiveUnavailable = 0; item.unavailable = false; }
   if (item?.kind === 'song' && item !== lastRecentItem) {
     recent = [...recent.filter(title => title !== item.title), item.title].slice(-30);
     lastRecentItem = item;

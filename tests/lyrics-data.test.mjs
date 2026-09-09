@@ -27,4 +27,8 @@ test('lyric URL preserves raw joox plus signs, accepts local proxy and rejects e
   assert.equal(lyricEndpoint('https://other.example/s/netease/123.mp3', origin), null);
   assert.equal(lyricEndpoint('/voice/speech.mp3', origin), null);
   assert.equal(lyricEndpoint('/music/s/joox/%QQ.mp3', origin), null);
+  assert.equal(lyricEndpoint('/music/s/kuwo/song-hash.mp3?stream=1', origin, { source: 'kuwo', id: 'song-hash', lyric_id: 'separate-lyric-id' }), '/music/lyrics/kuwo/separate-lyric-id.json');
+  assert.equal(lyricEndpoint('/music/s/tencent/123.mp3', origin, { source: 'tencent', lyric_id: 'abc+def==' }), '/music/lyrics/tencent/abc%2Bdef%3D%3D.json');
+  assert.equal(lyricEndpoint('/music/s/id/123.mp3', origin), '/music/lyrics/netease/123.json');
+  assert.equal(lyricEndpoint('https://other.example/music/s/tencent/123.mp3', origin, { source: 'tencent', lyric_id: '123' }), null);
 });

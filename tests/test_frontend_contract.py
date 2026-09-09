@@ -40,7 +40,16 @@ async def request(path, body=None, headers=(), include_headers=False):
     return status, content
 
 
+async def verified(song, exclude=()):
+    return {"status": "available", "song": dict(song, _verified=True), "searched": ["netease"]}
+
+
 class FrontendContract(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        patcher = patch.object(radio, "verify_song", side_effect=verified)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     async def test_frontend_revalidates_cached_resources(self):
         for path in ("/", "/index.html", "/credits.html", "/quiet.css", "/app.js", "/layout.js", "/record-scene.js"):
             status, content, headers = await request(path, include_headers=True)
@@ -101,7 +110,7 @@ class FrontendContract(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["meta"]["theme"], "午后咖啡")
         self.assertEqual([item["kind"] for item in result["items"]], ["text", "song"])
         self.assertEqual(result["items"][0]["text"], "Contract narration")
-        self.assertTrue(result["items"][1]["url"].endswith("s/netease/123.mp3"))
+        self.assertTrue(result["items"][1]["url"].endswith("s/netease/123.mp3?stream=1"))
 
     async def test_intent_preserves_control_actions_without_inserting_a_song(self):
         with patch.object(radio, "fetch_library", return_value=[]), \

@@ -29,6 +29,9 @@ def api_result(url):
 class PlaybackProxy(unittest.TestCase):
     def setUp(self):
         proxy._play_cache.clear()
+        proxy._api_cache.clear()
+        proxy._api_times.clear()
+        proxy._api_blocked_until = 0
 
     def test_broken_high_bitrates_fall_back_on_the_same_recording(self):
         sid = "bLnv0PqDX_qAlIqapc+Okw=="
@@ -76,7 +79,7 @@ class PlaybackProxy(unittest.TestCase):
         self.assertNotIn(("joox", "0"), proxy._play_cache)
 
     def test_exhausted_budget_stops_further_requests(self):
-        with patch.object(proxy.time, "monotonic", side_effect=[0, 1, 21]), \
+        with patch.object(proxy.time, "monotonic", side_effect=[0, 1, 2, 3, 21]), \
                 patch.object(proxy, "http_get", return_value=(503, b"")) as api:
             self.assertIsNone(proxy._resolve_play_url("joox", "one"))
         api.assert_called_once()
@@ -147,6 +150,46 @@ class PlaybackProxy(unittest.TestCase):
 
 
 class PlaybackRoutes(unittest.IsolatedAsyncioTestCase):
+    async def test_stream_forwards_single_range_and_closes_upstream(self):
+        response = upstream(b"ID3" + b"x" * 600, 206)
+        response.headers = {"Content-Type": "audio/mpeg", "Content-Length": "603", "Content-Range": "bytes 0-602/5000"}
+        opener = Mock()
+        opener.open.return_value = response
+        with patch.object(proxy.urllib.request, "build_opener", return_value=opener):
+            result = proxy._stream_audio("https://music.126.net/a", "bytes=0-602")
+        self.assertEqual(opener.open.call_args.args[0].get_header("Range"), "bytes=0-602")
+        self.assertEqual(result.status_code, 206)
+        self.assertEqual(result.headers["content-range"], "bytes 0-602/5000")
+        body = b"".join([block async for block in result.body_iterator])
+        self.assertTrue(body.startswith(b"ID3"))
+        self.assertTrue(response.closed)
+
+    async def test_stream_disconnect_cleanup_and_range_validation(self):
+        response = upstream(b"ID3", 206)
+        response.headers = {"Content-Type": "audio/mpeg"}
+        opener = Mock()
+        opener.open.return_value = response
+        with patch.object(proxy.urllib.request, "build_opener", return_value=opener):
+            result = proxy._stream_audio("https://music.126.net/a", "bytes=0-")
+        await result.background()
+        self.assertTrue(response.closed)
+        for value in ("bytes=0-1,5-6", "items=0-1", "bytes=-", "bytes=1-2\r\nInjected: 1"):
+            with self.subTest(value=value), self.assertRaises(HTTPException) as error:
+                proxy._stream_audio("https://music.126.net/a", value)
+            self.assertEqual(error.exception.status_code, 416)
+
+    async def test_stream_rejects_html_and_disallowed_urls(self):
+        response = upstream(b"not audio", 200)
+        response.headers = {"Content-Type": "text/html"}
+        opener = Mock()
+        opener.open.return_value = response
+        with patch.object(proxy.urllib.request, "build_opener", return_value=opener), self.assertRaises(HTTPException):
+            proxy._stream_audio("https://music.126.net/a", None)
+        self.assertTrue(response.closed)
+        with patch.object(proxy.urllib.request, "build_opener") as opener, self.assertRaises(HTTPException):
+            proxy._stream_audio("http://127.0.0.1/private", None)
+        opener.assert_not_called()
+
     async def test_original_double_encoded_and_legacy_routes_preserve_id_and_refresh(self):
         sid = "bLnv0PqDX_qAlIqapc+Okw=="
         for route_source, source, identifier in [("joox", "joox", sid), ("id", "netease", "123")]:

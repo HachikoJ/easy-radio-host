@@ -6,6 +6,7 @@ import csv
 import json
 import os
 import re
+import time
 import urllib.parse
 import urllib.request
 from datetime import datetime
@@ -18,11 +19,13 @@ from pydantic import BaseModel, Field
 from typing import Annotated
 
 try:
-    from recommendations import select_songs
+    from recommendations import select_songs, track_key
     from speech_audio import normalize_speech
+    from music_sources import resolve_song, catalog_match, identity, availability_notice, SOURCES, IDENTIFIER
 except ModuleNotFoundError:
-    from backend.recommendations import select_songs
+    from backend.recommendations import select_songs, track_key
     from backend.speech_audio import normalize_speech
+    from backend.music_sources import resolve_song, catalog_match, identity, availability_notice, SOURCES, IDENTIFIER
 
 # ---------------- 配置 ----------------
 DEEPSEEK_KEY = os.getenv("DEEPSEEK_KEY", "").strip()
@@ -136,15 +139,26 @@ def song_url(rel):
     return NAS_BASE_URL.rstrip("/") + "/" + urllib.parse.quote(rel, safe="/")
 
 def find_song(library, title):
-    hit = next((s for s in library if s["title"] == title), None)
-    if not hit:
-        hit = next((s for s in library if title and title in s["title"]), None)
-    return hit
+    return catalog_match(library, title)
+
+
+async def verify_song(song, exclude=()):
+    return await asyncio.to_thread(resolve_song, NAS_LIST_URL, song, exclude)
+
+
+def song_item(song, requested=False):
+    item = {"kind": "song", "url": song_url(song["rel"]) + "?stream=1",
+            "title": song["title"], "text": "", "requested": requested}
+    for field in ("artist", "source", "id", "lyric_id", "recommendation"):
+        if field in song:
+            item[field] = song[field]
+    return item
 
 # ---------------- LLM ----------------
 PERSONA = (
     "你是音乐电台主持人，名叫{HOST}，声音亲切自然、说话像真实的人，不肉麻不油腻，"
-    "少用网络烂梗，多用具体可感的描述。歌曲只能从提供的歌单标题里选，不许编造。"
+    "少用网络烂梗，多用具体可感的描述。不编造歌名、歌手或音源可用性；"
+    "节目编排只能使用指定歌单，主动点歌可按用户指定的歌名和歌手提交在线检索。"
     '每段口播 40~110 字。始终严格只输出 JSON。'
 )
 
@@ -295,13 +309,15 @@ async def segments_to_items(library, segments, key, add_song_fallback=True):
             if not hit:
                 print("歌单中未找到:", title)
                 continue
-            items.append({"kind": "song", "url": song_url(hit["rel"]), "text": "",
-                          "title": hit["title"]})
-            if "recommendation" in hit:
-                items[-1]["recommendation"] = hit["recommendation"]
+            if not hit.get("_verified"):
+                result = await verify_song(hit)
+                hit = result.get("song")
+            if hit:
+                items.append(song_item(hit, requested=seg.get("requested", False)))
     if add_song_fallback and not any(i["kind"] == "song" for i in items) and library:
-        items.append({"kind": "song", "url": song_url(library[0]["rel"]),
-                      "text": "", "title": library[0]["title"]})
+        result = await verify_song(library[0])
+        if result.get("song"):
+            items.append(song_item(result["song"]))
     async def do_tts(fname, text):
         return fname, await tts_to_mp3(text, VOICE_DIR / fname)
     if talks:
@@ -327,6 +343,17 @@ async def make_show(library, theme, tod, tod_note, exclude, recommendation=None)
         library, theme["name"], exclude, recommendation, load_profile())
     if not songs:
         raise HTTPException(422, "没有可推荐歌曲，请调整少推荐列表或换一首作为推荐起点")
+    songs, checks = await verify_recommendations(library, songs, theme, exclude, recommendation)
+    if not songs:
+        status = "limited" if "limited" in checks else "temporary" if "temporary" in checks else "unavailable"
+        raise HTTPException(429 if status == "limited" else 503 if status == "temporary" else 422,
+                            availability_notice(status, "本期候选歌曲"))
+    recommendation_meta["count"] = len(songs)
+    recommendation_meta["availability_checked"] = True
+    failed = sum(status != "available" for status in checks)
+    if failed:
+        notice = (f"已跳过 {failed} 首暂未验证可播的候选，本期包含 {len(songs)} 首已验证歌曲。")
+        recommendation_meta["notice"] = "；".join(filter(None, [recommendation_meta.get("notice"), notice]))
     titles = json.dumps([song["title"] for song in songs], ensure_ascii=False)
     user = (f"现在是{theme['name']}时段：{tod}，{tod_note}。本期栏目《{theme['name']}》，"
             f"口号：{theme['slogan']}。风格：{theme['brief']}。"
@@ -365,6 +392,40 @@ async def make_show(library, theme, tod, tod_note, exclude, recommendation=None)
     return {"meta": {"theme": theme["name"], "slogan": theme["slogan"],
                      "time": tod, "recommendation": recommendation_meta}, "items": items}
 
+
+async def verify_recommendations(library, candidates, theme, exclude, recommendation):
+    """Validate before narration; refill only within the same preference rules."""
+    verified, statuses, tried = [], [], set()
+    deadline = time.monotonic() + 60
+    target = len(candidates)
+    while candidates and len(verified) < target:
+        remaining = deadline - time.monotonic()
+        if remaining < 2:
+            statuses.append("temporary")
+            break
+        batch = candidates[:target - len(verified)]
+        tried.update(song["rel"] for song in batch)
+        tasks = [asyncio.create_task(verify_song(song)) for song in batch]
+        done, pending = await asyncio.wait(tasks, timeout=remaining)
+        for task in tasks:
+            if task in pending:
+                task.cancel()
+                statuses.append("temporary")
+                continue
+            result = task.result()
+            statuses.append(result["status"])
+            if result.get("song"):
+                verified.append(result["song"])
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
+        if "limited" in statuses or time.monotonic() >= deadline:
+            break
+        used = {track_key(song) for song in verified}
+        available = [song for song in library if song["rel"] not in tried and track_key(song) not in used]
+        candidates, _ = select_songs(available, theme["name"], exclude, recommendation,
+                                     load_profile(), count=target - len(verified)) if available and len(verified) < target else ([], {})
+    return verified, statuses
+
 SongTitle = Annotated[str, Field(max_length=500)]
 
 class RecommendationReq(BaseModel):
@@ -381,7 +442,7 @@ class ShowReq(BaseModel):
 
 @app.post("/api/show")
 async def api_show(req: ShowReq):
-    library = fetch_library()
+    library = await asyncio.to_thread(fetch_library)
     if not library:
         raise HTTPException(502, "曲库为空")
     tod, tod_note = time_of_day()
@@ -390,47 +451,53 @@ async def api_show(req: ShowReq):
     return await make_show(library, theme, tod, tod_note, req.exclude, req.recommendation.model_dump())
 
 class ChatReq(BaseModel):
-    message: str = ""
-    exclude: list = []
+    message: str = Field(default="", max_length=1000)
+    exclude: list[SongTitle] = Field(default_factory=list, max_length=100)
 
 @app.post("/api/chat")
 async def api_chat(req: ChatReq):
-    library = fetch_library()
-    msg = (req.message or "").strip()
-    if not msg:
-        raise HTTPException(400, "empty")
-    titles = "\n".join(f"- {t}" for t in library[:80])
-    user = (f"听众刚才对你说：{msg}\n\n"
-            f"请以{HOST_NAME}的身份自然回应。如果听众是在点歌或暗示想听某首，"
-            f"而且它就在歌单里，就选出来放。如果歌单里没有，就坦诚说没有并回应。\n\n"
-            f"可选歌单:\n{titles}\n\n"
-            '输出 JSON: {"reply":"你要说出口播的一段话","song_title":"歌单原标题或空字符串"}')
-    try:
-        raw = llm_json(user, max_tokens=500)
-    except Exception as e:
-        print("chat LLM 失败:", e)
-        raw = {"reply": f"我这边有点走神，能再说一次吗？", "song_title": ""}
-    reply = (raw.get("reply") or "").strip() or "嗯嗯，我在听。"
-    segs = [{"type": "talk", "text": reply}]
-    st = (raw.get("song_title") or "").strip()
-    if st:
-        hit = find_song(library, st)
-        if hit:
-            segs.append({"type": "song", "title": hit["title"]})
-        else:
-            segs.append({"type": "talk", "text": "其实这一首不在我的曲库里，"
-                                                 "等以后有了再放给你听。"})
-    items = await segments_to_items(library, segs, f"c{int(__import__('time').time()*1000)}")
-    return {"items": items}
+    result = await api_intent(IntentReq(message=req.message, exclude=req.exclude))
+    if result.get("notice"):
+        result["items"] = [{"kind": "text", "title": "点歌提示", "text": result["notice"]}]
+    return result
 
 class IntentReq(BaseModel):
-    message: str = ""
-    exclude: list = []
-    state: dict = {}     # {playing,paused,current,theme,auto} 来自前端
+    message: str = Field(default="", max_length=1000)
+    exclude: list[SongTitle] = Field(default_factory=list, max_length=100)
+    state: dict = Field(default_factory=dict)
+
+
+class SourceRef(BaseModel):
+    source: str = Field(pattern="^(" + "|".join(sorted(SOURCES)) + ")$")
+    id: str = Field(pattern=r"^[A-Za-z0-9_+=.-]{1,200}$")
+
+
+class PlaybackResolveReq(BaseModel):
+    title: str = Field(min_length=1, max_length=500)
+    artist: str = Field(default="", max_length=200)
+    source: str = Field(default="", max_length=20)
+    id: str = Field(default="", max_length=200)
+    exclude: list[SourceRef] = Field(default_factory=list, max_length=40)
+
+
+@app.post("/api/playback/resolve")
+async def api_playback_resolve(req: PlaybackResolveReq):
+    if req.source and (req.source not in SOURCES or not IDENTIFIER.fullmatch(req.id)):
+        raise HTTPException(422, "音源标识无效")
+    song = {"title": req.title, "artist": req.artist}
+    if req.source:
+        song.update(source=req.source, id=req.id)
+    result = await verify_song(song, [entry.model_dump() for entry in req.exclude])
+    response = {key: result[key] for key in ("status", "searched", "retry_after") if key in result}
+    if result.get("song"):
+        response["item"] = song_item(result["song"])
+    else:
+        response["notice"] = availability_notice(result["status"], req.title)
+    return response
 
 INTENT_ACTIONS = (
     '可用动作(按需选多个, 都可不填): '
-    '[{"type":"play_song","title":"歌单标题"}] 放某首歌; '
+    '[{"type":"play_song","title":"歌名或歌单标题","artist":"用户指定歌手或空字符串"}] 在线点歌，歌单外也可检索; '
     '[{"type":"play_theme","theme":"主题名"}] 换成某主题开新一期; '
     '{"type":"pause"} / {"type":"resume"} / {"type":"next"} / {"type":"prev"} / '
     '{"type":"stop"} / {"type":"set_auto","on":true或false}; '
@@ -440,7 +507,10 @@ INTENT_ACTIONS = (
 
 @app.post("/api/intent")
 async def api_intent(req: IntentReq):
-    library = fetch_library()
+    try:
+        library = await asyncio.to_thread(fetch_library)
+    except HTTPException:
+        library = []
     msg = (req.message or "").strip()
     if not msg:
         raise HTTPException(400, "empty")
@@ -451,36 +521,59 @@ async def api_intent(req: IntentReq):
     theme = st.get("theme") or "无"
     automode = "开" if st.get("auto") else "关"
     themes = "、".join(t["name"] for t in THEMES)
-    titles = "\n".join(f"- {t}" for t in library[:80])
+    titles = "\n".join(f"- {song['title']}" for song in library)
     user = (f"你是{HOST_NAME}。现在电台状态：{playing}{paused}，正在播：「{cur}」，"
             f"当前主题：{theme}，自动广播：{automode}。\n"
             f"听众说：「{msg}」。请判断听众意图并决定动作（点歌/换主题/播放控制/闲聊等）。\n"
             f"可用主题名：{themes}\n"
             f"可用动作：{INTENT_ACTIONS}\n"
             f"注意：听众说「下一首/上一首/跳过/暂停/继续/停止」等是在操作播放器，必须输出对应控制动作，不要自己选歌。\n"
+            "用户明确点歌时，即使歌单外也输出 play_song 并保留歌名、歌手、现场或其他版本要求；"
+            "没有指定歌手就留空，不猜原唱。不承诺找到或播放成功，系统会实际检索验证。\n"
             f"可选歌单:\n{titles}\n\n"
             '输出 JSON: {"reply":"口播文本或空","actions":[动作对象...]}')
+    quoted = re.fullmatch(r"(?:请|帮我|麻烦)?\s*(?:播放|点播|放|我想听|想听|听)\s*《([^》]{1,500})》[。！!\s]*", msg)
     try:
-        raw = llm_json(user, max_tokens=700)
+        raw = ({"actions": [{"type": "play_song", "title": quoted.group(1), "artist": ""}]}
+               if quoted else await asyncio.to_thread(llm_json, user, max_tokens=700))
     except Exception as e:
         print("intent LLM 失败:", e)
         raw = {"reply": f"嗯，你说的是「{msg}」吗？我接着放歌陪你。", "actions": []}
-    reply = (raw.get("reply") or "").strip()
+    if not isinstance(raw, dict):
+        raw = {}
+    reply = str(raw.get("reply") or "").strip()
     actions = raw.get("actions") if isinstance(raw.get("actions"), list) else []
 
     segs = []
     if reply:
         segs.append({"type": "talk", "text": reply})
     valid_actions = []
+    notice, availability = "", ""
+    song_requests = 0
     for a in actions:
         if not isinstance(a, dict):
             continue
         t = a.get("type")
         if t == "play_song":
-            title = (a.get("title") or "").strip()
-            hit = find_song(library, title)
-            if hit:
-                segs.append({"type": "song", "title": hit["title"]})
+            title = str(a.get("title") or "").strip()[:500]
+            artist = str(a.get("artist") or "").strip()[:200]
+            if not title or song_requests:
+                continue
+            song_requests += 1
+            hit = catalog_match(library, title, artist)
+            result = await verify_song(hit or {"title": title, "artist": artist})
+            availability = result["status"]
+            if result.get("song"):
+                hit = result["song"]
+                library = [hit]
+                segs = [{"type": "talk", "text": f"找到《{hit['title']}》的可用音源了，接下来听这首。"},
+                        {"type": "song", "title": hit["title"], "rel": hit["rel"], "requested": True}]
+            else:
+                notice = availability_notice(availability, f"{artist} - {title}" if artist else title)
+                # A deterministic visible reply cannot be lost to a TTS fallback.
+                segs = []
+                if availability == "unavailable":
+                    valid_actions.append({"type": "next"})
         elif t in ("pause", "resume", "next", "prev", "stop"):
             valid_actions.append({"type": t})
         elif t == "set_auto":
@@ -495,7 +588,10 @@ async def api_intent(req: IntentReq):
         segs = [s for s in segs if s["type"] == "talk"]
     items = await segments_to_items(library, segs, f"c{int(__import__('time').time()*1000)}", add_song_fallback=False) \
             if segs else []
-    return {"items": items, "actions": valid_actions}
+    response = {"items": items, "actions": valid_actions}
+    if notice:
+        response.update(notice=notice, availability=availability)
+    return response
 
 
 ALARM_FILE = DATA_DIR / "alarm.json"
@@ -611,14 +707,12 @@ def _episode_candidates(library, liked, recent):
 
 def _resolve_candidate(local_lib, liked, kind, obj):
     """把 LLM 选中的一项解析为 (url, display) 或 None"""
-    if kind == "local":
-        return song_url(obj["rel"]), obj["title"]
-    # ncm: 用池内 id 现场取链 (URL 有时效, 必须播前现取)
-    u = _ncm_by_liked_id(obj["id"])
-    if not u:
-        return None
-    disp = f"{obj['title']} - {obj['artist']}" if obj.get("artist") else obj["title"]
-    return u, disp
+    song = obj if kind == "local" else dict(obj, source="netease", id=str(obj["id"]))
+    result = resolve_song(NAS_LIST_URL, song)
+    if result.get("song"):
+        item = song_item(result["song"])
+        return item["url"], item["title"]
+    return None
 
 async def make_mixed_episode():
     """生成一期连续电台: 混合本地+网易云 liked, 返回纯文本行 (口播mp3 与 歌URL 交替)"""
@@ -673,7 +767,7 @@ async def make_mixed_episode():
                 best = ("local", hit)
             else:
                 continue
-        r = _resolve_candidate(library, liked, best[0], best[1])
+        r = await asyncio.to_thread(_resolve_candidate, library, liked, best[0], best[1])
         if not r:
             continue
         u, disp = r
@@ -683,12 +777,15 @@ async def make_mixed_episode():
         chosen += 1
 
     if chosen == 0 and library:
-        # 极端兜底: 本地几首模板串
         picks = _random.sample(library, min(3, len(library)))
-        segs = [("talk", f"{tod}，欢迎回来。"),
-                ("song", song_url(picks[0]["rel"]), picks[0]["title"]),
-                ("talk", "继续陪你听。"),
-                ("song", song_url(picks[1]["rel"]), picks[1]["title"])]
+        results = await asyncio.gather(*(verify_song(song) for song in picks))
+        segs = [("talk", f"{tod}，欢迎回来。")]
+        for result in results:
+            if result.get("song"):
+                item = song_item(result["song"])
+                segs.append(("song", item["url"], item["title"]))
+        if len(segs) == 1:
+            raise HTTPException(503, "在线音源暂未通过校验，请稍后重试")
 
     # TTS (talk 段) + 更新防重
     key = f"r{int(_tt.time()*1000)}"
@@ -777,23 +874,11 @@ def _ncm_search(title: str, artist: str = ""):
         return None
 
 def _ncm_resolve(title: str, artist: str = ""):
-    """本地曲库外点歌: 搜网易云并取可播 URL.
-    返回 dict(id/title/url/artist/artist_match) 或 None.
-    artist_match: 指定了歌手时, 选中的结果是否真的由该歌手演唱
-    (false 说明多半是翻唱/演奏版, 用于让主持人如实串词)."""
-    hit = _ncm_search(title, artist)
-    if not hit:
-        return None
-    sid, real_title, who = hit
-    u = _ncm_song_url(sid)
-    if not u:
-        return None
-    match = False
-    if artist:
-        who_list = [a for a in who.replace("/", "、").split("、") if a]
-        match = any(artist in a or a in artist for a in who_list)
-    return {"id": sid, "title": real_title, "url": u, "artist": who,
-            "artist_match": match, "want_artist": artist}
+    """Compatibility helper; all new requests use the verified multi-source path."""
+    result = resolve_song(NAS_LIST_URL, {"title": title, "artist": artist})
+    if result.get("song"):
+        return dict(song_item(result["song"]), artist_match=True, want_artist=artist)
+    return None
 
 @app.get("/api/radio/playlist")
 async def api_radio_playlist(next_ep: int = 0):
@@ -929,7 +1014,7 @@ async def api_talk(request: Request):
         user = (f"听众刚才对你说（语音识别结果，可能仍有同音字误差）：{text}\n\n"
                 f"请以{HOST_NAME}的身份自然回应，口语化、简短（40~110字）。"
                 f"如果听众是在点歌或暗示想听某首：优先从下方可选歌单里选；"
-                f"歌单里没有的流行/常见歌也可以点，歌名填在 song_title，我们会去网易云找。"
+                f"歌单里没有的歌曲也可以点，歌名填在 song_title，我们会跨音源检索。"
                 f"点歌时若歌名有同音字误差，请按歌手和常识推断出真实歌名再填——例如"
                 f"“周杰伦的青天”应推断为周杰伦的《晴天》而非《青花瓷》。"
                 f"歌手名也填进 artist 字段（听众提到或你能推断出原唱时），方便找原唱版本而非翻唱。\n\n"
@@ -941,8 +1026,15 @@ async def api_talk(request: Request):
             print("talk LLM 失败:", e)
             raw_llm = {"reply": "嗯嗯，我在听，你接着说。", "song_title": ""}
         reply = (raw_llm.get("reply") or "").strip() or "嗯嗯，我在听。"
-        # 口播 + (本地或网易云)歌曲 -> 直接产出最终行, 不走 segments_to_items
-        # (segments_to_items 只能放本地曲库歌曲, 会丢掉网易云 URL)
+        st = str(raw_llm.get("song_title") or "").strip()[:500]
+        ar = str(raw_llm.get("artist") or "").strip()[:200]
+        verified = None
+        if st:
+            hit = catalog_match(library, st, ar)
+            result = await verify_song(hit or {"title": st, "artist": ar})
+            verified = result.get("song")
+            reply = (f"找到《{verified['title']}》的可用音源了，接下来听这首。" if verified
+                     else availability_notice(result["status"], st))
         import time as _tt
         key = f"t{ts}"
         fname = f"{key}_00.mp3"
@@ -954,31 +1046,8 @@ async def api_talk(request: Request):
             fb = pick_fallback_url()
             if fb:
                 items2.append({"kind": "talk", "url": fb})
-        st = (raw_llm.get("song_title") or "").strip()
-        ar = (raw_llm.get("artist") or "").strip()
-        if st:
-            hit = find_song(library, st)
-            if hit:
-                items2.append({"kind": "song", "url": song_url(hit["rel"]), "title": hit["title"]})
-            else:
-                ncm = _ncm_resolve(st, ar)   # 本地没有 -> 网易云兜底(带歌手找原唱)
-                if ncm:
-                    print(f"网易云点歌: {st!r} + {ar!r} -> {ncm['title']} by {ncm.get('artist','')} (id {ncm['id']}, match={ncm.get('artist_match')})")
-                    note = ""
-                    if ar and not ncm.get("artist_match"):
-                        # 想要原唱但只搜到翻唱/演奏: 主持人如实串一句
-                        note = (f"{ar}的《{st}》原版这边暂时没有，"
-                                f"我放一个「{ncm['title']}」的版本给你，先听着。")
-                    if note:
-                        fnote = f"{key}_01.mp3"
-                        if await tts_to_mp3(note, VOICE_DIR / fnote):
-                            items2.append({"kind": "talk", "url": f"{RADIO_BASE}/voice/{fnote}"})
-                    items2.append({"kind": "song", "url": ncm["url"], "title": ncm["title"]})
-                else:
-                    f2 = f"{key}_02.mp3"
-                    miss = f"《{st}》我这边暂时找不到能播的，换一首试试？"
-                    if await tts_to_mp3(miss, VOICE_DIR / f2):
-                        items2.append({"kind": "talk", "url": f"{RADIO_BASE}/voice/{f2}"})
+        if verified:
+            items2.append(song_item(verified, requested=True))
         final_lines = [it["url"] for it in items2 if it["kind"] in ("talk", "song")]
 
     if not final_lines:

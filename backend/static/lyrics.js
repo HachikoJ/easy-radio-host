@@ -103,7 +103,7 @@ export function createLyricsExperience({ audio, state, seek, demo }) {
       if (demo) {
         data = { lyric: '[00:00.00]听间 · 原创器乐试听\n[00:03.00]窗边的光，慢慢落下\n[00:07.00]让旋律留住这一刻\n[00:11.00]微风经过，音乐继续', source: '原创演示文案' };
       } else {
-        const endpoint = lyricEndpoint(item.url, location.origin);
+        const endpoint = lyricEndpoint(item.url, location.origin, item);
         if (!endpoint) { status('此音源暂不支持歌词'); return; }
         const response = await fetch(endpoint, { signal: request.signal });
         if (!response.ok) throw new Error();
@@ -131,7 +131,7 @@ export function createLyricsExperience({ audio, state, seek, demo }) {
     requestAnimationFrame(() => center(true));
   }
   function render() {
-    const item = state(), key = item?.kind === 'song' ? `${item.url}|${item.title}` : item?.kind || '';
+    const item = state(), key = item?.kind === 'song' ? `${item.url}|${item.title}|${item.source || ''}|${item.lyric_id || ''}` : item?.kind || '';
     place(); motionState();
     if (key !== itemKey) { itemKey = key; load(item); }
   }

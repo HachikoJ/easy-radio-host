@@ -134,13 +134,18 @@ class RecommendationSelection(unittest.TestCase):
 
 # Reuse the repository's direct ASGI harness, without network services or keys.
 if importlib.util.find_spec("fastapi") is not None:
-    from test_frontend_contract import radio, request
+    from test_frontend_contract import radio, request, verified
 else:
     radio = None
 
 
 @unittest.skipIf(radio is None, "FastAPI dependencies or ASGI harness unavailable")
 class RecommendationAPI(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        patcher = patch.object(radio, "verify_song", side_effect=verified)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     async def show(self, library, llm, body=None):
         with patch.object(radio, "fetch_library", return_value=library), \
              patch.object(radio, "llm_json", side_effect=llm), \
@@ -158,7 +163,7 @@ class RecommendationAPI(unittest.IsolatedAsyncioTestCase):
             urls = [row["url"] for row in data["items"] if row["kind"] == "song"]
             self.assertEqual(len(urls), 2)
             self.assertEqual(len(set(urls)), 2)
-            self.assertEqual({url.rsplit("/", 1)[-1] for url in urls}, {"11.mp3", "22.mp3"})
+            self.assertEqual({url.split("?")[0].rsplit("/", 1)[-1] for url in urls}, {"11.mp3", "22.mp3"})
 
     async def test_model_cannot_change_duplicate_or_reorder_songs(self):
         library = [song(i) for i in range(5)]
@@ -223,10 +228,12 @@ class RecommendationAPI(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(status, 422)
         library = [song(1)]
         with patch.object(radio, "fetch_library", return_value=library), \
+             patch.object(radio, "tts_to_mp3", new=AsyncMock(return_value=False)), \
+             patch.object(radio, "ensure_fallback_voice", new=AsyncMock(return_value=False)), \
              patch.object(radio, "llm_json", return_value={"reply": "", "actions": [{"type": "play_song", "title": library[0]["title"]}]}):
             status, content = await request("/api/intent", {"message": "再放这首", "exclude": [library[0]["title"]]})
         self.assertEqual(status, 200)
-        self.assertEqual(json.loads(content)["items"][0]["title"], library[0]["title"])
+        self.assertEqual(next(row for row in json.loads(content)["items"] if row["kind"] == "song")["title"], library[0]["title"])
 
 
 if __name__ == "__main__":

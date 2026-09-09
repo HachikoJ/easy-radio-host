@@ -25,6 +25,9 @@ def upstream(data, status=200):
 class LyricsProxy(unittest.TestCase):
     def setUp(self):
         proxy._lyric_cache.clear()
+        proxy._api_cache.clear()
+        proxy._api_times.clear()
+        proxy._api_blocked_until = 0
 
     def test_joox_identifier_and_translation_are_preserved(self):
         sid = "bLnv0PqDX_qAlIqapc+Okw=="
@@ -46,6 +49,7 @@ class LyricsProxy(unittest.TestCase):
         for data in ({"lyric": "", "tlyric": ""}, {}, {"lyric": None, "tlyric": None}):
             with self.subTest(data=data):
                 proxy._lyric_cache.clear()
+                proxy._api_cache.clear()
                 with patch.object(proxy.urllib.request, "urlopen", return_value=upstream(data)):
                     self.assertEqual(proxy.lyrics("netease", "missing"), {
                         "lyric": "", "translation": "", "source": "netease",
@@ -103,8 +107,9 @@ class LyricsProxy(unittest.TestCase):
                 patch.object(proxy.urllib.request, "urlopen", side_effect=lambda *args, **kw: upstream({"lyric": "new line"})) as fetch:
             self.assertEqual(proxy.lyrics("netease", "1")["lyric"], "new line")
             self.assertEqual(fetch.call_count, 1)
-            for number in range(2, proxy.LYRIC_CACHE_SIZE + 2):
-                proxy.lyrics("netease", str(number))
+            with patch.object(proxy, "API_LIMIT", 1000):
+                for number in range(2, proxy.LYRIC_CACHE_SIZE + 2):
+                    proxy.lyrics("netease", str(number))
             self.assertEqual(len(proxy._lyric_cache), proxy.LYRIC_CACHE_SIZE)
             self.assertNotIn(("netease", "1"), proxy._lyric_cache)
 
@@ -112,6 +117,8 @@ class LyricsProxy(unittest.TestCase):
 class LyricsRoute(unittest.IsolatedAsyncioTestCase):
     async def test_encoded_identifier_survives_the_asgi_route(self):
         proxy._lyric_cache.clear()
+        proxy._api_cache.clear()
+        proxy._api_times.clear()
         sid = "bLnv0PqDX_qAlIqapc+Okw=="
         raw_path = "/lyrics/joox/" + urllib.parse.quote(sid, safe="") + ".json"
         messages = []

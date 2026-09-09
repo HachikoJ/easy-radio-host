@@ -30,13 +30,15 @@ export function activeLine(lines, time) {
   return found;
 }
 
-export function lyricEndpoint(songUrl, origin) {
+export function lyricEndpoint(songUrl, origin, metadata = {}) {
   try {
     const url = new URL(songUrl, origin);
-    const match = url.pathname.match(/^(.*)\/s\/(joox|netease)\/([^/]+)\.mp3$/);
+    const match = url.pathname.match(/^(.*)\/s\/([a-z][a-z0-9_-]*)\/([^/]+)\.mp3$/);
     if (!match || url.origin !== new URL(origin).origin) return null;
+    const rawSource = metadata.source || match[2], source = rawSource === 'id' ? 'netease' : rawSource;
+    if (!/^[a-z][a-z0-9_-]*$/.test(source)) return null;
     // The playlist and song_url each quote the ID once before playback.
-    const id = decodeURIComponent(decodeURIComponent(match[3]));
-    return `${match[1]}/lyrics/${match[2]}/${encodeURIComponent(id)}.json`;
+    const id = metadata.lyric_id || decodeURIComponent(decodeURIComponent(match[3]));
+    return `${match[1]}/lyrics/${source}/${encodeURIComponent(id)}.json`;
   } catch { return null; }
 }
