@@ -73,6 +73,7 @@ export function createLyricsExperience({ audio, state, seek, demo }) {
       return node;
     }));
     active = -2; update(true);
+    if (!reduced.matches && lines.length) viewport.animate([{ opacity: .2, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 280, easing: 'ease-out' });
   }
   function preview(text) {
     get('player-lyric-text').textContent = text;
@@ -90,6 +91,7 @@ export function createLyricsExperience({ audio, state, seek, demo }) {
     lines = []; translations = []; timed = false; active = -2; offset = 0;
     viewport.replaceChildren(); viewport.scrollTop = 0;
     get('lyrics-offset').value = '0'; get('lyrics-follow').checked = true;
+    get('lyrics-follow').disabled = true;
     get('lyrics-retry').hidden = true; get('translation-control').hidden = true;
     get('lyrics-timing').hidden = true;
     get('lyrics-source').textContent = '';
@@ -111,6 +113,7 @@ export function createLyricsExperience({ audio, state, seek, demo }) {
       }
       if (request.signal.aborted || controller !== request) return;
       ({ lines, timed } = parseLyrics(data.lyric));
+      get('lyrics-follow').disabled = !timed;
       const translated = parseLyrics(data.translation);
       translations = translated.timed ? translated.lines : [];
       get('translation-control').hidden = !translations.length || !timed;
@@ -128,7 +131,8 @@ export function createLyricsExperience({ audio, state, seek, demo }) {
   }
   function place() {
     const target = get(document.body.classList.contains('focus-mode') ? 'lyrics-focus' : 'lyrics-home');
-    if (panel.parentElement !== target) { target.append(panel); center(true); }
+    if (panel.parentElement !== target) target.append(panel);
+    requestAnimationFrame(() => center(true));
   }
   function render() {
     const item = state(), key = item?.kind === 'song' ? `${item.url}|${item.title}` : item?.kind || '';
@@ -154,6 +158,7 @@ export function createLyricsExperience({ audio, state, seek, demo }) {
   audio.addEventListener('seeked', () => update(true));
   window.addEventListener('tingjian:layout', place);
   window.addEventListener('resize', () => center(true));
+  new ResizeObserver(() => requestAnimationFrame(() => center(true))).observe(viewport);
   render();
   return { render };
 }

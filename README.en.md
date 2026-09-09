@@ -26,14 +26,14 @@ Tingjian is an AI music radio for listeners who enjoy themed listening and are c
 - **Six themes:** Afternoon Coffee, City Walk, Sleep at Night, Nostalgic Hits, Morning Energy, and Mood Station; the program selects tracks, and DeepSeek writes narration in the selected order.
 - **Multiple recommendation sources:** Combine themes, favorite tracks, favorite artists, artist preferences configured by the deployment owner, and exploration candidates. Extend a current track with more works by the same artist and see the actual selection reasons.
 - **Deduplication and variety:** No repeated tracks within a show; recent tracks are avoided where possible and artists are spread out. Shows shorten when candidates are scarce, and any recent-track reuse or relaxed artist limits are disclosed.
-- **Optional preferences:** "按我的偏好选歌" (Use my preferences) is off by default. Enabling it allows local favorites, history, and "Recommend less" titles to inform the current recommendation. "Recommend less" can be undone; ordinary skips and playback failures are not treated as dislikes, and explicit song requests remain available.
+- **Optional preferences:** Listening settings bring together continuous playback, translations, lyric timing, and song preferences. "按我的偏好选歌" (Use my preferences) is off by default. Enabling it allows local favorites, history, and "Recommend less" titles to inform the current recommendation, with privacy details available before opting in. "Recommend less" can be undone; ordinary skips and playback failures are not treated as dislikes, and explicit song requests remain available.
 - **Host narration:** MiniMax synthesizes the voice, with edge-tts fallback support.
 - **Continuous playback:** A show queue, previous/next segments, seeking and volume, automatic continuation, and stop controls.
-- **Focused listening:** Desktop and mobile layouts, light/dark appearance, immersive mode, keyboard controls, and system media controls in supported browsers.
+- **Focused listening:** The first screen centers on the disc, current track, and a spacious lyric view. Compact track details leave more room for lyrics on mobile. Theme stations, the queue/favorites/history, and chat open on demand while the bottom player stays available. Light/dark appearance, smooth transitions into immersive mode, keyboard controls, and system media controls in supported browsers are included.
 - **Favorites and history:** Store up to 100 favorites and 50 recent tracks locally in your browser, deduplicated by title; history records songs only once playback actually starts.
 - **Song requests:** Chat with Xiaolan, request tracks, or control playback; cancel generation, retry failures, and keep your draft when a request fails.
 - **Online library:** Store track names, artists, sources, and IDs; resolve playback URLs on demand. Unavailable URLs can fall back to an available bitrate for the same track ID. Playback failures trigger one automatic refresh, followed by retry and next-segment controls if playback still fails.
-- **Synchronized lyrics:** The fixed player shows the current line; its lyric preview and the header lyric button open the immersive view. LRC lyrics follow playback and highlight each line by default, with tap-to-seek including 0 seconds. Following resumes 3 seconds after manual browsing; only explicitly switching it off keeps it disabled. Delay adjustment from -10 to +10 seconds and optional timestamped translations are available. Loading, missing lyrics, failure, and timeout have distinct states; plain text stays untimed.
+- **Synchronized lyrics:** A spacious lyric view is visible by default, with faded theme photography behind highlighted text and following and animation toggles together in one row. The fixed player shows the current line; tapping its lyric preview focuses the lyric view and resumes following. LRC lyrics follow playback by default, with tap-to-seek including 0 seconds. Following resumes 3 seconds after manual browsing; only explicitly switching it off keeps it disabled. Delay adjustment from -10 to +10 seconds and optional timestamped translations are available. Loading, missing lyrics, failure, and timeout have distinct states; plain text stays untimed.
 - **Playback animation:** A rotating disc displays a theme image at its center, surrounded by a black ring supporting colorful glowing edges and layered translucent 3D waves. When the browser and audio source support analysis, the waves flow with actual frequency bands, bass, and volume; otherwise, a smooth playback animation takes over. A 2D ripple fallback is available without WebGL. Motion stops during buffering, pauses, or when the page is hidden. The animation toggle is remembered and system reduced-motion preferences are respected. The theme image is not the track's album artwork.
 
 ## Product preview
@@ -41,26 +41,26 @@ Tingjian is an AI music radio for listeners who enjoy themed listening and are c
 ### Desktop
 
 <p>
-  <img src="docs/radio-desktop.png" alt="Tingjian live desktop playback: theme selection, show queue, chat, and bottom player" width="100%">
+  <img src="docs/radio-desktop.png" alt="Tingjian desktop: disc and current track, spacious lyrics, and bottom player" width="100%">
 </p>
 
 ### Mobile
 
 <p>
-  <img src="docs/radio-mobile.png" alt="Tingjian live mobile playback: theme artwork, show, and playback controls" width="375">
+  <img src="docs/radio-mobile.png" alt="Tingjian mobile: compact disc area, lyrics, and bottom playback controls" width="375">
 </p>
 
 ### Immersive mode
 
 <p>
-  <img src="docs/radio-focus.png" alt="Tingjian live immersive playback: current segment, theme artwork, and playback controls" width="100%">
+  <img src="docs/radio-focus.png" alt="Tingjian immersive mode: rotating disc, current track, lyrics, and playback controls" width="100%">
 </p>
 
-Screenshots show real generated shows and online music playback on the [live site](https://audio.deline.top). Theme photos represent listening settings, not actual album artwork. Track availability depends on third-party services.
+Screenshots show the actual interface in the explicitly labeled demo mode, using original instrumental audio and original sample text without reproducing third-party song lyrics. Theme photos represent listening settings, not actual album artwork. Online tracks and availability on the [live site](https://audio.deline.top) depend on third-party services.
 
 ### Lyrics and animation
 
-<img src="docs/radio-lyrics.png" alt="Tingjian desktop focus mode: synchronized lyric highlighting, following, timing adjustment, and playback animation" width="100%">
+<img src="docs/radio-lyrics.png" alt="Tingjian desktop lyrics: soft theme background, highlighted text, and compact following and animation toggles" width="100%">
 
 <img src="docs/radio-lyrics-mobile.png" alt="Tingjian mobile lyrics view: compact track details, lyrics, and bottom playback controls" width="375">
 
@@ -68,9 +68,9 @@ These two screenshots use the explicitly labeled demo mode with original instrum
 
 ### Recommendations and preferences
 
-<img src="docs/radio-recommendations.png" alt="Tingjian desktop recommendations: preference toggle, selection reasons, and Recommend less management" width="100%">
+<img src="docs/radio-recommendations.png" alt="Tingjian desktop listening settings: preference toggle, privacy details, and Recommend less management" width="100%">
 
-<img src="docs/radio-recommendations-mobile.png" alt="Tingjian mobile recommendations: local preferences and track recommendation actions" width="375">
+<img src="docs/radio-recommendations-mobile.png" alt="Tingjian mobile listening settings: playback options, lyric timing, and local song preferences" width="375">
 
 Recommendation screenshots show the actual interface. Fixed demo tracks and reasons are previews and do not establish recommendation quality in the live service.
 

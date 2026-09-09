@@ -25,6 +25,7 @@ jobs:
           node-version: "22"
       - run: node --check backend/static/app.js
       - run: node --check backend/static/listening.js
+      - run: node --check backend/static/layout.js
       - run: node --check backend/static/demo.js
       - run: node --check backend/static/lyrics.js
       - run: node --check backend/static/recommendations.js

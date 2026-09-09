@@ -1,5 +1,6 @@
 import { createLyricsExperience } from './lyrics.js';
 import { createRecommendationExperience } from './recommendations.js';
+import { createQuietLayout } from './layout.js';
 
 const $ = id => document.getElementById(id);
 const audio = $('audio');
@@ -122,11 +123,15 @@ function renderQueue() {
 }
 function renderPlayback() {
   const item = current(), busy = Boolean(generation);
+  document.body.classList.toggle('has-programme', queue.length > 0);
+  document.body.classList.toggle('preparing-programme', busy);
   $('generate').disabled = busy;
   document.querySelectorAll('.theme-card').forEach(button => { button.disabled = busy; });
   $('cancel-generate').hidden = !busy;
   $('listening').classList.toggle('loading', busy);
   $('generate-label').textContent = busy ? '正在编排…' : queue.length ? '生成新一期' : '开始收听';
+  $('generate').dataset.tip = $('generate-label').textContent;
+  $('generate').setAttribute('aria-label', $('generate-label').textContent);
   $('generate').querySelector('.icon').style.setProperty('--icon', `url(assets/${busy ? 'LoaderCircle' : queue.length ? 'RefreshCw' : 'Play'}.svg)`);
   $('play').disabled = busy && !item;
   const playLabel = item ? playing ? '暂停' : '继续播放' : '开始收听';
@@ -333,7 +338,7 @@ async function sendChat(event, requestedMessage) {
     label.textContent = controller.signal.aborted && controller.signal.reason !== 'timeout' ? '你 · 已取消' : '你 · 未发送';
     if (controller.signal.aborted && controller.signal.reason !== 'timeout') return;
     $('chat-error').textContent = error.message || '消息发送失败，请重试。'; $('chat-error').hidden = false;
-    if (requestedMessage || document.body.classList.contains('focus-mode')) notify(error.message || '点播失败，请重试。');
+    if (requestedMessage || document.body.classList.contains('focus-mode') || document.body.classList.contains('quiet-ui')) notify(error.message || '点播失败，请重试。');
   } finally { if (chatRequest === controller) chatRequest = null; $('send').disabled = false; $('chat-status').textContent = ''; if (requestedMessage) $('library-status').textContent = ''; }
 }
 
@@ -346,8 +351,8 @@ $('previous').addEventListener('click', previous);
 $('next').addEventListener('click', advance);
 $('stop').addEventListener('click', stop);
 function showLyrics() {
-  listening?.setFocus(true);
-  $('lyrics-panel').scrollIntoView({ block: 'center', behavior: 'auto' });
+  window.dispatchEvent(new Event('tingjian:show-lyrics'));
+  if (!document.body.classList.contains('quiet-ui')) listening?.setFocus(true);
   $('lyrics-lines').focus({ preventScroll: true });
   $('lyrics-follow').checked = true;
   $('lyrics-follow').dispatchEvent(new Event('change'));
@@ -403,4 +408,5 @@ recommendations = createRecommendationExperience({ demo, icon, notify,
   signals: () => listening.recommendationSignals(),
   related: seed => generateShow({ seed })
 });
+createQuietLayout({ icon, setFocus: listening.setFocus });
 updateVolume(); renderThemes(); renderPlayback();

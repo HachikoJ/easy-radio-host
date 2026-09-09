@@ -101,23 +101,34 @@ function createListeningExperience(actions) {
     appearance = appearance === 'dark' ? 'light' : 'dark'; setAppearance(appearance);
     try { localStorage.setItem('tingjian.appearance.v1', appearance); } catch { actions.notify('当前浏览器无法记住配色，下次打开将使用浅色。'); }
   });
+  let layoutTransition = null;
   function setFocus(on) {
+    if (focused === on) return;
     focused = on;
-    document.body.classList.toggle('focus-mode', on);
-    get('focus-stage').hidden = !on;
-    const label = on ? '退出沉浸模式' : '进入沉浸模式';
-    get('focus-toggle').setAttribute('aria-label', label); get('focus-toggle').dataset.tip = label;
-    get('focus-toggle').setAttribute('aria-pressed', String(on));
-    get('focus-icon').style.setProperty('--icon', `url(assets/${on ? 'Minimize' : 'Maximize'}.svg)`);
-    render(); window.scrollTo(0, 0);
-    window.dispatchEvent(new Event('tingjian:layout'));
-    if (on) get('focus-title').focus({ preventScroll: true }); else get('focus-toggle').focus();
+    const update = () => {
+      document.body.classList.toggle('focus-mode', on);
+      get('focus-stage').hidden = !on;
+      const label = on ? '退出沉浸模式' : '进入沉浸模式';
+      get('focus-toggle').setAttribute('aria-label', label); get('focus-toggle').dataset.tip = label;
+      get('focus-toggle').setAttribute('aria-pressed', String(on));
+      get('focus-icon').style.setProperty('--icon', `url(assets/${on ? 'Minimize' : 'Maximize'}.svg)`);
+      render(); window.scrollTo(0, 0);
+      window.dispatchEvent(new Event('tingjian:layout'));
+      if (on) get('focus-title').focus({ preventScroll: true }); else get('focus-toggle').focus();
+    };
+    if (document.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      layoutTransition?.skipTransition();
+      layoutTransition = document.startViewTransition(update);
+      layoutTransition.ready.catch(() => { /* A newer toggle can skip this animation. */ });
+      return layoutTransition.updateCallbackDone;
+    } else update();
   }
   get('focus-toggle').addEventListener('click', () => setFocus(!focused));
   document.querySelector('.focus-brand').addEventListener('click', () => setFocus(false));
 
   function seekBy(delta) { actions.seek((document.getElementById('audio').currentTime || 0) + delta); }
   document.addEventListener('keydown', event => {
+    if (event.defaultPrevented) return;
     if (event.key === 'Escape' && focused) { setFocus(false); return; }
     if (event.isComposing || event.repeat || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || event.target.closest('input,textarea,button,a,select,[contenteditable="true"],[role="tab"]')) return;
     if (event.code === 'Space') { event.preventDefault(); actions.state().playing ? actions.pause() : actions.play(); }
