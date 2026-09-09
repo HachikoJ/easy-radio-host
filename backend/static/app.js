@@ -21,6 +21,8 @@ let mediaRetryUsed = false, mediaRetryTimer = null, failedGeneration = -1;
 let recoveryRequest = null, recoveryState = null, consecutiveUnavailable = 0;
 let continuationTimer = null, continuityVersion = 0, availabilityRequest = null;
 let announcementAudio = null, finishAnnouncement = null, pausedOffset = 0;
+let cooldownAudio = null, cooldownRequest = null, finishCooldown = null;
+let cooldownItems = [], cooldownIndex = 0;
 let quotaUntil = 0, continuationFailure = null, pausedWaiting = false;
 let generation = null, chatRequest = null, retryAction = null;
 let programmeVersion = 0;
@@ -60,6 +62,7 @@ function normalizeItems(items) {
     id: item.id == null ? '' : String(item.id),
     artist: typeof item.artist === 'string' ? item.artist : '',
     lyric_id: item.lyric_id == null ? '' : String(item.lyric_id),
+    lyric_title: typeof item.lyric_title === 'string' ? item.lyric_title : '',
     requested: item.requested === true,
     recommendation: item.recommendation && typeof item.recommendation.reason === 'string' ? { reason: item.recommendation.reason.slice(0, 300) } : null
   })).filter(item => item.kind !== 'song' || item.url);
@@ -159,7 +162,7 @@ function renderPlayback() {
   $('mini-cover').src = `assets/${(item ? activeTheme : selected).image}.jpg`;
   $('transcript').hidden = !item || item.kind === 'song' || !item.text;
   $('transcript-text').textContent = item && item.kind !== 'song' ? item.text : '';
-  $('show-status').textContent = busy ? '小蓝正在准备节目' : mode === 'waiting' ? '等待自动续播' : mode === 'announcement' ? '小蓝正在提醒' : item && selected !== activeTheme ? `待切换 · 正在收听${activeTheme.name}` : item ? playing ? interrupt ? '互动插播中' : '正在播放' : '已暂停' : pausedWaiting ? '已暂停自动续播' : queue.length ? '本期已播完' : '准备就绪';
+  $('show-status').textContent = busy ? '小蓝正在准备节目' : mode === 'cooldown' ? '小蓝陪你聊一会儿' : mode === 'waiting' ? '等待自动续播' : mode === 'announcement' ? '小蓝正在提醒' : item && selected !== activeTheme ? `待切换 · 正在收听${activeTheme.name}` : item ? playing ? interrupt ? '互动插播中' : '正在播放' : '已暂停' : pausedWaiting ? '已暂停自动续播' : queue.length ? '本期已播完' : '准备就绪';
   $('status-dot').classList.toggle('playing', playing);
   $('now-title').textContent = item?.title || selected.name;
   $('now-title').title = $('now-title').textContent;
@@ -187,7 +190,10 @@ function cancelContinuation() {
   continuityVersion++;
   clearTimeout(continuationTimer); continuationTimer = null;
   availabilityRequest?.abort(); availabilityRequest = null;
+  cooldownRequest?.abort(); cooldownRequest = null;
   finishAnnouncement?.(false);
+  finishCooldown?.(false);
+  cooldownItems = []; cooldownIndex = 0;
 }
 function failureReason(status) {
   return ['unavailable', 'limited'].includes(status) ? status : 'temporary';
@@ -245,6 +251,101 @@ async function failureAndContinue(status, notice, retryAfter) {
     else scheduleRecommendation();
   }
 }
+
+function shuffleCooldownItems(items, previousId = '') {
+  const shuffled = [...items];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  if (shuffled.length > 1 && shuffled[0].id === previousId) [shuffled[0], shuffled[1]] = [shuffled[1], shuffled[0]];
+  return shuffled;
+}
+
+function orderCooldownItems(items, previousId = '') {
+  const hour = new Date().getHours();
+  const localPeriod = hour >= 5 && hour < 12 ? 'morning' : hour >= 18 || hour < 5 ? 'evening' : '';
+  const ordered = shuffleCooldownItems(items.filter(item => item.period === 'any'), previousId);
+  const seasonal = localPeriod ? shuffleCooldownItems(items.filter(item => item.period === localPeriod), previousId) : [];
+  for (const item of seasonal) ordered.splice(Math.floor(Math.random() * (Math.min(ordered.length, 2) + 1)), 0, item);
+  if (ordered.length > 1 && ordered[0].id === previousId) [ordered[0], ordered[1]] = [ordered[1], ordered[0]];
+  return ordered;
+}
+
+function playCooldownItem(item, token) {
+  return new Promise(resolve => {
+    let settled = false, fallbackStarted = false, timeout;
+    const clip = new Audio(item.url);
+    cooldownAudio = clip;
+    clip.volume = volume; clip.muted = muted;
+    const finish = completed => {
+      if (settled) return;
+      settled = true; clearTimeout(timeout);
+      clip.onended = null; clip.onerror = null;
+      clip.pause(); clip.removeAttribute('src'); clip.load();
+      window.speechSynthesis?.cancel();
+      if (cooldownAudio === clip) cooldownAudio = null;
+      if (finishCooldown === finish) finishCooldown = null;
+      resolve(completed && token === continuityVersion);
+    };
+    finishCooldown = finish;
+    const fallback = () => {
+      if (settled || fallbackStarted) return;
+      fallbackStarted = true;
+      clip.pause(); clip.removeAttribute('src'); clip.load();
+      clearTimeout(timeout);
+      timeout = setTimeout(() => finish(true), 45000);
+      if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) { finish(true); return; }
+      const speech = new SpeechSynthesisUtterance(item.text);
+      speech.lang = 'zh-CN'; speech.volume = muted ? 0 : volume;
+      speech.onend = () => finish(true); speech.onerror = () => finish(true);
+      window.speechSynthesis.speak(speech);
+    };
+    clip.onended = () => finish(true); clip.onerror = fallback;
+    timeout = setTimeout(fallback, 90000);
+    clip.play().catch(fallback);
+  });
+}
+
+async function playCooldownContent(token) {
+  const controller = new AbortController(); cooldownRequest = controller;
+  const timeout = setTimeout(() => controller.abort('timeout'), 10000);
+  try {
+    const response = await fetch('/api/playback/cooldown/content.json', { signal: controller.signal });
+    if (!response.ok) throw new Error('cooldown manifest');
+    const data = await response.json();
+    if (token !== continuityVersion) return;
+    const validItems = Array.isArray(data.items) ? data.items.flatMap(item => {
+      if (!item || typeof item.id !== 'string' || typeof item.title !== 'string' || typeof item.url !== 'string' || typeof item.text !== 'string' || !['any', 'morning', 'evening'].includes(item.period)) return [];
+      try {
+        const url = new URL(item.url, location.href);
+        if (url.origin !== location.origin || !url.pathname.startsWith('/api/playback/cooldown/') || !url.pathname.endsWith('.mp3')) return [];
+        return [{ ...item, url: url.href }];
+      } catch { return []; }
+    }) : [];
+    cooldownItems = orderCooldownItems(validItems);
+    if (!cooldownItems.length) throw new Error('empty cooldown manifest');
+    cooldownIndex = 0;
+    while (token === continuityVersion && quotaUntil - Date.now() >= 6000) {
+      if (cooldownIndex >= cooldownItems.length) {
+        cooldownItems = orderCooldownItems(cooldownItems, cooldownItems.at(-1)?.id || '');
+        cooldownIndex = 0;
+      }
+      mode = 'cooldown'; playing = true;
+      const item = cooldownItems[cooldownIndex];
+      cooldownIndex++; notify(`${item.title} · 音乐将在额度恢复后自动继续。`); renderPlayback();
+      if (!await playCooldownItem(item, token)) return;
+    }
+  } catch {
+    if (token !== continuityVersion || controller.signal.aborted && controller.signal.reason !== 'timeout') return;
+    mode = 'waiting'; playing = true; renderPlayback();
+    await announce('waiting', '音源请求额度正在恢复，我们稍微聊一会儿，音乐随后继续。');
+  } finally {
+    clearTimeout(timeout);
+    if (cooldownRequest === controller) cooldownRequest = null;
+  }
+}
+
 async function scheduleRecommendation(delay = null) {
   cancelContinuation();
   const token = continuityVersion;
@@ -254,11 +355,12 @@ async function scheduleRecommendation(delay = null) {
   mode = 'waiting'; playing = true;
   notify(remaining > 0 ? `音源请求额度暂未恢复，约 ${Math.ceil(wait / 1000)} 秒后自动继续。` : `正在等待音源恢复，约 ${Math.max(1, Math.ceil(wait / 1000))} 秒后自动推荐下一首。`);
   renderPlayback();
-  if (remaining > 0 && delay === null) {
-    if (!await announce('waiting', $('notice-text').textContent) || token !== continuityVersion) return;
-  }
+  if (remaining > 0) playCooldownContent(token);
   continuationTimer = setTimeout(async () => {
     if (token !== continuityVersion) return;
+    finishCooldown?.(false);
+    finishAnnouncement?.(false);
+    cooldownRequest?.abort(); cooldownRequest = null;
     const controller = new AbortController(); availabilityRequest = controller;
     const timeout = setTimeout(() => controller.abort(), 10000);
     try {
@@ -269,7 +371,7 @@ async function scheduleRecommendation(delay = null) {
       if (data.status === 'limited') {
         rememberFailure('limited', data.retry_after);
         notify('音源请求额度暂未恢复，将在允许访问后自动继续。');
-        if (await announce('waiting', $('notice-text').textContent) && token === continuityVersion) scheduleRecommendation(0);
+        scheduleRecommendation();
       } else if (data.status === 'ready') generateShow();
       else {
         rememberFailure('temporary', data.retry_after);
@@ -331,7 +433,7 @@ function playMedia() {
 }
 function pausePlayback() {
   if (mode === 'media' || mode === 'text') pausedOffset = position();
-  pausedWaiting = !current() && ['waiting', 'announcement'].includes(mode);
+  pausedWaiting = !current() && ['waiting', 'announcement', 'cooldown'].includes(mode);
   programmeVersion++;
   generation?.abort(); generation = null;
   chatRequest?.abort(); chatRequest = null;
@@ -588,6 +690,7 @@ function updateVolume() {
   // Narration is mastered to -14 LUFS; trim the louder online music sources.
   audio.volume = volume * (current()?.kind === 'song' ? .85 : 1); audio.muted = muted;
   if (announcementAudio) { announcementAudio.volume = volume; announcementAudio.muted = muted; }
+  if (cooldownAudio) { cooldownAudio.volume = volume; cooldownAudio.muted = muted; }
   $('volume').value = muted ? 0 : volume * 100;
   $('volume-value').textContent = `${Math.round(muted ? 0 : volume * 100)}%`;
   const label = muted ? '取消静音' : '静音'; $('mute').setAttribute('aria-label', label); $('mute').dataset.tip = label;

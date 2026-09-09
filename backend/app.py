@@ -4,6 +4,7 @@
 import asyncio
 import contextlib
 import csv
+import hashlib
 import json
 import os
 import re
@@ -39,6 +40,8 @@ MINIMAX_GROUP = os.getenv("MINIMAX_GROUP", "").strip()
 MINIMAX_BASE = os.getenv("MINIMAX_BASE", "https://api.minimaxi.com").rstrip("/")
 MINIMAX_MODEL = os.getenv("MINIMAX_MODEL", "speech-02-turbo")
 MINIMAX_VOICE = os.getenv("MINIMAX_VOICE", "Chinese (Mandarin)_Warm_Girl")
+MINIMAX_VOICE_SETTING = {"voice_id": MINIMAX_VOICE, "speed": 1.0, "vol": 1.0, "pitch": 0}
+MINIMAX_AUDIO_SETTING = {"sample_rate": 32000, "bitrate": 128000, "format": "mp3", "channel": 1}
 NAS_LIST_URL = os.getenv("NAS_LIST_URL", "http://127.0.0.1:8001/songs.txt")
 NAS_BASE_URL = os.getenv("NAS_BASE_URL", "http://127.0.0.1:8001")
 HOST_NAME = os.getenv("HOST_NAME", "小蓝")
@@ -174,8 +177,11 @@ async def verify_song(song, exclude=()):
 
 
 def song_item(song, requested=False):
+    lyric_title = identity(song).get("title", "")
     item = {"kind": "song", "url": song_url(song["rel"]) + "?stream=1",
             "title": song["title"], "text": "", "requested": requested}
+    if lyric_title:
+        item["lyric_title"] = lyric_title
     for field in ("artist", "source", "id", "lyric_id", "recommendation"):
         if field in song:
             item[field] = song[field]
@@ -232,8 +238,8 @@ def template_show(library, theme, tod):
 async def minimax_synth(text, path):
     body = json.dumps({
         "model": MINIMAX_MODEL, "text": text, "stream": False,
-        "voice_setting": {"voice_id": MINIMAX_VOICE, "speed": 1.0, "vol": 1.0, "pitch": 0},
-        "audio_setting": {"sample_rate": 32000, "bitrate": 128000, "format": "mp3", "channel": 1},
+        "voice_setting": MINIMAX_VOICE_SETTING,
+        "audio_setting": MINIMAX_AUDIO_SETTING,
     }).encode()
     url = f"{MINIMAX_BASE}/v1/t2a_v2"
     if MINIMAX_GROUP:
@@ -293,21 +299,52 @@ ANNOUNCEMENT_LINES = {
     "temporary": "音源服务暂时没有响应，检索尚未完成。接下来尝试下一首推荐。",
     "waiting": "目前没有可播放的歌曲，正在等待音源服务或调用额度恢复，稍后会自动继续播放推荐歌曲。",
 }
+COOLDOWN_LINES = (
+    {"id": "mood1", "title": "给心情留一点空白", "period": "any", "text": "趁着音乐稍作休息，也给此刻的心情留一点空白。开心不必急着解释，疲惫也不用马上振作。把肩膀放松下来，慢慢呼吸，等一会儿，我们继续听歌。"},
+    {"id": "mood2", "title": "今天已经走了很远", "period": "any", "text": "如果今天有些事情没有按计划发生，也没关系。能走到现在，你已经处理了许多大大小小的事。先把未完成的念头放在一旁，让这几分钟只属于自己。"},
+    {"id": "breath1", "title": "三次舒缓呼吸", "period": "any", "text": "我们做三次舒缓的呼吸。慢慢吸气，停一停，再缓缓呼出。第二次，把注意力放在呼吸上。最后一次，放松眉间和肩颈，让身体找到舒服的位置。"},
+    {"id": "breath2", "title": "听一听身边的声音", "period": "any", "text": "现在可以听一听身边最近的声音，再听一听稍远的声音。不必判断它们，只要让声音经过。短暂地回到当下，也是一种很好的休息。"},
+    {"id": "weather1", "title": "如果窗外正在下雨", "period": "any", "text": "如果窗外正在下雨，可以听一会儿雨点落下的节奏；如果没有下雨，也可以想起某个雨天。天气会变化，心情也会流动，不必把此刻变成永远。"},
+    {"id": "weather2", "title": "如果今天阳光很好", "period": "any", "text": "如果今天阳光很好，稍后不妨去窗边看一眼；如果天空阴着，也可以给自己留一盏温暖的灯。无论外面是什么天气，都愿你此刻感到安稳。"},
+    {"id": "morning", "title": "早晨的一点从容", "period": "morning", "text": "早上好。新的一天不必一开始就跑得很快，先整理呼吸，再挑一件最值得做的事。其余的事情，可以一件一件来。音乐很快就会回来。"},
+    {"id": "evening", "title": "把今天轻轻放下", "period": "evening", "text": "夜晚适合把白天的声音慢慢放低。做得好的事情值得记住，没有完成的事情留给明天。现在让眼睛和肩膀都松一点，陪自己安静片刻。"},
+)
+
+
+def _cooldown_revision(model=MINIMAX_MODEL, voice_setting=MINIMAX_VOICE_SETTING,
+                       audio_setting=MINIMAX_AUDIO_SETTING, lines=COOLDOWN_LINES):
+    contract = {"model": model, "voice_setting": voice_setting,
+                "audio_setting": audio_setting, "lines": lines}
+    digest = hashlib.sha256(json.dumps(contract, ensure_ascii=False, sort_keys=True).encode()).hexdigest()[:12]
+    return f"v1-{digest}"
+
+
+COOLDOWN_CONTENT_VERSION = _cooldown_revision()
 _announcement_task = None
 
 
-async def prepare_announcements():
-    # Generate once at startup, never as part of an error or retry loop.
+def _cooldown_path(asset_id):
+    return VOICE_DIR / f"cooldown_{COOLDOWN_CONTENT_VERSION}_{asset_id}.mp3"
+
+
+async def prepare_playback_audio():
+    # Generate once at startup, never as part of a failure or cooldown loop.
     for reason, text in ANNOUNCEMENT_LINES.items():
         path = VOICE_DIR / f"notice_v1_{reason}.mp3"
         if not path.is_file() or not path.stat().st_size:
             await tts_to_mp3(text, path)
+    if not MINIMAX_KEY:
+        return
+    for item in COOLDOWN_LINES:
+        path = _cooldown_path(item["id"])
+        if not path.is_file() or not path.stat().st_size:
+            await tts_to_mp3(item["text"], path)
 
 
 @app.on_event("startup")
 async def start_announcements():
     global _announcement_task
-    _announcement_task = asyncio.create_task(prepare_announcements())
+    _announcement_task = asyncio.create_task(prepare_playback_audio())
 
 
 @app.on_event("shutdown")
@@ -326,6 +363,28 @@ def announcement_file(reason: str):
     if not path.is_file() or not path.stat().st_size:
         raise HTTPException(503, "播报缓存准备中", headers={"Retry-After": "30"})
     return FileResponse(path, media_type="audio/mpeg", headers={"Cache-Control": "public, max-age=3600"})
+
+
+@app.get("/api/playback/cooldown/content.json")
+def cooldown_content():
+    items = []
+    for item in COOLDOWN_LINES:
+        path = _cooldown_path(item["id"])
+        if path.is_file() and path.stat().st_size:
+            items.append({**item, "url": f"/api/playback/cooldown/{COOLDOWN_CONTENT_VERSION}/{item['id']}.mp3"})
+    return {"version": COOLDOWN_CONTENT_VERSION, "items": items}
+
+
+@app.get("/api/playback/cooldown/{version}/{asset_id}.mp3")
+def cooldown_audio(version: str, asset_id: str):
+    known = {item["id"] for item in COOLDOWN_LINES}
+    if version != COOLDOWN_CONTENT_VERSION or asset_id not in known:
+        raise HTTPException(404)
+    path = _cooldown_path(asset_id)
+    if not path.is_file() or not path.stat().st_size:
+        raise HTTPException(503, "冷却内容缓存准备中", headers={"Retry-After": "30"})
+    return FileResponse(path, media_type="audio/mpeg",
+                        headers={"Cache-Control": "public, max-age=31536000, immutable"})
 
 
 @app.get("/api/playback/availability")
@@ -367,7 +426,7 @@ def _cleanup_old_voice():
         files = sorted(VOICE_DIR.glob("*.mp3"), key=lambda p: p.stat().st_mtime)
         if len(files) > 240:
             for f in files[: len(files) - 200]:
-                if f.name.startswith(("fb_", "notice_")):
+                if f.name.startswith(("fb_", "notice_")) or f.name.startswith(f"cooldown_{COOLDOWN_CONTENT_VERSION}_"):
                     continue
                 f.unlink(missing_ok=True)
     except Exception as e:

@@ -1,4 +1,4 @@
-import { parseLyrics, activeLine, lyricEndpoint } from './lyrics-data.js?v=20260909-2';
+import { parseLyrics, activeLine, lyricEndpoint, lyricRetryAfter } from './lyrics-data.js?v=20260909-2';
 import { createRecordMotion } from './record-motion.js?v=20260909-2';
 
 export function createLyricsExperience({ audio, state, seek, demo }) {
@@ -14,7 +14,7 @@ export function createLyricsExperience({ audio, state, seek, demo }) {
   const recordMotion = createRecordMotion([...document.querySelectorAll('.record-stage')], audio);
   let itemKey = null, controller = null, lines = [], timed = false, active = -2;
   let translations = [], offset = 0, ready = false, motion = true;
-  let browseTimer = null, suspended = false;
+  let browseTimer = null, retryTimer = null, suspended = false;
   try { motion = localStorage.getItem('tingjian.motion.v1') !== 'off'; } catch { /* Optional preference. */ }
   get('motion-enabled').checked = motion;
 
@@ -82,9 +82,24 @@ export function createLyricsExperience({ audio, state, seek, demo }) {
     get('lyrics-panel').dataset.state = lines.length ? timed ? 'synced' : 'plain' : 'empty';
     preview(text);
   }
+  function itemIdentity(item) {
+    return item?.kind === 'song' ? `${item.url}|${item.title}|${item.artist || ''}|${item.source || ''}|${item.lyric_id || ''}` : item?.kind || '';
+  }
+  function scheduleRetry(item, wait) {
+    clearTimeout(retryTimer);
+    const key = itemIdentity(item);
+    status(`歌词接口正在冷却，将在 ${wait} 秒后自动重试`);
+    panel.dataset.state = 'loading';
+    get('lyrics-retry').hidden = true;
+    retryTimer = setTimeout(() => {
+      retryTimer = null;
+      if (!suspended && key === itemKey && key === itemIdentity(state())) load(state());
+    }, wait * 1000);
+  }
   async function load(item) {
     if (suspended) return;
     controller?.abort();
+    clearTimeout(retryTimer); retryTimer = null;
     clearTimeout(browseTimer); browseTimer = null;
     const request = new AbortController(); controller = request;
     lines = []; translations = []; timed = false; active = -2; offset = 0;
@@ -107,6 +122,12 @@ export function createLyricsExperience({ audio, state, seek, demo }) {
         const endpoint = lyricEndpoint(item.url, location.origin, item);
         if (!endpoint) { status('此音源暂不支持歌词'); return; }
         const response = await fetch(endpoint, { signal: request.signal });
+        if (response.status === 429) {
+          const payload = await response.json().catch(() => ({}));
+          if (request.signal.aborted || controller !== request) return;
+          scheduleRetry(item, lyricRetryAfter(response, payload));
+          return;
+        }
         if (!response.ok) throw new Error();
         data = await response.json();
       }
@@ -117,7 +138,7 @@ export function createLyricsExperience({ audio, state, seek, demo }) {
       translations = translated.timed ? translated.lines : [];
       get('translation-control').hidden = !translations.length || !timed;
       get('lyrics-timing').hidden = !timed;
-      get('lyrics-source').textContent = demo ? '原创演示文案 · 非歌曲原词' : lines.length ? '歌词来源：GD 音乐 API · 版权归原权利人' : '';
+      get('lyrics-source').textContent = demo ? '原创演示文案 · 非歌曲原词' : lines.length ? `歌词来源：GD 音乐 API · ${data.source || item.source || '当前音源'} · 版权归原权利人` : '';
       status(!lines.length ? '该音源未返回歌词' : timed ? `同步歌词 · ${lines.length} 行` : '纯文本歌词 · 无时间戳');
       get('lyrics-retry').hidden = lines.length > 0;
       draw();
@@ -132,7 +153,7 @@ export function createLyricsExperience({ audio, state, seek, demo }) {
     requestAnimationFrame(() => center(true));
   }
   function render() {
-    const item = state(), key = item?.kind === 'song' ? `${item.url}|${item.title}|${item.source || ''}|${item.lyric_id || ''}` : item?.kind || '';
+    const item = state(), key = itemIdentity(item);
     place(); motionState();
     if (!suspended && key !== itemKey) { itemKey = key; load(item); }
   }
@@ -163,6 +184,7 @@ export function createLyricsExperience({ audio, state, seek, demo }) {
       suspended = true;
       controller?.abort(); controller = null;
       clearTimeout(browseTimer); browseTimer = null;
+      clearTimeout(retryTimer); retryTimer = null;
       recordMotion.setPlaying(false);
       if (!lines.length) itemKey = null;
     },

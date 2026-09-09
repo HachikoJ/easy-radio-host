@@ -38,9 +38,13 @@ UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
 
 app = FastAPI(title="radio-online-musiclib")
 LYRIC_SOURCES = frozenset(SOURCES)
+LYRIC_SEARCH_SOURCES = ("netease", "kuwo", "tencent", "joox")
 LYRIC_MAX_BYTES = 256 * 1024
-LYRIC_CACHE_TTL = 300
+LYRIC_CACHE_TTL = 6 * 3600
+LYRIC_NEGATIVE_TTL = 60
 LYRIC_CACHE_SIZE = 128
+LYRIC_BUDGET = 18
+LYRIC_CANDIDATE_LIMIT = 6
 _lyric_cache = OrderedDict()
 _lyric_cache_lock = Lock()
 PLAY_MAX_BYTES = 64 * 1024
@@ -245,51 +249,174 @@ def songs_txt():
     return PlainTextResponse("\n".join(buf) + "\n", media_type="text/plain; charset=utf-8")
 
 
-def lyrics(source: str, song_id: str):
-    _check_cancelled()
-    if source not in LYRIC_SOURCES or not re.fullmatch(r"[A-Za-z0-9_+=.-]{1,200}", song_id):
-        raise HTTPException(status_code=400, detail="invalid song identifier")
-    key = (source, song_id)
+def _lyric_cache_get(key):
     now = time.monotonic()
     with _lyric_cache_lock:
         cached = _lyric_cache.get(key)
         if cached and cached[0] > now:
             _lyric_cache.move_to_end(key)
             return cached[1]
+        if cached:
+            _lyric_cache.pop(key, None)
+    return None
 
-    query = urllib.parse.urlencode({"types": "lyric", "source": source, "id": song_id})
-    try:
-        code, body = http_get(f"{API}?{query}", timeout=PLAY_TIMEOUT)
-        _check_cancelled()
-        if code == 429:
-            raise HTTPException(status_code=429, detail="lyrics rate limited",
-                                headers={"Retry-After": str(_retry_after())})
-        if code != 200:
-            raise ValueError("unexpected lyric status")
-        if len(body) > LYRIC_MAX_BYTES:
-            raise ValueError("lyric response too large")
-        data = json.loads(body)
-        if not isinstance(data, dict):
-            raise ValueError("invalid lyric response")
-        if data and not {"lyric", "tlyric"}.intersection(data):
-            raise ValueError("unexpected lyric response")
-        lyric = data.get("lyric", "")
-        translation = data.get("tlyric", "")
-        lyric = "" if lyric is None else lyric
-        translation = "" if translation is None else translation
-        if not isinstance(lyric, str) or not isinstance(translation, str):
-            raise ValueError("invalid lyric fields")
-    except (OSError, ValueError, TypeError):
-        raise HTTPException(status_code=502, detail="lyrics temporarily unavailable") from None
 
-    result = {"lyric": lyric, "translation": translation, "source": source}
-    # Cache only successful responses in memory; lyrics are never written to disk.
+def _lyric_cache_put(key, result, ttl):
     with _lyric_cache_lock:
-        _lyric_cache[key] = (time.monotonic() + LYRIC_CACHE_TTL, result)
+        _lyric_cache[key] = (time.monotonic() + ttl, result)
         _lyric_cache.move_to_end(key)
         while len(_lyric_cache) > LYRIC_CACHE_SIZE:
             _lyric_cache.popitem(last=False)
+
+
+def _lyric_result(source, song_id, deadline):
+    key = ("source", source, song_id)
+    cached = _lyric_cache_get(key)
+    if cached is not None:
+        return cached
+    data = _api_data("lyric", source, deadline, id=song_id)
+    if data is None:
+        return {"lyric": "", "translation": "", "source": source}
+    if not isinstance(data, dict) or (data and not {"lyric", "tlyric"}.intersection(data)):
+        raise ResolveFailure("temporary")
+    lyric = data.get("lyric", "")
+    translation = data.get("tlyric", "")
+    lyric = "" if lyric is None else lyric
+    translation = "" if translation is None else translation
+    if not isinstance(lyric, str) or not isinstance(translation, str):
+        raise ResolveFailure("temporary")
+    if not lyric.strip() and translation.strip():
+        lyric, translation = translation, ""
+    result = {"lyric": lyric, "translation": translation, "source": source}
+    if lyric.strip():
+        _lyric_cache_put(key, result, LYRIC_CACHE_TTL)
     return result
+
+
+def _lyric_failure(error):
+    if error.status == "limited":
+        retry_after = max(1, error.retry_after or _retry_after())
+        raise HTTPException(
+            status_code=429,
+            detail={"status": "limited", "retry_after": retry_after},
+            headers={"Retry-After": str(retry_after)},
+        )
+    if error.status == "cancelled":
+        raise error
+    raise HTTPException(
+        status_code=502,
+        detail={"status": "temporary", "message": "lyrics temporarily unavailable"},
+    )
+
+
+def _lyric_candidates(title, artist, original_source):
+    with _play_cache_lock:
+        cached = list(_recording_cache.items())
+    now = time.monotonic()
+    for wanted_source in LYRIC_SEARCH_SOURCES:
+        if wanted_source == original_source:
+            continue
+        for (source, sid), (expires, row) in reversed(cached):
+            if (source == wanted_source and expires > now
+                    and recording_match(title, artist, row)):
+                lyric_id = row.get("lyric_id") or sid
+                if _valid_id(lyric_id):
+                    yield source, str(lyric_id)
+
+
+def _search_lyrics(title, artist, original_source, deadline, checked):
+    attempted = 0
+    complete = True
+    for source, lyric_id in _lyric_candidates(title, artist, original_source):
+        key = (source, lyric_id)
+        if key in checked:
+            continue
+        checked.add(key)
+        attempted += 1
+        try:
+            result = _lyric_result(source, lyric_id, deadline)
+        except ResolveFailure as error:
+            if error.status in ("limited", "cancelled"):
+                raise
+            complete = False
+            continue
+        if result["lyric"].strip():
+            return result, False
+        if attempted >= LYRIC_CANDIDATE_LIMIT:
+            return None, False
+
+    query = f"{title} {artist}".strip()
+    for source in LYRIC_SEARCH_SOURCES:
+        _check_cancelled()
+        if source == original_source:
+            continue
+        try:
+            rows = _api_data("search", source, deadline, name=query, count=30, pages=1)
+        except ResolveFailure as error:
+            if error.status in ("limited", "cancelled"):
+                raise
+            complete = False
+            continue
+        if rows is None:
+            continue
+        if not isinstance(rows, list):
+            complete = False
+            continue
+        if len(rows) >= 30:
+            complete = False
+        for row in rows:
+            if not recording_match(title, artist, row):
+                continue
+            lyric_id = row.get("lyric_id") or row.get("url_id") or row.get("id", row.get("sid"))
+            key = (source, str(lyric_id))
+            if not _valid_id(lyric_id) or key in checked:
+                continue
+            checked.add(key)
+            attempted += 1
+            try:
+                result = _lyric_result(source, str(lyric_id), deadline)
+            except ResolveFailure as error:
+                if error.status in ("limited", "cancelled"):
+                    raise
+                complete = False
+                continue
+            if result["lyric"].strip():
+                return result, False
+            if attempted >= LYRIC_CANDIDATE_LIMIT:
+                return None, False
+    return None, complete
+
+
+def lyrics(source: str, song_id: str, title: str = "", artist: str = ""):
+    _check_cancelled()
+    if source not in LYRIC_SOURCES or not re.fullmatch(r"[A-Za-z0-9_+=.-]{1,200}", song_id):
+        raise HTTPException(status_code=400, detail="invalid song identifier")
+    title, artist = title.strip(), artist.strip()
+    if len(title) > 500 or len(artist) > 500:
+        raise HTTPException(status_code=400, detail="invalid song identity")
+    request_key = ("request", source, song_id, simplified(title), simplified(artist))
+    cached = _lyric_cache_get(request_key)
+    if cached is not None:
+        return cached
+    deadline = time.monotonic() + LYRIC_BUDGET
+    try:
+        result = _lyric_result(source, song_id, deadline)
+        if result["lyric"].strip():
+            _lyric_cache_put(request_key, result, LYRIC_CACHE_TTL)
+            return result
+        # An artist is required for cross-source matching. Without it, returning
+        # no lyric is safer than attaching a different recording's words.
+        if not title or not artist or not base_title(title) or not artists(artist):
+            return result
+        fallback, exhausted = _search_lyrics(title, artist, source, deadline, {(source, song_id)})
+        if fallback:
+            _lyric_cache_put(request_key, fallback, LYRIC_CACHE_TTL)
+            return fallback
+        if exhausted:
+            _lyric_cache_put(request_key, result, LYRIC_NEGATIVE_TTL)
+        return result
+    except ResolveFailure as error:
+        _lyric_failure(error)
 
 
 def _allowed_media_url(url):
@@ -601,8 +728,8 @@ async def resolve_route(payload: ResolveRequest, request: Request):
 
 
 @app.get("/lyrics/{source}/{song_id}.json")
-async def lyrics_route(source: str, song_id: str, request: Request):
-    return await _run_for_request(request, partial(lyrics, source, song_id))
+async def lyrics_route(source: str, song_id: str, request: Request, title: str = "", artist: str = ""):
+    return await _run_for_request(request, partial(lyrics, source, song_id, title, artist))
 
 
 def _stream_audio(url, range_header):

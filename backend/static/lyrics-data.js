@@ -30,6 +30,13 @@ export function activeLine(lines, time) {
   return found;
 }
 
+export function lyricIdentityTitle(title, artist) {
+  if (typeof title !== 'string') return '';
+  const cleanTitle = title.trim(), cleanArtist = typeof artist === 'string' ? artist.trim() : '';
+  const prefix = cleanArtist ? `${cleanArtist} - ` : '';
+  return prefix && cleanTitle.startsWith(prefix) ? cleanTitle.slice(prefix.length).trim() : cleanTitle;
+}
+
 export function lyricEndpoint(songUrl, origin, metadata = {}) {
   try {
     const url = new URL(songUrl, origin);
@@ -39,6 +46,23 @@ export function lyricEndpoint(songUrl, origin, metadata = {}) {
     if (!/^[a-z][a-z0-9_-]*$/.test(source)) return null;
     // The playlist and song_url each quote the ID once before playback.
     const id = metadata.lyric_id || decodeURIComponent(decodeURIComponent(match[3]));
-    return `${match[1]}/lyrics/${source}/${encodeURIComponent(id)}.json`;
+    const endpoint = `${match[1]}/lyrics/${source}/${encodeURIComponent(id)}.json`;
+    const query = new URLSearchParams();
+    const title = typeof metadata.lyric_title === 'string' && metadata.lyric_title.trim()
+      ? metadata.lyric_title.trim()
+      : lyricIdentityTitle(metadata.title, metadata.artist);
+    if (title) query.set('title', title.slice(0, 500));
+    if (typeof metadata.artist === 'string' && metadata.artist.trim()) query.set('artist', metadata.artist.trim().slice(0, 500));
+    return query.size ? `${endpoint}?${query}` : endpoint;
   } catch { return null; }
+}
+
+export function lyricRetryAfter(response, payload, now = Date.now()) {
+  const detail = payload && typeof payload.detail === 'object' ? payload.detail : payload;
+  const raw = detail?.retry_after ?? response?.headers?.get?.('Retry-After');
+  const seconds = Number(raw);
+  if (Number.isFinite(seconds) && seconds > 0) return Math.max(1, Math.ceil(seconds));
+  const date = Date.parse(String(raw || ''));
+  if (Number.isFinite(date)) return Math.max(1, Math.ceil((date - now) / 1000));
+  return 300;
 }

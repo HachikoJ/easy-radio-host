@@ -1,6 +1,8 @@
 """Cancellation must release upstream work, not just hide its UI result."""
 import asyncio
 import json
+from pathlib import Path
+import tempfile
 import unittest
 from unittest.mock import AsyncMock, patch
 
@@ -93,6 +95,36 @@ class PlaybackLifecycle(unittest.IsolatedAsyncioTestCase):
             status, _ = await request("/api/playback/announcement/unknown.mp3")
             self.assertEqual(status, 404)
             synth.assert_not_awaited()
+
+    async def test_cooldown_manifest_only_exposes_ready_versioned_audio(self):
+        with tempfile.TemporaryDirectory() as directory, patch.object(radio, "VOICE_DIR", Path(directory)):
+            radio._cooldown_path("mood1").write_bytes(b"ID3ready")
+            with patch.object(radio, "tts_to_mp3", new=AsyncMock()) as synth:
+                status, body = await request("/api/playback/cooldown/content.json")
+                missing, _ = await request(f"/api/playback/cooldown/{radio.COOLDOWN_CONTENT_VERSION}/mood2.mp3")
+                unknown, _ = await request(f"/api/playback/cooldown/{radio.COOLDOWN_CONTENT_VERSION}/unknown.mp3")
+            manifest = json.loads(body)
+            self.assertEqual(status, 200)
+            self.assertEqual(manifest["version"], radio.COOLDOWN_CONTENT_VERSION)
+            self.assertEqual([item["id"] for item in manifest["items"]], ["mood1"])
+            self.assertIn(radio.COOLDOWN_CONTENT_VERSION, manifest["items"][0]["url"])
+            self.assertEqual(missing, 503)
+            self.assertEqual(unknown, 404)
+            synth.assert_not_awaited()
+
+    def test_cooldown_revision_changes_with_voice_or_text(self):
+        changed_voice = dict(radio.MINIMAX_VOICE_SETTING, voice_id="another-voice")
+        changed_lines = tuple([dict(radio.COOLDOWN_LINES[0], text="更新后的内容"), *radio.COOLDOWN_LINES[1:]])
+        self.assertNotEqual(radio.COOLDOWN_CONTENT_VERSION,
+                            radio._cooldown_revision(voice_setting=changed_voice))
+        self.assertNotEqual(radio.COOLDOWN_CONTENT_VERSION,
+                            radio._cooldown_revision(lines=changed_lines))
+
+    def test_song_item_preserves_canonical_lyric_title(self):
+        song = {"title": "周杰伦 - 晴天", "artist": "周杰伦", "rel": "s/netease/1.mp3"}
+        with patch.object(radio, "identity", return_value={"title": "晴天", "artist": "周杰伦"}):
+            item = radio.song_item(song)
+        self.assertEqual(item["lyric_title"], "晴天")
 
     async def test_show_error_preserves_actual_cooldown(self):
         with patch.object(radio, "fetch_library", return_value=[{"title": "Song", "rel": "1"}]), \

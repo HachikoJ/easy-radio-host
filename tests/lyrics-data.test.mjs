@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseLyrics, activeLine, lyricEndpoint } from '../backend/static/lyrics-data.js';
+import { parseLyrics, activeLine, lyricEndpoint, lyricIdentityTitle, lyricRetryAfter } from '../backend/static/lyrics-data.js';
 
 test('LRC supports multiple timestamps, metadata offset, blank instrumental lines and translations', () => {
   const { lines, timed } = parseLyrics('[ar:Example]\n[offset:500]\n[00:03.00][00:08.00]Original\n[00:03.00]Translation\n[00:05.00]\n[00:00.00]Intro');
@@ -31,4 +31,28 @@ test('lyric URL preserves raw joox plus signs, accepts local proxy and rejects e
   assert.equal(lyricEndpoint('/music/s/tencent/123.mp3', origin, { source: 'tencent', lyric_id: 'abc+def==' }), '/music/lyrics/tencent/abc%2Bdef%3D%3D.json');
   assert.equal(lyricEndpoint('/music/s/id/123.mp3', origin), '/music/lyrics/netease/123.json');
   assert.equal(lyricEndpoint('https://other.example/music/s/tencent/123.mp3', origin, { source: 'tencent', lyric_id: '123' }), null);
+});
+
+test('lyric URL includes strict identity and removes only the exact artist display prefix', () => {
+  const origin = 'https://audio.deline.top';
+  assert.equal(lyricIdentityTitle('赵雷 - 南方姑娘', '赵雷'), '南方姑娘');
+  assert.equal(lyricIdentityTitle('Blue - Live', 'Artist'), 'Blue - Live');
+  assert.equal(
+    lyricEndpoint('/music/s/netease/123.mp3', origin, { title: '赵雷 - 南方姑娘', artist: '赵雷' }),
+    '/music/lyrics/netease/123.json?title=%E5%8D%97%E6%96%B9%E5%A7%91%E5%A8%98&artist=%E8%B5%B5%E9%9B%B7',
+  );
+  assert.equal(
+    lyricEndpoint('/music/s/netease/123.mp3', origin, {
+      title: '赵雷 - 南方姑娘', lyric_title: '南方姑娘', artist: '趙雷',
+    }),
+    '/music/lyrics/netease/123.json?title=%E5%8D%97%E6%96%B9%E5%A7%91%E5%A8%98&artist=%E8%B6%99%E9%9B%B7',
+  );
+});
+
+test('lyric retry delay prefers structured retry_after and understands HTTP dates', () => {
+  const response = { headers: { get: () => '45' } };
+  assert.equal(lyricRetryAfter(response, { detail: { status: 'limited', retry_after: 137 } }), 137);
+  assert.equal(lyricRetryAfter(response, {}), 45);
+  assert.equal(lyricRetryAfter({ headers: { get: () => 'Thu, 01 Jan 2026 00:01:00 GMT' } }, {}, Date.UTC(2026, 0, 1)), 60);
+  assert.equal(lyricRetryAfter({ headers: { get: () => null } }, {}), 300);
 });
