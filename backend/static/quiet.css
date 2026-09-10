@@ -102,11 +102,11 @@
 .quiet-ui .record-column{grid-column:1;grid-row:2;min-width:0;min-height:0;height:100%;align-self:stretch;display:flex;flex-direction:column;align-items:center;justify-content:center}
 .quiet-ui .listening-tools>label{display:flex;align-items:center}
 .quiet-ui .record-column .cover-wrap{width:min(100%,430px,var(--record-room,430px));max-width:none;flex:none;align-self:center}
-.quiet-ui .record-column .show-summary{width:100%;padding:0;min-height:0;flex:none}
+.quiet-ui .record-column .show-summary{width:min(100%,440px);padding:0;min-height:0;flex:none;align-self:center}
 .quiet-ui .record-column .show-status{margin:0;min-height:20px}
 .quiet-ui .record-column .selected-theme{margin:0;font-size:11px}
 .quiet-ui .record-column .now-heading{display:none}
-.quiet-ui .record-column .show-actions{display:flex;align-items:center;justify-content:center;gap:8px;position:static;min-height:44px;margin:6px 0 0}
+.quiet-ui .record-column .show-actions{display:flex;align-items:center;justify-content:center;gap:8px;position:static;width:100%;min-height:44px;margin:6px 0 0}
 .quiet-ui.has-programme:not(.preparing-programme) .record-column .show-actions{position:static}
 .quiet-ui .record-column .song-actions{margin:0;gap:0;flex:none}
 .quiet-ui:not(.has-song) .record-column .song-actions{display:none}
