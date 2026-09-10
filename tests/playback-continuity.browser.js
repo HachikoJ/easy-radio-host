@@ -7,6 +7,12 @@ async (page) => {
     window.holdAnnouncement = false;
     window.holdCooldown = false;
     window.abortedRequests = [];
+    window.autoplayUnlocked = false;
+    let transientPlaybackGesture = false;
+    document.addEventListener('click', () => {
+      transientPlaybackGesture = true;
+      setTimeout(() => { transientPlaybackGesture = false; }, 0);
+    }, { capture: true });
     const originalFetch = window.fetch;
     window.fetch = (url, options = {}) => {
       options.signal?.addEventListener('abort', () => window.abortedRequests.push(String(url)), { once: true });
@@ -20,6 +26,8 @@ async (page) => {
     proto.load = function () { this._time = 0; };
     proto.play = function () {
       const url = this.src;
+      if (!window.autoplayUnlocked && !transientPlaybackGesture) return Promise.reject(new DOMException('User gesture required', 'NotAllowedError'));
+      if (!window.autoplayUnlocked && transientPlaybackGesture && !url) window.autoplayUnlocked = true;
       window.playEvents.push({ url, time: Date.now() });
       this._paused = false;
       if (url.includes('/bad.mp3')) {
@@ -78,6 +86,7 @@ async (page) => {
   const reset = async () => { await page.goto('http://127.0.0.1:8131/'); await page.evaluate(() => { document.querySelector('#auto').checked = false; }); };
   await reset();
   await page.locator('#generate').click();
+  check(await page.waitForFunction(() => window.autoplayUnlocked), 'start click primes browser playback permission');
   await page.waitForFunction(() => window.playEvents.some(event => event.url.includes('/announcement/limited.mp3')));
   check(!(await page.locator('audio').getAttribute('src')), 'failed audio unloads during announcement');
   check((await page.locator('#track-title').textContent()).includes('指定歌曲'), 'reason announcement precedes next track');

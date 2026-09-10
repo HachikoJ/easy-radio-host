@@ -1,6 +1,7 @@
 import { createLyricsExperience } from './lyrics.js?v=20260909-3';
 import { createRecommendationExperience } from './recommendations.js?v=20260909-3';
-import { createQuietLayout } from './layout.js?v=20260909-3';
+import { createQuietLayout } from './layout.js?v=20260910-1';
+import { scheduledTheme } from './theme-schedule.js?v=20260910-1';
 
 const $ = id => document.getElementById(id);
 const audio = $('audio');
@@ -13,7 +14,8 @@ const themes = [
   { name: '元气早班', slogan: '把好心情叫醒', detail: '轻快 · 新的一天', image: 'forest' },
   { name: '心情小站', slogan: '此刻的你最想听什么', detail: '随心 · 放空一下', image: 'lake' }
 ];
-let selected = themes[0], activeTheme = themes[0];
+let selected = scheduledTheme(themes), activeTheme = selected;
+let followSystemTime = true;
 let queue = [], index = -1, interrupt = null, recent = [];
 let playing = false, mode = 'none', textPosition = 0, textDuration = 0;
 let timer = null, lastTick = 0, nextSeek = 0, mediaGeneration = 0;
@@ -51,6 +53,14 @@ function notify(message, retry = null) {
   $('retry').hidden = !retry;
 }
 function clearNotice() { $('notice').hidden = true; retryAction = null; }
+function primePlayback() {
+  if (!audio.getAttribute('src')) audio.muted = true;
+  else if (!audio.paused) return;
+  try {
+    const pending = audio.play();
+    pending?.catch(() => {});
+  } catch { /* Older browsers may reject an empty media element synchronously. */ }
+}
 function normalizeItems(items) {
   if (!Array.isArray(items)) return [];
   return items.filter(item => item && ['song', 'talk', 'text'].includes(item.kind)).map(item => ({
@@ -105,17 +115,23 @@ function renderThemes() {
     const subtitle = document.createElement('small'); subtitle.textContent = theme.detail;
     button.append(image, title, subtitle);
     if (theme === selected) { const check = document.createElement('span'); check.className = 'theme-check'; check.append(icon('Check')); button.append(check); }
-    button.addEventListener('click', () => selectTheme(theme));
+    button.addEventListener('click', () => selectTheme(theme, true));
     return button;
   }));
 }
-function selectTheme(theme) {
+function selectTheme(theme, manual = false) {
+  if (manual) followSystemTime = false;
   selected = theme;
   $('cover').src = `assets/${theme.image}.jpg`;
   $('cover').alt = `${theme.name}主题封面`;
   $('show-theme').textContent = theme.name;
   $('show-slogan').textContent = theme.slogan;
   renderThemes(); renderPlayback();
+}
+function syncThemeWithSystemTime() {
+  if (!followSystemTime) return;
+  const next = scheduledTheme(themes);
+  if (next !== selected) selectTheme(next);
 }
 function renderQueue() {
   const visible = interrupt ? [...interrupt.items.map((item, i) => ({ item, i, inserted: true })), ...queue.map((item, i) => ({ item, i, inserted: false }))] : queue.map((item, i) => ({ item, i, inserted: false }));
@@ -621,7 +637,7 @@ function updateChatComposer() {
 }
 function applyActions(actions) {
   const theme = actions.find(action => action.type === 'play_theme');
-  if (theme) { selectTheme(themes.find(item => item.name === theme.theme) || selected); generateShow({ replace: true }); return; }
+  if (theme) { selectTheme(themes.find(item => item.name === theme.theme) || selected, true); generateShow({ replace: true }); return; }
   for (const action of actions) {
     if (action.type === 'pause') pausePlayback();
     if (action.type === 'resume' && !playing) togglePlay();
@@ -666,9 +682,9 @@ async function sendChat(event, requestedMessage) {
 
 $('today').textContent = new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' }).format(new Date());
 $('demo-badge').hidden = !demo;
-$('generate').addEventListener('click', generateShow);
+$('generate').addEventListener('click', () => { primePlayback(); generateShow(); });
 $('cancel-generate').addEventListener('click', pausePlayback);
-$('play').addEventListener('click', togglePlay);
+$('play').addEventListener('click', () => { if (!playing && !audio.getAttribute('src')) primePlayback(); togglePlay(); });
 $('previous').addEventListener('click', previous);
 $('next').addEventListener('click', advance);
 $('stop').addEventListener('click', stop);
@@ -680,10 +696,10 @@ function showLyrics() {
 }
 $('lyrics-toggle').addEventListener('click', showLyrics);
 $('player-lyric').addEventListener('click', showLyrics);
-$('retry').addEventListener('click', () => { const action = retryAction; clearNotice(); action?.(); });
+$('retry').addEventListener('click', () => { const action = retryAction; clearNotice(); primePlayback(); action?.(); });
 $('dismiss-notice').addEventListener('click', clearNotice);
-$('auto').addEventListener('change', () => { if ($('auto').checked && !current() && !generation) generateShow(); });
-$('chat-form').addEventListener('submit', sendChat);
+$('auto').addEventListener('change', () => { if ($('auto').checked) primePlayback(); if ($('auto').checked && !current() && !generation) generateShow(); });
+$('chat-form').addEventListener('submit', event => { primePlayback(); sendChat(event); });
 $('message').addEventListener('keydown', event => { if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) { event.preventDefault(); sendChat(); } });
 $('message').addEventListener('input', updateChatComposer);
 new ResizeObserver(updateChatComposer).observe($('message').parentElement);
@@ -743,3 +759,7 @@ recommendations = createRecommendationExperience({ demo, icon, notify,
 });
 createQuietLayout({ icon });
 updateVolume(); renderThemes(); renderPlayback();
+setInterval(syncThemeWithSystemTime, 60000);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) syncThemeWithSystemTime();
+});

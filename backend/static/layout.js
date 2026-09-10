@@ -110,7 +110,7 @@ export function createQuietLayout({ icon }) {
     updateNavigation('listening');
     if (restore) opener?.focus({ preventScroll: true });
   }
-  function openDrawer(id, trigger) {
+  function openDrawer(id, trigger, focusOnOpen = true) {
     const selected = sections.get(id);
     if (!selected) { closeDrawer(false); return; }
     if (drawer.open && activePanel === id) { closeDrawer(); return; }
@@ -125,10 +125,11 @@ export function createQuietLayout({ icon }) {
     get('listening').inert = true;
     updateNavigation(id);
     if (!reduced.matches) content.animate([{ opacity: .2, transform: 'translateX(14px)' }, { opacity: 1, transform: 'none' }], { duration: 220, easing: 'ease-out' });
-    (id === 'conversation' ? get('message') : close).focus({ preventScroll: true });
+    if (id === 'conversation') get('message').focus({ preventScroll: true });
+    else if (focusOnOpen) close.focus({ preventScroll: true });
   }
   navLinks.forEach(link => link.addEventListener('click', event => {
-    event.preventDefault(); openDrawer(link.hash.slice(1), link);
+    event.preventDefault(); openDrawer(link.hash.slice(1), link, event.detail === 0);
   }));
   document.querySelector('.brand').addEventListener('click', event => { event.preventDefault(); closeDrawer(false); });
   close.addEventListener('click', () => closeDrawer());
@@ -147,7 +148,8 @@ export function createQuietLayout({ icon }) {
       const focusable = [...drawer.querySelectorAll('button:not(:disabled),a[href],input:not(:disabled),textarea:not(:disabled),select:not(:disabled),summary,[tabindex]:not([tabindex="-1"])')].filter(node => !node.hidden && node.getClientRects().length);
       if (!focusable.length) { event.preventDefault(); drawer.focus(); return; }
       const first = focusable[0], last = focusable.at(-1);
-      if (event.shiftKey && (document.activeElement === first || !drawer.contains(document.activeElement))) { event.preventDefault(); last.focus(); }
+      if (!drawer.contains(document.activeElement)) { event.preventDefault(); (event.shiftKey ? last : first).focus(); }
+      else if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
       return;
     }

@@ -64,7 +64,7 @@ class FrontendContract(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(updated, content, path)
 
     async def test_static_assets_and_license(self):
-        for path in ("/", "/app.js", "/listening.js", "/style.css", "/listening.css", "/layout.js", "/quiet.css", "/assets/SlidersHorizontal.svg", "/recommendations.js", "/recommendations.css", "/assets/ThumbsDown.svg", "/lyrics.js", "/lyrics-data.js", "/lyrics.css", "/vendor/lrc-kit/lrc.js", "/vendor/lrc-kit/line-parser.js", "/vendor/lrc-kit/LICENSE", "/credits.html", "/assets/brand.svg", "/licenses/Claudio-MIT.txt"):
+        for path in ("/", "/app.js", "/listening.js", "/theme-schedule.js", "/style.css", "/listening.css", "/layout.js", "/quiet.css", "/assets/SlidersHorizontal.svg", "/recommendations.js", "/recommendations.css", "/assets/ThumbsDown.svg", "/lyrics.js", "/lyrics-data.js", "/lyrics.css", "/vendor/lrc-kit/lrc.js", "/vendor/lrc-kit/line-parser.js", "/vendor/lrc-kit/LICENSE", "/credits.html", "/assets/brand.svg", "/licenses/Claudio-MIT.txt"):
             status, content = await request(path)
             self.assertEqual(status, 200, path)
             self.assertTrue(content, path)
