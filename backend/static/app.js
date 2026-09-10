@@ -1,6 +1,6 @@
 import { createLyricsExperience } from './lyrics.js?v=20260909-3';
 import { createRecommendationExperience } from './recommendations.js?v=20260909-3';
-import { createQuietLayout } from './layout.js?v=20260910-1';
+import { createQuietLayout } from './layout.js?v=20260910-2';
 import { scheduledTheme } from './theme-schedule.js?v=20260910-1';
 
 const $ = id => document.getElementById(id);
@@ -758,7 +758,7 @@ recommendations = createRecommendationExperience({ demo, icon, notify,
   related: seed => generateShow({ seed })
 });
 createQuietLayout({ icon });
-updateVolume(); renderThemes(); renderPlayback();
+updateVolume(); selectTheme(selected);
 setInterval(syncThemeWithSystemTime, 60000);
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) syncThemeWithSystemTime();

@@ -44,6 +44,7 @@
 .quiet-ui .player-bar{z-index:50}.quiet-ui .notice,.quiet-ui.focus-mode .notice{position:fixed;bottom:calc(var(--player) + 12px);left:50%;transform:translateX(-50%);width:min(560px,calc(100% - 32px));z-index:60;margin:0}
 .quiet-ui .drawer-shade{position:fixed;inset:80px 0 var(--player);background:#11182720;z-index:30;backdrop-filter:blur(2px)}
 .quiet-ui .utility-drawer{position:fixed;inset:92px 14px calc(var(--player) + 12px) auto;margin:0;padding:0;width:440px;max-width:calc(100vw - 28px);height:auto;max-height:none;border:1px solid var(--line);border-radius:8px;background:var(--white);color:var(--ink);box-shadow:0 12px 44px #0002;z-index:40;overflow:hidden}
+.quiet-ui .utility-drawer:focus{outline:none}
 .quiet-ui .utility-drawer[open]{display:flex;flex-direction:column}.quiet-ui .drawer-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 20px;border-bottom:1px solid var(--line);flex:none}.quiet-ui .drawer-heading h2{font-size:17px;font-weight:600}
 .quiet-ui .drawer-content{padding:18px 20px;overflow:auto;min-height:0;overscroll-behavior:contain}
 .quiet-ui .utility-drawer .theme-section,.quiet-ui .utility-drawer .queue-section,.quiet-ui .utility-drawer .conversation{display:block;padding:0;margin:0;border:0}

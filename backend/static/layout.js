@@ -57,6 +57,7 @@ export function createQuietLayout({ icon }) {
   window.addEventListener('scroll', sizeSettings, { passive: true });
 
   const drawer = document.createElement('dialog'); drawer.className = 'utility-drawer'; drawer.id = 'utility-drawer';
+  drawer.tabIndex = -1;
   drawer.setAttribute('aria-modal', 'false'); drawer.setAttribute('aria-labelledby', 'drawer-title');
   const drawerHeader = document.createElement('div'); drawerHeader.className = 'drawer-heading';
   const title = document.createElement('h2'); title.id = 'drawer-title';
@@ -127,6 +128,7 @@ export function createQuietLayout({ icon }) {
     if (!reduced.matches) content.animate([{ opacity: .2, transform: 'translateX(14px)' }, { opacity: 1, transform: 'none' }], { duration: 220, easing: 'ease-out' });
     if (id === 'conversation') get('message').focus({ preventScroll: true });
     else if (focusOnOpen) close.focus({ preventScroll: true });
+    else drawer.focus({ preventScroll: true });
   }
   navLinks.forEach(link => link.addEventListener('click', event => {
     event.preventDefault(); openDrawer(link.hash.slice(1), link, event.detail === 0);
