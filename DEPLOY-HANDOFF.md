@@ -86,11 +86,13 @@ RADIO_BASE=https://audio.deline.top
 DATA_DIR=/var/lib/tingjian
 HOST_NAME=小蓝
 DEEPSEEK_BASE=https://api.deepseek.com
-DEEPSEEK_MODEL=deepseek-chat
+DEEPSEEK_MODEL=deepseek-flash
 MINIMAX_BASE=https://api.minimaxi.com
 MINIMAX_MODEL=speech-02-turbo
 MINIMAX_VOICE="Chinese (Mandarin)_Warm_Girl"
 ```
+
+`deepseek-flash` 是 DeepSeek 官方 API 模型 ID，对应 `DeepSeek-V4.1-Flash`。已有环境文件中的显式 `DEEPSEEK_MODEL` 优先于代码默认值，更新时应保留原 `DEEPSEEK_KEY`，只调整模型名后重启主服务。
 
 `MINIMAX_GROUP` 按账号接口要求填写，可为空。密钥仅放服务器运行配置，不放入 Git、前端或命令行参数。systemd 管理器读取 root 所有的环境文件后，以 `tingjian` 用户启动主服务；曲库服务不读取带密钥的配置。
 

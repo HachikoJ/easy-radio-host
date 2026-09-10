@@ -8,7 +8,7 @@ services:
     environment:
       DEEPSEEK_KEY: ""            # 填入 DeepSeek key 后重启生效
       DEEPSEEK_BASE: "https://api.deepseek.com"
-      DEEPSEEK_MODEL: "deepseek-chat"
+      DEEPSEEK_MODEL: "deepseek-flash"
       NAS_LIST_URL: "http://<SERVER_IP>:8001/songs.txt"
       NAS_BASE_URL: "http://<SERVER_IP>:8001"
       HOST_NAME: "小蓝"

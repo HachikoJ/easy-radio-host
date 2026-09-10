@@ -34,7 +34,8 @@ except ModuleNotFoundError:
 # ---------------- 配置 ----------------
 DEEPSEEK_KEY = os.getenv("DEEPSEEK_KEY", "").strip()
 DEEPSEEK_BASE = os.getenv("DEEPSEEK_BASE", "https://api.deepseek.com").rstrip("/")
-DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+# DeepSeek-V4.1-Flash 的官方 API model ID 为 deepseek-flash
+DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-flash")
 MINIMAX_KEY = os.getenv("MINIMAX_KEY", "").strip()
 MINIMAX_GROUP = os.getenv("MINIMAX_GROUP", "").strip()
 MINIMAX_BASE = os.getenv("MINIMAX_BASE", "https://api.minimaxi.com").rstrip("/")

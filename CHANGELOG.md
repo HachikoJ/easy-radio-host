@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-09-10 · DeepSeek V4.1 Flash
+
+- 默认 DeepSeek 模型由 `deepseek-chat` 更新为官方 API 模型 ID `deepseek-flash`，对应 `DeepSeek-V4.1-Flash`；API key、接口地址和调用格式不变。
+- 影响范围为节目、点歌和聊天中的 AI 口播编排。服务器已有环境文件若显式设置 `DEEPSEEK_MODEL`，部署时需同步更新；回退时恢复部署前的模型配置并重启 `tingjian`，不迁移歌单、收藏或运行数据。
+
 ## 2026-09-09 · 限流陪伴与歌词恢复
 
 - GD 额度冷却且没有可播缓存时，在原因播报后轮播 8 条部署时预生成的 MiniMax 陪伴话题，涵盖心情、放松、条件式天气和时段内容；等待期间不查询实时天气或位置，不调用 GD、DeepSeek 或 MiniMax，额度恢复后立即继续音乐。
