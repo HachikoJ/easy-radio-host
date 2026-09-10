@@ -1,7 +1,8 @@
 # AI 电台主持人 v2 · 后端 (FastAPI 单文件)
 # 主题化节目 / 生动口播 / 点歌互动 / 栏目包装 / 防重复
-# 曲库来自在线音乐代理; DeepSeek 编排; MiniMax TTS (v2, audio 为 hex 字符串)
+# 曲库来自在线音乐代理; DeepSeek 编排; Qwen/MiniMax/edge-tts 合成口播
 import asyncio
+import base64
 import contextlib
 import csv
 import hashlib
@@ -33,9 +34,16 @@ except ModuleNotFoundError:
 
 # ---------------- 配置 ----------------
 DEEPSEEK_KEY = os.getenv("DEEPSEEK_KEY", "").strip()
-DEEPSEEK_BASE = os.getenv("DEEPSEEK_BASE", "https://api.deepseek.com").rstrip("/")
-# DeepSeek-V4.1-Flash 的官方 API model ID 为 deepseek-flash
-DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-flash")
+# Command Code 提供 OpenAI 兼容的 DeepSeek 路由
+DEEPSEEK_BASE = os.getenv("DEEPSEEK_BASE", "https://api.commandcode.ai/provider/v1").rstrip("/")
+DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek/deepseek-v4.1-flash")
+DASHSCOPE_API_KEY = os.getenv("DASHSCOPE_API_KEY", "").strip()
+DASHSCOPE_BASE = os.getenv("DASHSCOPE_BASE", "https://dashscope.aliyuncs.com/api/v1").rstrip("/")
+QWEN_TTS_MODEL = os.getenv("QWEN_TTS_MODEL", "qwen3-tts-instruct-flash")
+QWEN_TTS_VOICE = os.getenv("QWEN_TTS_VOICE", "Cherry")
+QWEN_TTS_INSTRUCTIONS = os.getenv(
+    "QWEN_TTS_INSTRUCTIONS", "温暖亲切、自然松弛，中速，吐字清晰，像真实电台主持人")
+EDGE_TTS_VOICE = os.getenv("EDGE_TTS_VOICE", "zh-CN-XiaoxiaoNeural")
 MINIMAX_KEY = os.getenv("MINIMAX_KEY", "").strip()
 MINIMAX_GROUP = os.getenv("MINIMAX_GROUP", "").strip()
 MINIMAX_BASE = os.getenv("MINIMAX_BASE", "https://api.minimaxi.com").rstrip("/")
@@ -235,7 +243,61 @@ def template_show(library, theme, tod):
                      {"type": "song", "title": song["title"], "rel": song["rel"]}])
     return show
 
-# ---------------- TTS (MiniMax 主; hex audio) ----------------
+# ---------------- TTS (Qwen 主; MiniMax/edge-tts 备用) ----------------
+async def _download_audio(url):
+    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=45)) as client:
+        async with client.get(url) as response:
+            response.raise_for_status()
+            data = await response.read()
+    if not data:
+        raise ValueError("empty audio response")
+    return data
+
+
+def _audio_bytes_from_data(value):
+    encoded = str(value or "").strip()
+    if encoded.startswith("data:") and "," in encoded:
+        encoded = encoded.split(",", 1)[1]
+    if not encoded:
+        raise ValueError("empty audio data")
+    return base64.b64decode(encoded)
+
+
+async def qwen_synth(text, path):
+    body = json.dumps({
+        "model": QWEN_TTS_MODEL,
+        "input": {
+            "text": text,
+            "voice": QWEN_TTS_VOICE,
+            "language_type": "Chinese",
+            "instructions": QWEN_TTS_INSTRUCTIONS,
+        },
+    }, ensure_ascii=False).encode()
+    req = urllib.request.Request(
+        f"{DASHSCOPE_BASE}/services/aigc/multimodal-generation/generation",
+        data=body,
+        headers={"Content-Type": "application/json",
+                 "Authorization": "Bearer " + DASHSCOPE_API_KEY})
+    data = b""
+    try:
+        data = await post_provider(req)
+        payload = json.loads(data.decode("utf-8"))
+        audio = payload.get("output", {}).get("audio") or {}
+        if audio.get("data"):
+            audio_data = await asyncio.to_thread(_audio_bytes_from_data, audio["data"])
+        elif audio.get("url"):
+            audio_data = await _download_audio(audio["url"])
+        else:
+            print("Qwen TTS 无音频:", payload.get("code") or "missing output.audio")
+            return False
+        normalized_audio = await asyncio.to_thread(normalize_speech, audio_data)
+        Path(path).write_bytes(normalized_audio)
+        return True
+    except Exception as e:
+        print("Qwen TTS 失败:", type(e).__name__, str(e)[:160])
+        return False
+
+
 async def minimax_synth(text, path):
     body = json.dumps({
         "model": MINIMAX_MODEL, "text": text, "stream": False,
@@ -266,17 +328,22 @@ async def minimax_synth(text, path):
         print("MiniMax 解析失败:", e, str(data[:160])); return False
 
 async def tts_to_mp3(text, path):
-    if MINIMAX_KEY:
+    if DASHSCOPE_API_KEY:
         # 静默重试最多 3 次 (不通报), 偶发失败/限流可恢复
+        for attempt in range(3):
+            if await qwen_synth(text, str(path)):
+                return True
+            await asyncio.sleep(0.4)
+        print("Qwen TTS 3 次失败, 尝试备用渠道")
+    if MINIMAX_KEY:
         for attempt in range(3):
             if await minimax_synth(text, str(path)):
                 return True
             await asyncio.sleep(0.4)
-        print("MiniMax 3 次失败, 使用固定串场语音")
-        return False
+        print("MiniMax 3 次失败, 尝试备用渠道")
     try:
         import edge_tts
-        await edge_tts.Communicate(text, "zh-CN-XiaoxiaoNeural").save(str(path))
+        await edge_tts.Communicate(text, EDGE_TTS_VOICE).save(str(path))
         normalized = await asyncio.to_thread(normalize_speech, Path(path).read_bytes())
         Path(path).write_bytes(normalized)
         return True
@@ -312,10 +379,14 @@ COOLDOWN_LINES = (
 )
 
 
-def _cooldown_revision(model=MINIMAX_MODEL, voice_setting=MINIMAX_VOICE_SETTING,
+def _cooldown_revision(qwen_model=QWEN_TTS_MODEL, qwen_voice=QWEN_TTS_VOICE,
+                       qwen_instructions=QWEN_TTS_INSTRUCTIONS,
+                       model=MINIMAX_MODEL, voice_setting=MINIMAX_VOICE_SETTING,
                        audio_setting=MINIMAX_AUDIO_SETTING, lines=COOLDOWN_LINES):
-    contract = {"model": model, "voice_setting": voice_setting,
-                "audio_setting": audio_setting, "lines": lines}
+    contract = {"qwen_model": qwen_model, "qwen_voice": qwen_voice,
+                "qwen_instructions": qwen_instructions, "model": model,
+                "voice_setting": voice_setting, "audio_setting": audio_setting,
+                "edge_voice": EDGE_TTS_VOICE, "lines": lines}
     digest = hashlib.sha256(json.dumps(contract, ensure_ascii=False, sort_keys=True).encode()).hexdigest()[:12]
     return f"v1-{digest}"
 
@@ -328,13 +399,21 @@ def _cooldown_path(asset_id):
     return VOICE_DIR / f"cooldown_{COOLDOWN_CONTENT_VERSION}_{asset_id}.mp3"
 
 
+def _announcement_path(reason):
+    return VOICE_DIR / f"notice_{COOLDOWN_CONTENT_VERSION}_{reason}.mp3"
+
+
+def _fallback_path(index):
+    return VOICE_DIR / f"fb_{COOLDOWN_CONTENT_VERSION}_{index}.mp3"
+
+
 async def prepare_playback_audio():
     # Generate once at startup, never as part of a failure or cooldown loop.
     for reason, text in ANNOUNCEMENT_LINES.items():
-        path = VOICE_DIR / f"notice_v1_{reason}.mp3"
+        path = _announcement_path(reason)
         if not path.is_file() or not path.stat().st_size:
             await tts_to_mp3(text, path)
-    if not MINIMAX_KEY:
+    if not (DASHSCOPE_API_KEY or MINIMAX_KEY):
         return
     for item in COOLDOWN_LINES:
         path = _cooldown_path(item["id"])
@@ -360,7 +439,7 @@ async def stop_announcements():
 def announcement_file(reason: str):
     if reason not in ANNOUNCEMENT_LINES:
         raise HTTPException(404)
-    path = VOICE_DIR / f"notice_v1_{reason}.mp3"
+    path = _announcement_path(reason)
     if not path.is_file() or not path.stat().st_size:
         raise HTTPException(503, "播报缓存准备中", headers={"Retry-After": "30"})
     return FileResponse(path, media_type="audio/mpeg", headers={"Cache-Control": "public, max-age=3600"})
@@ -401,9 +480,9 @@ async def ensure_fallback_voice():
         if _fb_ready is not None:
             return _fb_ready
         ok = False
-        if MINIMAX_KEY:
+        if DASHSCOPE_API_KEY or MINIMAX_KEY:
             for i, line in enumerate(FALLBACK_LINES):
-                if await tts_to_mp3(line, VOICE_DIR / f"fb_{i}.mp3"):
+                if await tts_to_mp3(line, _fallback_path(i)):
                     ok = True
                     break
         _fb_ready = ok
@@ -416,8 +495,9 @@ def pick_fallback_url():
     for _ in range(n):
         i = _fb_round % n
         _fb_round += 1
-        if (VOICE_DIR / f"fb_{i}.mp3").is_file():
-            return f"/voice/fb_{i}.mp3"
+        path = _fallback_path(i)
+        if path.is_file() and path.stat().st_size:
+            return f"/voice/{path.name}"
     return None
 
 # ---------------- 组节目 ----------------
@@ -776,7 +856,7 @@ def api_alarm_set(req: AlarmReq):
     return {"saved": True}
 
 # 电台播放列表短缓存: 闹钟/播放器刚拉过的整期在 5 分钟内直接复用,
-# 避免每次现场调 DeepSeek+MiniMax (7~30s) 拖垮 EasyInput 的列表请求
+# 避免每次现场调 DeepSeek+TTS (7~30s) 拖垮 EasyInput 的列表请求
 _PLAYLIST_CACHE = {"t": 0.0, "text": ""}
 
 NCM_API = os.getenv("NCM_API", "http://192.168.1.88:8300").rstrip("/")

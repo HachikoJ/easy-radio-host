@@ -6,9 +6,14 @@ services:
     ports:
       - "8100:8000"
     environment:
-      DEEPSEEK_KEY: ""            # 填入 DeepSeek key 后重启生效
-      DEEPSEEK_BASE: "https://api.deepseek.com"
-      DEEPSEEK_MODEL: "deepseek-flash"
+      DEEPSEEK_KEY: ""            # 填入 Command Code key 后重启生效
+      DEEPSEEK_BASE: "https://api.commandcode.ai/provider/v1"
+      DEEPSEEK_MODEL: "deepseek/deepseek-v4.1-flash"
+      DASHSCOPE_API_KEY: ""       # 百炼 Qwen-TTS key
+      DASHSCOPE_BASE: "https://dashscope.aliyuncs.com/api/v1"
+      QWEN_TTS_MODEL: "qwen3-tts-instruct-flash"
+      QWEN_TTS_VOICE: "Cherry"
+      QWEN_TTS_INSTRUCTIONS: "温暖亲切、自然松弛，中速，吐字清晰，像真实电台主持人"
       NAS_LIST_URL: "http://<SERVER_IP>:8001/songs.txt"
       NAS_BASE_URL: "http://<SERVER_IP>:8001"
       HOST_NAME: "小蓝"

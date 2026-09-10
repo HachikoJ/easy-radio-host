@@ -35,8 +35,8 @@
 - **多路推荐**：融合主题、收藏歌曲、收藏歌手、部署者配置的歌手偏好及探索候选；支持从当前歌曲延伸同歌手作品，展示实际选歌依据。
 - **去重与多样性**：一期内歌曲不重复，优先避开最近播放并分散歌手；候选不足时缩短节目，必要的近期回补和歌手限制放宽会标明。
 - **自主偏好**：收听设置集中放置连续播放、译文、歌词时差与选歌偏好。「按我的偏好选歌」默认关闭；开启后才将本地收藏、历史和「少推荐」标题用于本次推荐，开启前可查看隐私说明。「少推荐」可撤回，普通跳过与播放失败不视为不喜欢，主动点歌仍可播放指定歌曲。
-- **主持人口播**：MiniMax 默认使用 `Chinese (Mandarin)_Warm_Girl`，支持 edge-tts 降级。新生成的口播通过 ffmpeg 平衡响度，歌曲以主音量的 85% 播放，减少口播与歌曲切换时的音量落差；缺少 ffmpeg 或处理失败时保留原口播。
-- **连续播放**：节目单、上一段与下一段、进度和音量控制，支持自动续播与停止。无音源、限流或临时故障时，文字提示并播报原因后自动尝试下一首推荐；暂无可播歌曲且额度冷却时，从 8 条预生成的 MiniMax 陪伴话题中轮播心情、放松、条件式天气和时段内容，额度恢复后立即继续音乐。等待期间不请求天气或位置，也不调用 GD、DeepSeek 或 MiniMax。暂停或关闭页面会取消请求、歌词恢复、等待计时及播报，释放音频连接。
+- **主持人口播**：优先使用阿里云百炼 `qwen3-tts-instruct-flash` 的 `Cherry`（芊悦）音色，支持 MiniMax 与 edge-tts 逐级降级。新生成的口播通过 ffmpeg 平衡响度，歌曲以主音量的 85% 播放，减少口播与歌曲切换时的音量落差；缺少 ffmpeg 或处理失败时保留原口播。
+- **连续播放**：节目单、上一段与下一段、进度和音量控制，支持自动续播与停止。无音源、限流或临时故障时，文字提示并播报原因后自动尝试下一首推荐；暂无可播歌曲且额度冷却时，从 8 条预生成的陪伴话题中轮播心情、放松、条件式天气和时段内容，额度恢复后立即继续音乐。等待期间不请求天气或位置，也不调用 GD、DeepSeek 或云端 TTS。暂停或关闭页面会取消请求、歌词恢复、等待计时及播报，释放音频连接。
 - **专注收听**：统一的收听页随视口高度分配唱片与歌词空间，主要内容保持一屏；待机和节目生成时收起空歌词区，播放后恢复双栏歌词。歌曲标题与右对齐的跟随、动效和设置同处一行。主题电台、节目/收藏/历史与点歌互动按需展开，底部播放控制始终保留播放上下文。明暗配色在没有保存偏好时跟随系统；支持空格播放、左右键快进退、上下键调音量及兼容浏览器的系统媒体控制。右上角的致谢和作者 GitHub 在新标签页打开，致谢默认中文，点击 English 后展示英文。
 - **收藏与历史**：浏览器本地保存最多 100 首收藏、50 条按标题去重的收听历史；歌曲实际开始播放后才记入历史。
 - **点歌互动**：与小蓝聊天、点歌或控制播放；支持生成取消、失败重试和失败时保留输入草稿。
@@ -99,7 +99,7 @@
   → 主应用 :8100
       → 多路候选融合、近期过滤、去重与歌手分散
       → DeepSeek 按选定歌曲顺序编排口播
-      → MiniMax / edge-tts 合成口播
+      → Qwen / MiniMax / edge-tts 合成口播
       → 在线曲库代理 :8001 读取歌单
   ← 口播与歌曲播放清单
   → 曲库代理复核音频并流转发，支持进度拖动
@@ -123,7 +123,7 @@ source .venv/bin/activate
 python -m pip install -r backend/requirements.txt zhconv
 ```
 
-1. 按部署手册创建 `/etc/tingjian/radio.env`，配置 DeepSeek、MiniMax 和服务地址，密钥文件权限设为 600。
+1. 按部署手册创建 `/etc/tingjian/radio.env`，配置 DeepSeek、百炼 Qwen-TTS 和服务地址，密钥文件权限设为 600。MiniMax 可作为可选备用渠道。
 2. 启动主应用（8100）与在线曲库代理（8001），两项服务仅监听 `127.0.0.1`。
 3. 配置 Nginx 与 HTTPS，通过同一域名访问页面、`/api/`、`/voice/` 和 `/music/`，生成一期节目。公网只需开放 80、443。
 
@@ -143,15 +143,25 @@ node scripts/serve-demo.mjs
 
 | 变量 | 用途 |
 | --- | --- |
-| `DEEPSEEK_KEY` | 节目编排与对话的 API Key |
-| `MINIMAX_KEY` | 主持人口播的 API Key |
-| `MINIMAX_VOICE` | 主持人音色，默认 `Chinese (Mandarin)_Warm_Girl` |
+| `DEEPSEEK_KEY` | Command Code 的 API Key |
+| `DEEPSEEK_BASE` | OpenAI 兼容接口地址，默认 `https://api.commandcode.ai/provider/v1` |
+| `DEEPSEEK_MODEL` | DeepSeek 模型，默认 `deepseek/deepseek-v4.1-flash` |
+| `DASHSCOPE_API_KEY` | 阿里云百炼 Qwen-TTS 的 API Key |
+| `DASHSCOPE_BASE` | 百炼 API 地址，默认 `https://dashscope.aliyuncs.com/api/v1` |
+| `QWEN_TTS_MODEL` | Qwen-TTS 模型，默认 `qwen3-tts-instruct-flash` |
+| `QWEN_TTS_VOICE` | Qwen 音色，默认 `Cherry` |
+| `QWEN_TTS_INSTRUCTIONS` | Qwen 口播风格指令 |
+| `MINIMAX_KEY` | 可选备用 MiniMax API Key |
+| `MINIMAX_VOICE` | MiniMax 备用音色，默认 `Chinese (Mandarin)_Warm_Girl` |
+| `EDGE_TTS_VOICE` | 本地 edge-tts 最终降级音色，默认 `zh-CN-XiaoxiaoNeural` |
 | `NAS_LIST_URL` | 曲库列表地址，通常为 `http://127.0.0.1:8001/songs.txt` |
 | `NAS_BASE_URL` | 浏览器可以访问的在线曲库代理地址 |
 | `RADIO_BASE` | 浏览器可以访问的主应用地址 |
 | `DATA_DIR` | 口播和运行数据目录 |
 
 `NAS_*` 是保留的兼容变量名，指向在线曲库代理。远程浏览器无法访问服务器自身的 `127.0.0.1`，对外播放地址须使用服务器的可访问地址。
+
+云端口播按 `Qwen -> MiniMax -> edge-tts` 顺序调用；只配置其中一项也会正常工作。使用百炼专属业务空间时，将 `DASHSCOPE_BASE` 设为控制台给出的带 `/api/v1` 的 DashScope 地址。
 
 响度处理使用 ffmpeg 两遍 `loudnorm`，目标为 -14 LUFS、真峰值上限 -1.5 dBTP，并启用 `dual_mono`。缺少 ffmpeg、处理超时或失败时使用原音，不阻断口播播放。此处理只作用于新生成的口播，不重新处理旧口播或第三方歌曲；歌曲的 0.85 音量系数不改变音量滑杆显示值，也不保证所有音源听感完全一致。
 
@@ -210,7 +220,7 @@ node scripts/serve-demo.mjs
 - 「按我的偏好选歌」默认关闭。开启后，收藏、历史和「少推荐」标题随每次节目请求发往听间服务器，仅在本次请求中使用，不新增服务端偏好档案。DeepSeek 只接收选定歌曲及节目上下文，不接收这些完整偏好列表；关闭后不再发送这些本地偏好。当前会话的近期歌曲仍用于减少重复，同歌手延伸会发送主动选定的起点标题。
 - 服务器已有的全局歌手偏好配置属于部署者配置，不是每位听众的独立档案；推荐理由会区分该来源与浏览器本地收藏。
 - 再次点播会按标题重新请求匹配与播放地址；收藏不保存精确歌曲 ID 或永久音频链接，可能匹配到不同版本。
-- DeepSeek、MiniMax 等服务可能产生费用，价格与额度以各服务商为准。
+- DeepSeek、阿里云百炼、MiniMax 等服务可能产生费用，价格与额度以各服务商为准。
 - AI 生成的口播不保证事实准确；歌曲可用性、版本匹配和响应时间依赖第三方服务。
 - 歌词与译文来自现有 GD 音乐 API，可能缺失或与音频版本不匹配；有时间戳才启用同步，不推算纯文本歌词时间。429 和临时失败不缓存为空；200 空歌词才会在严格身份匹配下跨渠道补找。代理最多缓存 128 条，成功歌词在内存保留 6 小时，完整跨渠道未命中的空结果保留 60 秒；不保存歌词文件或随仓库再分发歌词库。歌词版权归原权利人。
 - 本项目用于个人学习与体验，歌曲版权归相应权利人，使用时须遵守平台规则。
@@ -233,7 +243,7 @@ node scripts/serve-demo.mjs
 - [lrc-kit 1.2.1](https://www.npmjs.com/package/lrc-kit/v/1.2.1)，Copyright (c) 2016 Weirong Xu，MIT；用于解析 LRC，保留[完整许可](backend/static/vendor/lrc-kit/LICENSE)和[源码改动记录](THIRD_PARTY_NOTICES.md#lrc-kit)。
 - [Three.js 0.170.0](https://github.com/mrdoob/three.js/tree/r170)，Copyright © 2010-2024 three.js authors，MIT；本地模块用于渲染立体唱片与波幕，保留[完整许可](backend/static/vendor/three/LICENSE)。
 - [Lucide](https://lucide.dev) 提供 ISC 授权的界面图标；[Unsplash](https://unsplash.com) 提供主题摄影，逐图来源见[资产来源](backend/static/assets/SOURCES.md)。
-- DeepSeek、MiniMax、edge-tts 及其他第三方依赖；其权利和使用条款归各自权利人。
+- DeepSeek、[阿里云百炼](https://help.aliyun.com/zh/model-studio/qwen-tts)、MiniMax、edge-tts 及其他第三方依赖；其权利和使用条款归各自权利人。
 
 ## GitHub 关注度
 

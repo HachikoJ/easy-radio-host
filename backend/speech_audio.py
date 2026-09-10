@@ -20,7 +20,10 @@ def normalize_speech(audio):
             filter_spec + ":print_format=json", "-f", "null", "-",
         ], input=audio, capture_output=True, timeout=20, check=False)
         report = measured.stderr.decode("utf-8", errors="replace")
-        stats = json.loads(report[report.rfind("{"):])
+        start = report.find("{")
+        if start < 0:
+            raise ValueError("loudnorm report missing")
+        stats, _ = json.JSONDecoder().raw_decode(report[start:])
         fields = {"measured_I": "input_i", "measured_TP": "input_tp",
                   "measured_LRA": "input_lra", "measured_thresh": "input_thresh",
                   "offset": "target_offset"}

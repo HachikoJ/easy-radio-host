@@ -19,7 +19,9 @@ class SpeechAudioTests(unittest.TestCase):
             if command[-1] == "-":
                 stats = {"input_i": "-24", "input_tp": "-9", "input_lra": "2",
                          "input_thresh": "-34", "target_offset": "0"}
-                return subprocess.CompletedProcess(command, 0, stderr=json.dumps(stats).encode())
+                report = ("[Parsed_loudnorm_0 @ test]\n" + json.dumps(stats) +
+                          "\n[out#0/null @ test] trailing output\n").encode()
+                return subprocess.CompletedProcess(command, 0, stderr=report)
             Path(command[-1]).write_bytes(normalized)
             return subprocess.CompletedProcess(command, 0)
 

@@ -84,9 +84,9 @@ UI icons come from Lucide under ISC. Theme photos are documented individually an
 
 ## 服务 / Services
 
-DeepSeek、MiniMax、edge-tts、在线音乐 API 及其依赖继续遵循各自的授权、服务与音乐使用条款。项目致谢不表示获得额外音源再分发权，也不表示第三方对本项目背书。
+DeepSeek、阿里云百炼 Qwen-TTS、MiniMax、edge-tts、在线音乐 API 及其依赖继续遵循各自的授权、服务与音乐使用条款。项目致谢不表示获得额外音源再分发权，也不表示第三方对本项目背书。
 
-DeepSeek, MiniMax, edge-tts, the online music API, and their dependencies remain governed by their respective licenses and service/music terms. Attribution does not grant additional music redistribution rights or imply endorsement.
+DeepSeek, Alibaba Cloud Model Studio Qwen-TTS, MiniMax, edge-tts, the online music API, and their dependencies remain governed by their respective licenses and service/music terms. Attribution does not grant additional music redistribution rights or imply endorsement.
 
 歌词通过现有 GD 音乐 API 代理按当前歌曲的来源和 ID 获取，并展示来源说明。代理仅在内存中缓存最多 128 条结果、每条 300 秒，不写入磁盘，不随仓库再分发歌词库。歌词与译文版权归原权利人；软件 MIT 许可不授予歌词、歌曲或封面的使用权。
 

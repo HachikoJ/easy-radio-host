@@ -9,7 +9,7 @@
            ├─ /、/api/、/voice/ → 127.0.0.1:8100 主应用
            └─ /music/          → 127.0.0.1:8001 在线曲库代理
 
-主应用 → DeepSeek 编排节目 → MiniMax 合成口播
+主应用 → Command Code（DeepSeek）编排节目 → Qwen-TTS（MiniMax / edge-tts 备用）合成口播
 曲库代理 → 在线音乐 API → 校验音频、同源流转发（旧 307 跳转兼容）
 ```
 
@@ -31,7 +31,7 @@
 - 域名 A 记录指向目标服务器；如配置 AAAA，IPv6 也必须能到达同一站点。
 - 腾讯云安全组允许 TCP 80、443，SSH 保留管理所需访问范围。8100、8001 仅绑定回环地址，无需公网放行。
 - 检查已有站点、监听端口和证书，保留其他业务的配置。
-- 服务器能够访问 PyPI、DeepSeek、MiniMax、在线音乐 API 及其音频 CDN。
+- 服务器能够访问 PyPI、Command Code、阿里云百炼、可选 MiniMax、在线音乐 API 及其音频 CDN。
 
 ```bash
 sudo nginx -t
@@ -77,7 +77,7 @@ sudo install -o root -g root -m 600 /opt/easy-radio-host/deploy/radio.env.exampl
 sudoedit /etc/tingjian/radio.env
 ```
 
-填写 `DEEPSEEK_KEY`、`MINIMAX_KEY`，并确认：
+填写 `DEEPSEEK_KEY`、`DASHSCOPE_API_KEY`，并确认：
 
 ```dotenv
 NAS_LIST_URL=http://127.0.0.1:8001/songs.txt
@@ -85,24 +85,29 @@ NAS_BASE_URL=https://audio.deline.top/music
 RADIO_BASE=https://audio.deline.top
 DATA_DIR=/var/lib/tingjian
 HOST_NAME=小蓝
-DEEPSEEK_BASE=https://api.deepseek.com
-DEEPSEEK_MODEL=deepseek-flash
+DEEPSEEK_BASE=https://api.commandcode.ai/provider/v1
+DEEPSEEK_MODEL=deepseek/deepseek-v4.1-flash
+DASHSCOPE_BASE=https://dashscope.aliyuncs.com/api/v1
+QWEN_TTS_MODEL=qwen3-tts-instruct-flash
+QWEN_TTS_VOICE=Cherry
+QWEN_TTS_INSTRUCTIONS=温暖亲切、自然松弛，中速，吐字清晰，像真实电台主持人
+EDGE_TTS_VOICE=zh-CN-XiaoxiaoNeural
 MINIMAX_BASE=https://api.minimaxi.com
 MINIMAX_MODEL=speech-02-turbo
 MINIMAX_VOICE="Chinese (Mandarin)_Warm_Girl"
 ```
 
-`deepseek-flash` 是 DeepSeek 官方 API 模型 ID，对应 `DeepSeek-V4.1-Flash`。已有环境文件中的显式 `DEEPSEEK_MODEL` 优先于代码默认值，更新时应保留原 `DEEPSEEK_KEY`，只调整模型名后重启主服务。
+`DEEPSEEK_BASE` 使用 Command Code 的 OpenAI 兼容接口，`deepseek/deepseek-v4.1-flash` 是 `DeepSeek-V4.1-Flash` 在该网关中的模型 ID。已有环境文件中的显式配置优先于代码默认值；更新时同步替换 `DEEPSEEK_KEY`、`DEEPSEEK_BASE` 和 `DEEPSEEK_MODEL`，再重启主服务。
 
-`MINIMAX_GROUP` 按账号接口要求填写，可为空。密钥仅放服务器运行配置，不放入 Git、前端或命令行参数。systemd 管理器读取 root 所有的环境文件后，以 `tingjian` 用户启动主服务；曲库服务不读取带密钥的配置。
+百炼专属业务空间使用控制台给出的 DashScope 地址，即 `https://<业务空间主机>/api/v1`；没有专属地址时使用上面的公共地址。`DASHSCOPE_API_KEY` 与可选 `MINIMAX_KEY` 只放服务器运行配置，不放入 Git、前端或命令行参数。systemd 管理器读取 root 所有的环境文件后，以 `tingjian` 用户启动主服务；曲库服务不读取带密钥的配置。
 
-`MINIMAX_VOICE` 未配置时使用上述普通话音色；已有环境文件中的显式值优先于代码默认值，更新代码不会自动覆盖它。修改音色后重启主服务，新生成的口播才使用新音色，旧口播文件保持原样。
+云端口播按 `Qwen -> MiniMax -> edge-tts` 调用。只配置 Qwen，或只配置 MiniMax，都能工作；两者都未配置时直接使用 edge-tts。`QWEN_TTS_VOICE` 默认 `Cherry`，`MINIMAX_VOICE` 默认 `Chinese (Mandarin)_Warm_Girl`。已有环境文件中的显式值优先于代码默认值，更新代码不会自动覆盖；修改任一声音相关参数并重启后，节目口播、故障播报和固定串场都会使用新的版本文件。
 
-新生成的 MiniMax 或 edge-tts 口播通过 `backend/speech_audio.py` 做两遍 ffmpeg `loudnorm`：目标 -14 LUFS、真峰值上限 -1.5 dBTP、LRA 7，启用 `dual_mono`，每遍最长 20 秒。输出为 32 kHz、单声道、128 kbps MP3；缺少 ffmpeg、分析值无效、超时或编码失败时保留原音。处理不改写旧口播，也不下载或归一化第三方歌曲。前端歌曲播放音量为主音量乘以 0.85，口播使用主音量，滑杆数值仍表示主音量。
+新生成的 Qwen、MiniMax 或 edge-tts 口播通过 `backend/speech_audio.py` 做两遍 ffmpeg `loudnorm`：目标 -14 LUFS、真峰值上限 -1.5 dBTP、LRA 7，启用 `dual_mono`，每遍最长 20 秒。输出为 32 kHz、单声道、128 kbps MP3；缺少 ffmpeg、分析值无效、超时或编码失败时保留原音。处理不改写旧口播，也不下载或归一化第三方歌曲。前端歌曲播放音量为主音量乘以 0.85，口播使用主音量，滑杆数值仍表示主音量。
 
-供应商调用可能产生费用。缺少配置或调用失败时可能走模板节目、edge-tts 或纯文字降级，HTTP 200 不能单独证明 DeepSeek 和 MiniMax 调用成功。
+供应商调用可能产生费用。缺少配置或调用失败时可能走模板节目、edge-tts 或纯文字降级，HTTP 200 不能单独证明 DeepSeek、Qwen 或 MiniMax 调用成功。
 
-主服务启动后在后台检查故障播报和 8 条限流陪伴音频，只生成当前版本中缺失的文件；陪伴音频仅在配置 MiniMax 后生成，每项沿用最多 3 次启动期重试。版本形如 `v1-{12位摘要}`，由 MiniMax 模型、音色、音频参数和文案共同确定，修改任一项会生成新版本，不会在用户已经进入限流等待后临时调用供应商。`/api/playback/cooldown/content.json` 只列出已经成功生成的文件；单项失败不会虚报，清单为空时前端使用固定等待播报及浏览器语音降级，恢复计时仍继续。首次启动或版本变化后须等待清单完整再完成发布验收。
+主服务启动后在后台检查故障播报和 8 条限流陪伴音频，只生成当前版本中缺失的文件；陪伴音频在配置 Qwen 或 MiniMax 后生成，每项沿用最多 3 次启动期重试。版本形如 `v1-{12位摘要}`，由 Qwen/MiniMax 模型、音色、指令、音频参数、edge-tts 音色和文案共同确定，修改任一项会生成新版本，不会在用户已经进入限流等待后临时调用供应商。`/api/playback/cooldown/content.json` 只列出已经成功生成的文件；单项失败不会虚报，清单为空时前端使用固定等待播报及浏览器语音降级，恢复计时仍继续。首次启动或版本变化后须等待清单完整再完成发布验收。
 
 ## 4. 启动服务
 
@@ -160,7 +165,7 @@ sudo ss -ltnp
 sudo systemctl status tingjian tingjian-musiclib --no-pager
 ```
 
-检查 HTTP 跳转 HTTPS、证书域名及有效期、首页 200、曲库非空、限流陪伴清单正好包含 8 项，以及 8100/8001 只监听 `127.0.0.1`。逐项读取清单中的 `url`，确认返回可播放 MP3；文件未生成时清单不会虚报该项，可结合主服务日志定位 MiniMax 失败原因，修复后重启主服务补齐缺失文件。
+检查 HTTP 跳转 HTTPS、证书域名及有效期、首页 200、曲库非空、限流陪伴清单正好包含 8 项，以及 8100/8001 只监听 `127.0.0.1`。逐项读取清单中的 `url`，确认返回可播放 MP3；文件未生成时清单不会虚报该项，可结合主服务日志定位 Qwen、MiniMax 或 edge-tts 失败原因，修复后重启主服务补齐缺失文件。
 
 真实节目验证会调用供应商服务：
 
@@ -173,7 +178,7 @@ curl --fail --silent --show-error --max-time 360 \
 
 检查返回的 `items` 中有歌曲和口播；歌曲地址应以 `https://audio.deline.top/music/` 开头并带 `stream=1`，口播使用本站 `/voice/`。对歌曲发送小范围 GET，验证 206、音频文件头及 Content-Range，并在浏览器确认实际播放时间前进与拖动。原不带 `stream` 的歌曲地址保留 307 兼容。结合供应商请求结果与服务日志确认真实模型、语音调用，不能用降级结果代替验证。音源状态与完整恢复规则见 [音源检索与恢复](docs/MUSIC-SOURCES.md)。
 
-在桌面和手机浏览器打开正式入口，验证主题生成、口播到歌曲连续播放、暂停与恢复、下一首、点歌、聊天、收藏和历史。使用受控模拟验证无音源、限流与临时故障的文字说明、原因播报、自动下一曲及等待恢复；不能为验收主动向上游发送 45 次请求触发限额。限流模拟应覆盖时段内容优先、通用内容轮播、距恢复不足 6 秒不启新段、`ready` 后立即卸载陪伴音频并生成节目，以及再次返回 `limited/retry_after` 时继续等待。等待期间不得出现天气、定位、GD、DeepSeek 或 MiniMax 请求。
+在桌面和手机浏览器打开正式入口，验证主题生成、口播到歌曲连续播放、暂停与恢复、下一首、点歌、聊天、收藏和历史。使用受控模拟验证无音源、限流与临时故障的文字说明、原因播报、自动下一曲及等待恢复；不能为验收主动向上游发送 45 次请求触发限额。限流模拟应覆盖时段内容优先、通用内容轮播、距恢复不足 6 秒不启新段、`ready` 后立即卸载陪伴音频并生成节目，以及再次返回 `limited/retry_after` 时继续等待。等待期间不得出现天气、定位、GD、DeepSeek 或云端 TTS 请求。
 
 歌词用受控响应分别验证：首选渠道有词直接显示；首选渠道 200 空歌词后严格跨渠道命中；429 显示等待秒数并仅按 `retry_after` 自动重试；临时故障与确实无歌词不混淆。核对切歌、暂停或关闭页面后歌词重试不再发生，旧响应不覆盖新歌。暂停或关闭页面也应停止陪伴音频、后续检索和恢复计时，恢复播放保持原位置。缓存播报与陪伴接口应返回可播放语音，故障或等待时不应临时重新合成。检查布局无横向溢出、控制台无混合内容错误。`?demo=1` 只能验证演示交互，不能作为真实 API 验收。
 
@@ -230,7 +235,7 @@ curl --fail --silent http://127.0.0.1:8100/api/playback/availability
 
 本次接口兼容性变化：`/api/show` 的歌曲不可用错误将 `detail` 从字符串改为结构对象，客户端应读取其中的原因与恢复信息；`/api/intent` 的所有音源失败均包含 `next` 动作，须先提示并播报，再切换。新增 `/api/playback/availability`、`/api/playback/announcement/{reason}.mp3`、`/api/playback/cooldown/content.json` 和版本化陪伴音频路径，前后端应一同更新，避免旧客户端忽略恢复信息。歌词旧路径保持可用；新客户端传 `title/artist` 才能启用严格跨渠道补找，并处理 HTTP 429 的 `Retry-After` 头与结构化 `detail`。
 
-从未安装 ffmpeg 的版本更新时，安装系统包 `ffmpeg` 后可启用新口播响度处理；暂未安装仍会保留原音播放。需要采用新的默认音色时，应同时审阅现有 `MINIMAX_VOICE`，不能只依赖更新代码。音色配置恢复使用更新前的环境文件备份；代码回退不会自动改变已显式配置的音色。
+从未安装 ffmpeg 的版本更新时，安装系统包 `ffmpeg` 后可启用新口播响度处理；暂未安装仍会保留原音播放。需要采用新的默认音色时，应同时审阅现有 `QWEN_TTS_VOICE` 和 `MINIMAX_VOICE`，不能只依赖更新代码。音色配置恢复使用更新前的环境文件备份；代码回退不会自动改变已显式配置的音色。
 
 若新版未通过验收，停止本项目两项服务，将当前代码目录改名保留，然后从 `code.tar.gz` 恢复 `/opt/easy-radio-host`，按旧版 requirements 重建 venv。必要时恢复备份中的 systemd/Nginx 配置，校验后启动服务并复验。改名后的目录保留到恢复确认完成，不直接删除。用户口播等数据独立存放，普通代码回退无需回退数据；涉及数据迁移时先核对兼容性再恢复备份。版本化限流陪伴文件可保留，旧代码不会引用它们；歌词只在内存缓存，无数据回退步骤。
 
@@ -250,19 +255,21 @@ sudo certbot certificates
 | 现象 | 检查项 |
 | --- | --- |
 | 首页可开，生成超时 | 主服务日志、供应商连通性、额度、Nginx 超时 |
-| 只有文字或模板节目 | 模型/语音调用结果、音色配置、edge-tts 网络 |
+| 只有文字或模板节目 | DeepSeek/Qwen/MiniMax 调用结果、`QWEN_TTS_VOICE` 与备用音色配置、edge-tts 网络 |
 | 歌曲不播放 | 公网 `NAS_BASE_URL`、`/music/` 映射、歌曲源与最终音频 HTTPS |
 | 曲库为空 | `playlist.tsv` 路径、权限、TSV 格式 |
 | 口播 404 | `DATA_DIR`、服务写权限、`/voice/` 转发 |
 | 新口播仍明显偏轻或偏响 | ffmpeg 可用性、`TTS loudness normalization` 日志、实际新文件的响度；旧口播不会重新处理 |
 | HTTP 429 | 区分 Nginx 限制、GD 本地预算和上游限制；查询恢复时间并等待，不清空额度数据库或循环切换渠道 |
 | 故障提示后没有声音 | 检查缓存播报接口与浏览器音频权限；核对浏览器语音降级及当前主音量 |
-| 限流后只有等待提示 | 检查 `/api/playback/cooldown/content.json` 是否为 8 项、对应 MP3 是否可读、MiniMax 配置与主服务启动日志；不要在等待流程中临时生成 |
+| 限流后只有等待提示 | 检查 `/api/playback/cooldown/content.json` 是否为 8 项、对应 MP3 是否可读、Qwen/MiniMax 配置与主服务启动日志；不要在等待流程中临时生成 |
 | 歌词长期显示未返回 | 区分 429、502 与 200 空歌词；检查前端是否携带 `title/artist`、是否按 `Retry-After` 重试，以及跨渠道结果的录音身份 |
 | 暂停后仍有请求 | 检查前端版本、请求取消及服务端断开检测；已发送的请求仍计入额度 |
 | 证书续期失败 | DNS、80 端口、ACME 目录、timer 和 reload hook |
 
 排障时不要公开包含凭证、用户输入或个人数据的完整日志。AI 编排内容不保证事实准确；公开服务会使用部署者的供应商额度，应按访问规模配置预算和访问范围。
+
+当前 Nginx 限制按访客 IP 生效，不能约束大量不同来源的总 TTS 调用量。若要向所有人开放，应在上线前增加跨请求的 Qwen 字符预算、并发/RPM 闸门和短文本限制，并监控实际用量；仅保留 `DASHSCOPE_API_KEY` 而不设总额度会直接消耗部署者账户余额。
 
 ## 版权与致谢
 

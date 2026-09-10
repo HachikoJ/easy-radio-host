@@ -2,7 +2,7 @@
 
 ## 项目目标
 
-easy-radio-host 是一个基于 FastAPI 的在线 AI 音乐电台：使用 DeepSeek 编排节目，使用 MiniMax 或 edge-tts 合成口播，通过在线音乐 API 动态获取歌曲播放地址。项目不保存歌曲音频文件。
+easy-radio-host 是一个基于 FastAPI 的在线 AI 音乐电台：使用 DeepSeek 编排节目，优先使用阿里云百炼 Qwen-TTS，并可按 MiniMax、edge-tts 降级合成口播，通过在线音乐 API 动态获取歌曲播放地址。项目不保存歌曲音频文件。
 
 ## 变更边界
 
@@ -36,4 +36,3 @@ python3 -m py_compile backend/app.py musiclib/proxy_server.py musiclib/resolve_m
 - 只有在用户明确要求时才执行 `commit`、`push`、创建 PR、发布版本或公开部署。
 - 推送前确认目标仓库和分支；推送后核对远端提交 SHA，并报告验证结果。
 - 公开发布或完整质量审计时，补充真实截图、双语 README、许可证和适用的项目质量检查；普通维护改动不扩大范围。
-

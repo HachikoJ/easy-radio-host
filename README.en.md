@@ -35,8 +35,8 @@ Tingjian is an AI music radio for listeners who enjoy themed listening and are c
 - **Multiple recommendation sources:** Combine themes, favorite tracks, favorite artists, artist preferences configured by the deployment owner, and exploration candidates. Extend a current track with more works by the same artist and see the actual selection reasons.
 - **Deduplication and variety:** No repeated tracks within a show; recent tracks are avoided where possible and artists are spread out. Shows shorten when candidates are scarce, and any recent-track reuse or relaxed artist limits are disclosed.
 - **Optional preferences:** Listening settings bring together continuous playback, translations, lyric timing, and song preferences. "按我的偏好选歌" (Use my preferences) is off by default. Enabling it allows local favorites, history, and "Recommend less" titles to inform the current recommendation, with privacy details available before opting in. "Recommend less" can be undone; ordinary skips and playback failures are not treated as dislikes, and explicit song requests remain available.
-- **Host narration:** MiniMax uses `Chinese (Mandarin)_Warm_Girl` by default, with edge-tts fallback support. ffmpeg balances newly generated narration, while songs play at 85% of the master volume to reduce level differences between speech and music. Original narration is retained when ffmpeg is unavailable or processing fails.
-- **Continuous playback:** A show queue, previous/next segments, seeking and volume, automatic continuation, and stop controls. Missing sources, rate limits, and temporary failures display and announce the reason before automatically trying the next recommendation. When no playable track remains during a quota cooldown, the player rotates through eight pre-generated MiniMax segments about mood, relaxation, conditional weather, and the time of day, then resumes music as soon as the quota recovers. Waiting does not request weather or location data or call GD, DeepSeek, or MiniMax. Pausing or closing the page cancels requests, lyric recovery, waiting timers, and announcements, and releases audio connections.
+- **Host narration:** Narration prefers Alibaba Cloud Model Studio `qwen3-tts-instruct-flash` with the `Cherry` voice, then falls back to MiniMax and edge-tts. ffmpeg balances newly generated narration, while songs play at 85% of the master volume to reduce level differences between speech and music. Original narration is retained when ffmpeg is unavailable or processing fails.
+- **Continuous playback:** A show queue, previous/next segments, seeking and volume, automatic continuation, and stop controls. Missing sources, rate limits, and temporary failures display and announce the reason before automatically trying the next recommendation. When no playable track remains during a quota cooldown, the player rotates through eight pre-generated companion segments about mood, relaxation, conditional weather, and the time of day, then resumes music as soon as the quota recovers. Waiting does not request weather or location data or call GD, DeepSeek, or cloud TTS. Pausing or closing the page cancels requests, lyric recovery, waiting timers, and announcements, and releases audio connections.
 - **Focused listening:** A single listening view adapts the disc and lyrics to viewport height to keep the main experience on one screen. Idle and programme-generation states collapse the empty lyric area; playback restores the two-column lyric layout. The track title shares a row with right-aligned following, animation, and settings controls. Theme stations, the queue/favorites/history, and chat open on demand while the bottom player preserves playback context. Appearance follows the system when no preference is saved. Keyboard controls cover Space for play/pause, Left/Right for seeking, and Up/Down for volume; supported browsers also expose system media controls. Credits and the author's GitHub open in new tabs from the top right; credits display Chinese by default, with English shown after selecting English.
 - **Favorites and history:** Store up to 100 favorites and 50 recent tracks locally in your browser, deduplicated by title; history records songs only once playback actually starts.
 - **Song requests:** Chat with Xiaolan, request tracks, or control playback; cancel generation, retry failures, and keep your draft when a request fails.
@@ -99,7 +99,7 @@ Browser
   → Main app :8100
       → Candidate fusion, recent-track filtering, deduplication, and artist variety
       → DeepSeek writes narration in the selected track order
-      → MiniMax / edge-tts synthesizes narration
+      → Qwen / MiniMax / edge-tts synthesizes narration
       → Online library proxy :8001 reads the playlist
   ← Narration and song playback queue
   → Proxy validates and streams audio with seeking support
@@ -123,7 +123,7 @@ source .venv/bin/activate
 python -m pip install -r backend/requirements.txt zhconv
 ```
 
-1. Follow the deployment guide to create `/etc/tingjian/radio.env` with DeepSeek, MiniMax, and service URLs, using file permissions of 600.
+1. Follow the deployment guide to create `/etc/tingjian/radio.env` with DeepSeek, Model Studio Qwen-TTS, and service URLs, using file permissions of 600. MiniMax is an optional fallback provider.
 2. Start the main app (8100) and online library proxy (8001), both listening only on `127.0.0.1`.
 3. Configure Nginx and HTTPS to serve the page, `/api/`, `/voice/`, and `/music/` on the same domain, then generate a show. Only ports 80 and 443 need public access.
 
@@ -143,15 +143,25 @@ The demo uses original synthesized instrumental music and clearly labeled origin
 
 | Variable | Purpose |
 | --- | --- |
-| `DEEPSEEK_KEY` | API key for show planning and chat |
-| `MINIMAX_KEY` | API key for host narration |
-| `MINIMAX_VOICE` | Host voice, defaulting to `Chinese (Mandarin)_Warm_Girl` |
+| `DEEPSEEK_KEY` | Command Code API key |
+| `DEEPSEEK_BASE` | OpenAI-compatible endpoint, defaulting to `https://api.commandcode.ai/provider/v1` |
+| `DEEPSEEK_MODEL` | DeepSeek model, defaulting to `deepseek/deepseek-v4.1-flash` |
+| `DASHSCOPE_API_KEY` | Alibaba Cloud Model Studio API key for Qwen-TTS |
+| `DASHSCOPE_BASE` | Model Studio API base, defaulting to `https://dashscope.aliyuncs.com/api/v1` |
+| `QWEN_TTS_MODEL` | Qwen-TTS model, defaulting to `qwen3-tts-instruct-flash` |
+| `QWEN_TTS_VOICE` | Qwen voice, defaulting to `Cherry` |
+| `QWEN_TTS_INSTRUCTIONS` | Qwen narration style instruction |
+| `MINIMAX_KEY` | Optional MiniMax fallback API key |
+| `MINIMAX_VOICE` | MiniMax fallback voice, defaulting to `Chinese (Mandarin)_Warm_Girl` |
+| `EDGE_TTS_VOICE` | Final edge-tts fallback voice, defaulting to `zh-CN-XiaoxiaoNeural` |
 | `NAS_LIST_URL` | Playlist URL, typically `http://127.0.0.1:8001/songs.txt` |
 | `NAS_BASE_URL` | Online library proxy URL accessible from the browser |
 | `RADIO_BASE` | Main app URL accessible from the browser |
 | `DATA_DIR` | Narration and runtime data directory |
 
 The `NAS_*` names are retained for compatibility and point to the online library proxy. A remote browser cannot reach the server through the server's own `127.0.0.1`; use reachable server URLs for playback.
+
+Cloud narration follows `Qwen -> MiniMax -> edge-tts`, and configuring any one provider is sufficient. For a dedicated Model Studio workspace, set `DASHSCOPE_BASE` to the DashScope URL ending in `/api/v1` shown in its console.
 
 Normalization uses two-pass ffmpeg `loudnorm`, targeting -14 LUFS with a -1.5 dBTP true-peak limit and `dual_mono` enabled. Missing ffmpeg, timeouts, or processing failures retain the original audio without blocking narration playback. This applies only to newly generated narration, without reprocessing existing narration or third-party songs. The 0.85 song volume factor leaves the displayed master volume unchanged and does not guarantee identical perceived loudness across all sources.
 
@@ -210,7 +220,7 @@ The script rewrites the resolved playlist, searches multiple sources, filters ve
 - "Use my preferences" is off by default. When enabled, favorite, history, and "Recommend less" titles accompany each show request to the Tingjian server, where they are used only for that request without adding a server-side preference profile. DeepSeek receives selected tracks and show context, not these complete preference lists. Turning the option off stops sending these local preferences. Recent tracks in the current session still help avoid repeats, and extending an artist sends the explicitly selected seed title.
 - Existing global artist preferences are configured by the deployment owner, not maintained as individual listener profiles. Recommendation reasons distinguish this source from browser favorites.
 - Replaying a saved title requests a fresh match and playback URL. Favorites do not retain exact track IDs or permanent audio links, so a different version may be selected.
-- DeepSeek, MiniMax, and other services may incur charges. Pricing and quotas are set by each provider.
+- DeepSeek, Alibaba Cloud Model Studio, MiniMax, and other services may incur charges. Pricing and quotas are set by each provider.
 - AI narration is not guaranteed to be factual. Track availability, version matching, and response times depend on third-party services.
 - Lyrics and translations come from the existing GD music API and may be unavailable or differ from the audio version. Only timestamped lyrics are synchronized; plain text is not assigned estimated timings. Rate limits and temporary failures are not cached as empty results; only an empty 200 response can trigger cross-channel lookup under strict recording identity matching. The proxy holds at most 128 entries in memory: successful lyrics for six hours and an empty result for 60 seconds only after exhaustive cross-channel lookup. It does not save lyric files or distribute a lyric library in the repository. Lyrics belong to their respective rights holders.
 - The project is for personal learning and experimentation. Song rights belong to their respective owners; follow platform rules.
@@ -233,7 +243,7 @@ The script rewrites the resolved playlist, searches multiple sources, filters ve
 - [lrc-kit 1.2.1](https://www.npmjs.com/package/lrc-kit/v/1.2.1), Copyright (c) 2016 Weirong Xu, MIT; used for LRC parsing with the [full license](backend/static/vendor/lrc-kit/LICENSE) and [source modification record](THIRD_PARTY_NOTICES.md#lrc-kit) retained.
 - [Three.js 0.170.0](https://github.com/mrdoob/three.js/tree/r170), Copyright © 2010-2024 three.js authors, MIT; a local module renders the 3D disc and waves, with the [full license](backend/static/vendor/three/LICENSE) retained.
 - [Lucide](https://lucide.dev) provides UI icons under ISC; [Unsplash](https://unsplash.com) provides theme photography. See [individual asset sources](backend/static/assets/SOURCES.md).
-- DeepSeek, MiniMax, edge-tts, and other dependencies; their rights and terms remain with their respective owners.
+- DeepSeek, [Alibaba Cloud Model Studio](https://help.aliyun.com/zh/model-studio/qwen-tts), MiniMax, edge-tts, and other dependencies; their rights and terms remain with their respective owners.
 
 ## GitHub activity
 

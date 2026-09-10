@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-09-10 · Qwen-TTS 主渠道
+
+- 主持人口播改为优先调用阿里云百炼 `qwen3-tts-instruct-flash`，默认使用 `Cherry`（芊悦）音色与温暖自然的电台口播指令；原 MiniMax 和 edge-tts 保留为逐级降级渠道。配置 `DASHSCOPE_API_KEY` 后启用 Qwen，专属业务空间可通过 `DASHSCOPE_BASE` 指向控制台提供的 `/api/v1` 地址。
+- 故障播报、固定串场和限流陪伴内容使用同一声音版本摘要；Qwen 模型、音色、指令、MiniMax 参数或 edge-tts 音色变化后会生成新文件，不再播放旧渠道的固定缓存。影响范围为口播生成、启动预热和 `/voice/` 缓存文件；回退时恢复原环境配置与代码并重启，歌曲、歌单、收藏和用户记录无需迁移。
+
+## 2026-09-10 · Command Code DeepSeek 网关
+
+- DeepSeek 调用默认从官方 `https://api.deepseek.com` 切换到 OpenAI 兼容的 Command Code `https://api.commandcode.ai/provider/v1`，模型改为 `deepseek/deepseek-v4.1-flash`；请求和 JSON 响应格式不变。
+- 影响范围为节目、点歌和聊天中的 AI 口播编排。服务器需同步更新 `DEEPSEEK_KEY`、`DEEPSEEK_BASE` 和 `DEEPSEEK_MODEL` 后重启 `tingjian`；回退时恢复原环境配置并重启，不迁移歌单、收藏或运行数据。密钥只保存在服务器环境配置中，不进入 Git。
+
 ## 2026-09-10 · DeepSeek V4.1 Flash
 
 - 默认 DeepSeek 模型由 `deepseek-chat` 更新为官方 API 模型 ID `deepseek-flash`，对应 `DeepSeek-V4.1-Flash`；API key、接口地址和调用格式不变。

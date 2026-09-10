@@ -65,8 +65,8 @@
 
 ## 声音与响度
 
-- MiniMax 默认音色为 `Chinese (Mandarin)_Warm_Girl`，服务端 `MINIMAX_VOICE` 显式配置优先。换音色只影响新生成的口播，不重写已有音频。
-- MiniMax 与 edge-tts 新口播使用 ffmpeg 两遍 `loudnorm`，目标 -14 LUFS、真峰值上限 -1.5 dBTP、LRA 7，按 `dual_mono` 测量单声道的双扬声器播放响度；每遍超时 20 秒。缺少 ffmpeg、分析值无效、超时或处理失败均保留原音，不能以响度处理失败中断已生成口播。
+- 主持人口播优先使用阿里云百炼 `qwen3-tts-instruct-flash` 的 `Cherry` 音色，按 `Qwen -> MiniMax -> edge-tts` 降级；`QWEN_TTS_VOICE`、`MINIMAX_VOICE` 和 `EDGE_TTS_VOICE` 可显式覆盖。声音相关配置变化只影响新生成的口播，不重写已有音频；固定播报和串场文件也按声音版本命名，避免升级后混用旧音色。
+- Qwen、MiniMax 与 edge-tts 新口播使用 ffmpeg 两遍 `loudnorm`，目标 -14 LUFS、真峰值上限 -1.5 dBTP、LRA 7，按 `dual_mono` 测量单声道的双扬声器播放响度；每遍超时 20 秒。缺少 ffmpeg、分析值无效、超时或处理失败均保留原音，不能以响度处理失败中断已生成口播。
 - 原生播放器主音量统一由滑杆控制，歌曲应用 0.85 系数、口播应用 1.0 系数；切段时更新系数，静音状态保持一致。第三方歌曲不下载、不重新编码，不声称固定系数可以统一所有曲目的实际响度。
 
 ## 资料入口
