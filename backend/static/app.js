@@ -1,20 +1,13 @@
 import { createLyricsExperience } from './lyrics.js?v=20260909-3';
 import { createRecommendationExperience } from './recommendations.js?v=20260909-3';
 import { createQuietLayout } from './layout.js?v=20260910-2';
-import { scheduledTheme } from './theme-schedule.js?v=20260910-1';
+const { themes, scheduledTheme } = globalThis.TingjianThemeSchedule;
 
 const $ = id => document.getElementById(id);
 const audio = $('audio');
 const demo = new URLSearchParams(location.search).get('demo') === '1';
-const themes = [
-  { name: '午后咖啡', slogan: '忙里偷闲的一杯歌', detail: '轻松 · 慢一点', image: 'coffee' },
-  { name: '城市漫游', slogan: '陪你在路上', detail: '流行 · 在路上', image: 'city' },
-  { name: '深夜安眠', slogan: '让世界慢下来', detail: '安静 · 好好休息', image: 'night' },
-  { name: '怀旧金曲', slogan: '把旧时光唱给你听', detail: '经典 · 旧时光', image: 'stage' },
-  { name: '元气早班', slogan: '把好心情叫醒', detail: '轻快 · 新的一天', image: 'forest' },
-  { name: '心情小站', slogan: '此刻的你最想听什么', detail: '随心 · 放空一下', image: 'lake' }
-];
-let selected = scheduledTheme(themes), activeTheme = selected;
+let selected = themes.find(theme => theme.name === document.documentElement.dataset.scheduledTheme) || scheduledTheme(themes);
+let activeTheme = selected;
 let followSystemTime = true;
 let queue = [], index = -1, interrupt = null, recent = [];
 let playing = false, mode = 'none', textPosition = 0, textDuration = 0;

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" class="theme-booting">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -11,6 +11,7 @@
   <meta property="og:image" content="https://raw.githubusercontent.com/HachikoJ/easy-radio-host/main/docs/radio-desktop.png">
   <meta name="twitter:card" content="summary_large_image">
   <title>听间 Tingjian · 你的 AI 音乐电台</title>
+  <style>html.theme-booting #cover,html.theme-booting #mini-cover,html.theme-booting #show-theme,html.theme-booting #show-slogan,html.theme-booting #now-title{visibility:hidden}</style>
   <link rel="icon" href="assets/brand.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css?v=20260909-3">
   <link rel="stylesheet" href="listening.css?v=20260909-3">
@@ -18,7 +19,7 @@
   <link rel="stylesheet" href="recommendations.css?v=20260909-3">
   <link rel="stylesheet" href="quiet.css?v=20260910-2">
   <script src="listening.js?v=20260909-3" defer></script>
-  <script src="app.js?v=20260910-2" type="module"></script>
+  <script src="app.js?v=20260910-3" type="module"></script>
 </head>
 <body id="top">
   <a class="skip-link" href="#listening">跳到播放器</a>
@@ -96,5 +97,6 @@
     <div class="volume"><button class="icon-button" id="mute" aria-label="静音" data-tip="静音"><span class="icon" id="volume-icon" style="--icon:url(assets/Volume2.svg)"></span></button><input id="volume" type="range" min="0" max="100" value="75" aria-label="音量"><span id="volume-value">75%</span></div>
   </footer>
   <audio id="audio" preload="metadata"></audio>
+  <script src="theme-schedule.js?v=20260910-3"></script>
 </body>
 </html>

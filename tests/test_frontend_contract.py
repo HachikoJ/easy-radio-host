@@ -98,6 +98,25 @@ class FrontendContract(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(link["target"], "_blank")
             self.assertTrue({"noopener", "noreferrer"} <= set(link["rel"].split()))
 
+    async def test_scheduled_theme_is_ready_before_the_module_app_runs(self):
+        class Scripts(HTMLParser):
+            def handle_starttag(self, tag, attrs):
+                values = dict(attrs)
+                if tag == "script" and values.get("src", "").startswith("theme-schedule.js"):
+                    scripts.append(values)
+
+        scripts = []
+        status, content = await request("/")
+        self.assertEqual(status, 200)
+        html = content.decode("utf-8")
+        Scripts().feed(html)
+        self.assertEqual(len(scripts), 1)
+        self.assertNotIn("type", scripts[0])
+        self.assertIn('class="theme-booting"', html)
+        self.assertIn("html.theme-booting #cover", html)
+        self.assertIn('src="app.js?v=20260910-3" type="module"', html)
+        self.assertLess(html.index('id="mini-cover"'), html.index('src="theme-schedule.js?v=20260910-3"'))
+
     async def test_show_keeps_theme_and_song_text_contract_when_tts_unavailable(self):
         library = [{"title": "Contract Song", "rel": "s/netease/123.mp3"}]
         with patch.object(radio, "fetch_library", return_value=library), \
