@@ -140,6 +140,8 @@ python3 -m venv .venv-tts
 
 Set `LOCAL_TTS_URL=http://127.0.0.1:8101` in the runtime configuration and restart the main app; narration order becomes `local MeloTTS -> Qwen -> MiniMax -> edge-tts`. The model files are about 163 MB and stay around 490 MiB resident memory in the systemd cgroup, peaking near 500 MiB, with no GPU required. On two vCPUs, measured synthesis speed is roughly twice real time and mixed Chinese-English text works; English words use the model's mixed phonemes rather than native English pronunciation, so this is a low-cost first choice rather than a high-fidelity replacement. `scripts/install-local-tts.sh` downloads `csukuangfj/vits-melo-tts-zh_en` from `hf-mirror.com` and verifies SHA256 checksums, skipping files that already match. See the [deployment guide](DEPLOY-HANDOFF.md) for the systemd setup.
 
+`vits-melo-tts-zh_en` is a single-style VITS: sherpa-onnx exposes only a speed parameter, with no emotion label, style vector or reference audio, so the model itself cannot act out a script. The local service therefore renders prosody around it. Narration is split into 6-28 character clauses, each clause is synthesized with its own speaking rate and gain trim, punctuation-driven pauses are written between clauses, and the main app still applies one loudness normalization pass to the joined audio. `POST /synthesize` defaults to `style=expressive`; pass `style=plain` for the original one-shot read when comparing. This shapes rhythm, pauses and emphasis only: the timbre is unchanged and there is no natural-language emotion control like Qwen-TTS offers.
+
 ### Try the interface without API keys
 
 With Node.js 22+ already installed, start the local demo without third-party services:
@@ -165,7 +167,7 @@ The demo uses original synthesized instrumental music and clearly labeled origin
 | `QWEN_TTS_VOICE` | Qwen voice, defaulting to `Cherry` |
 | `QWEN_TTS_INSTRUCTIONS` | Qwen narration style instruction |
 | `LOCAL_TTS_URL` | Local TTS service URL; empty by default (disabled), set to `http://127.0.0.1:8101` to enable |
-| `LOCAL_TTS_CACHE_ID` | Local model identifier that feeds the cached narration version, defaulting to `sherpa-melo-zh-en-v1` |
+| `LOCAL_TTS_CACHE_ID` | Local model identifier that feeds the cached narration version, defaulting to `sherpa-melo-zh-en-expressive-v1` |
 | `LOCAL_TTS_TIMEOUT` | Per-request local synthesis timeout in seconds, defaulting to 60 |
 | `LOCAL_TTS_SPEED` | Local speech rate between 0.5 and 1.5, defaulting to 1.0 |
 | `MINIMAX_KEY` | Optional MiniMax fallback API key |

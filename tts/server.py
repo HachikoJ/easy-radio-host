@@ -12,7 +12,9 @@ from tts.engine import (
     NUM_THREADS,
     encode_wav,
     load_engine,
+    wav_bytes,
 )
+from tts import prosody
 
 _synth_lock = asyncio.Lock()
 
@@ -20,6 +22,7 @@ _synth_lock = asyncio.Lock()
 class SynthesisRequest(BaseModel):
     text: str = Field(..., min_length=1, max_length=MAX_TEXT_CHARS)
     speed: float = Field(default=DEFAULT_SPEED, ge=0.5, le=1.5)
+    style: str = Field(default="expressive", pattern="^(expressive|plain)$")
 
 
 @asynccontextmanager
@@ -43,6 +46,7 @@ def health():
         "sample_rate": engine.sample_rate,
         "num_threads": NUM_THREADS,
         "max_text_chars": MAX_TEXT_CHARS,
+        "style": "expressive",
     }
 
 
@@ -53,13 +57,28 @@ async def synthesize(req: SynthesisRequest):
         raise HTTPException(503, "model is not ready")
     try:
         async with _synth_lock:
-            audio = await asyncio.to_thread(engine.generate, req.text, 0, req.speed)
+            payload = None
+            if req.style == "expressive":
+                payload = await asyncio.to_thread(_render_expressive, engine, req)
+            if not payload:
+                audio = await asyncio.to_thread(engine.generate, req.text, 0, req.speed)
+                payload = encode_wav(audio) if len(audio.samples) else None
     except Exception as exc:
         raise HTTPException(500, f"synthesis failed: {type(exc).__name__}") from exc
-    if not len(audio.samples):
+    if not payload:
         raise HTTPException(500, "synthesis returned empty audio")
     return Response(
-        content=encode_wav(audio),
+        content=payload,
         media_type="audio/wav",
-        headers={"X-TTS-Sample-Rate": str(audio.sample_rate)},
+        headers={"X-TTS-Sample-Rate": str(engine.sample_rate)},
     )
+
+
+def _render_expressive(engine, req):
+    """Render one expressive WAV, or return None so the caller reads it plain."""
+    try:
+        pcm, sample_rate = prosody.render(engine, req.text, req.speed)
+        return wav_bytes(pcm, sample_rate) if pcm else None
+    except Exception as exc:
+        print("prosody failed, falling back to plain read:", type(exc).__name__, exc)
+        return None

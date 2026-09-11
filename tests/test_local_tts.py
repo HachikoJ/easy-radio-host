@@ -9,7 +9,7 @@ import wave
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
-from tts import engine
+from tts import engine, prosody
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -113,6 +113,94 @@ class LocalTtsServer(unittest.TestCase):
         self.assertIn("/health", paths)
         self.assertIn("/synthesize", paths)
         self.assertIsNone(getattr(server.app.state, "engine", None))
+
+    def test_synthesize_request_defaults_to_expressive_and_rejects_unknown_style(self):
+        if importlib.util.find_spec("fastapi") is None:
+            self.skipTest("fastapi is only installed in the service virtualenv")
+        from tts import server
+
+        self.assertEqual(server.SynthesisRequest(text="你好").style, "expressive")
+        self.assertEqual(server.SynthesisRequest(text="你好", style="plain").style, "plain")
+        with self.assertRaises(Exception):
+            server.SynthesisRequest(text="你好", style="cheerful")
+
+
+class _FakeEngine:
+    """Records per-clause synthesis calls and returns a fixed-length tone."""
+    sample_rate = 8000
+
+    def __init__(self):
+        self.calls = []
+
+    def generate(self, text, speaker, speed):
+        self.calls.append((text, speaker, speed))
+        count = max(1, int(self.sample_rate * len(text) * 0.1 / speed))
+        return types.SimpleNamespace(samples=[0.5] * count, sample_rate=self.sample_rate)
+
+
+class ProsodyPlan(unittest.TestCase):
+    def test_clauses_split_on_punctuation_and_keep_their_ending(self):
+        self.assertEqual(
+            prosody.split_clauses("晚上好，欢迎收听今天的节目。今晚风很轻，适合慢慢散步！"),
+            ["晚上好，欢迎收听今天的节目。", "今晚风很轻，", "适合慢慢散步！"],
+        )
+
+    def test_very_short_sentence_joins_the_next_clause(self):
+        self.assertEqual(prosody.split_clauses("好。下一首。"), ["好。下一首。"])
+
+    def test_punctuation_free_text_is_cut_within_the_limit(self):
+        clauses = prosody.split_clauses("这是一段没有任何标点的很长的口播文案" * 3)
+        self.assertGreater(len(clauses), 1)
+        self.assertTrue(all(len(clause) <= prosody.MAX_CLAUSE_CHARS for clause in clauses))
+
+    def test_plan_pauses_between_clauses_and_softens_the_close(self):
+        clauses = prosody.plan("晚上好，欢迎收听今天的节目。今晚风很轻。", base_speed=1.0)
+        self.assertEqual([clause.pause_ms for clause in clauses], [170, 0])
+        self.assertLess(clauses[-1].speed, 1.0)
+        self.assertLess(clauses[-1].gain, 1.0)
+
+    def test_plan_lifts_exclamation_and_eases_ellipsis(self):
+        excited = prosody.plan("今晚风很轻！", base_speed=1.0)[0]
+        quiet = prosody.plan("其实也没什么…", base_speed=1.0)[0]
+        self.assertGreater(excited.speed, 1.0)
+        self.assertGreater(excited.gain, 1.0)
+        self.assertLess(quiet.speed, 1.0)
+        self.assertLess(quiet.gain, 1.0)
+
+    def test_plan_keeps_speed_inside_the_service_limits(self):
+        for clause in prosody.plan("你好。" * 4, base_speed=1.5):
+            self.assertGreaterEqual(clause.speed, 0.5)
+            self.assertLessEqual(clause.speed, 1.5)
+
+
+class ProsodyRender(unittest.TestCase):
+    def test_render_synthesizes_each_clause_and_inserts_pauses(self):
+        fake = _FakeEngine()
+        pcm, rate = prosody.render(
+            fake, "晚上好，欢迎收听今天的节目。今晚风很轻。", base_speed=1.0)
+        self.assertEqual(rate, 8000)
+        self.assertEqual(
+            [call[0] for call in fake.calls],
+            ["晚上好，欢迎收听今天的节目。", "今晚风很轻。"],
+        )
+        self.assertEqual([call[1] for call in fake.calls], [0, 0])
+        # 两段音频加 170ms 静音; 淡入淡出只改幅度, 不改变长度。
+        voiced_samples = sum(int(8000 * len(text) * 0.1 / speed)
+                             for text, _, speed in fake.calls)
+        self.assertEqual(len(pcm) // 2, voiced_samples + int(8000 * 0.17))
+
+    def test_render_fades_clause_edges_so_joins_do_not_click(self):
+        pcm, _ = prosody.render(
+            _FakeEngine(), "晚上好，欢迎收听今天的节目。今晚风很轻。", base_speed=1.0)
+        samples = list(int.from_bytes(pcm[i:i + 2], "little", signed=True)
+                       for i in range(0, len(pcm), 2))
+        self.assertEqual(samples[0], 0)
+        self.assertLess(abs(samples[int(8000 * 0.008) - 1]), abs(samples[len(samples) // 4]))
+        self.assertEqual(samples[-1], 0)
+
+    def test_render_rejects_empty_text(self):
+        with self.assertRaises(ValueError):
+            prosody.render(_FakeEngine(), "   ", base_speed=1.0)
 
 
 class LocalSynthClient(unittest.IsolatedAsyncioTestCase):

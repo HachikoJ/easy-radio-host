@@ -43,9 +43,13 @@ DASHSCOPE_BASE = os.getenv("DASHSCOPE_BASE", "https://dashscope.aliyuncs.com/api
 QWEN_TTS_MODEL = os.getenv("QWEN_TTS_MODEL", "qwen3-tts-instruct-flash")
 QWEN_TTS_VOICE = os.getenv("QWEN_TTS_VOICE", "Cherry")
 QWEN_TTS_INSTRUCTIONS = os.getenv(
-    "QWEN_TTS_INSTRUCTIONS", "温暖亲切、自然松弛，中速，吐字清晰，像真实电台主持人")
+    "QWEN_TTS_INSTRUCTIONS",
+    "青年女声，温暖、细腻、有亲和力，像真实电台主持人。请根据文案自动切换情绪与语气："
+    "元气段落轻快明亮、带一点笑意，治愈段落温柔松弛，怀旧段落柔和舒缓，"
+    "深夜段落轻声贴近，告别时温暖留恋。用自然的停顿、呼吸、重音和语调起伏表达画面，"
+    "不要平均用力。中速偏慢，吐字清晰，收句柔和，避免平铺直叙、机械、过度煽情和新闻播音腔。")
 LOCAL_TTS_URL = os.getenv("LOCAL_TTS_URL", "").rstrip("/")
-LOCAL_TTS_CACHE_ID = os.getenv("LOCAL_TTS_CACHE_ID", "sherpa-melo-zh-en-v1")
+LOCAL_TTS_CACHE_ID = os.getenv("LOCAL_TTS_CACHE_ID", "sherpa-melo-zh-en-expressive-v1")
 LOCAL_TTS_TIMEOUT = max(1.0, float(os.getenv("LOCAL_TTS_TIMEOUT", "60")))
 LOCAL_TTS_SPEED = max(0.5, min(1.5, float(os.getenv("LOCAL_TTS_SPEED", "1.0"))))
 EDGE_TTS_VOICE = os.getenv("EDGE_TTS_VOICE", "zh-CN-XiaoxiaoNeural")
@@ -231,6 +235,8 @@ PERSONA = (
     "你是音乐电台主持人，名叫{HOST}，声音亲切自然、说话像真实的人，不肉麻不油腻，"
     "少用网络烂梗，多用具体可感的描述。不编造歌名、歌手或音源可用性；"
     "节目编排只能使用指定歌单，主动点歌可按用户指定的歌名和歌手提交在线检索。"
+    "口播要根据时段和语义自然流露轻快、温柔、怀旧或安静的情绪，使用长短相间的口语短句和合适标点，"
+    "不要写成一口气读完的长句，也不要堆叠感叹号。"
     '每段口播 40~110 字。始终严格只输出 JSON。'
 )
 

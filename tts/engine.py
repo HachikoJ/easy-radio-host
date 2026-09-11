@@ -44,16 +44,25 @@ def load_engine():
     return sherpa_onnx.OfflineTts(config)
 
 
-def encode_wav(audio):
-    """Convert sherpa-onnx floating-point samples to a PCM16 WAV file."""
-    pcm = array.array(
+def pcm16_from_samples(samples):
+    """Convert sherpa-onnx floating-point samples to clipped PCM16 values."""
+    return array.array(
         "h",
-        (max(-32768, min(32767, int(sample * 32767))) for sample in audio.samples),
+        (max(-32768, min(32767, int(sample * 32767))) for sample in samples),
     )
+
+
+def wav_bytes(pcm, sample_rate):
+    """Wrap raw mono PCM16 bytes in a WAV container."""
     output = io.BytesIO()
     with wave.open(output, "wb") as wav:
         wav.setnchannels(1)
         wav.setsampwidth(2)
-        wav.setframerate(audio.sample_rate)
-        wav.writeframes(pcm.tobytes())
+        wav.setframerate(sample_rate)
+        wav.writeframes(pcm)
     return output.getvalue()
+
+
+def encode_wav(audio):
+    """Convert sherpa-onnx floating-point samples to a PCM16 WAV file."""
+    return wav_bytes(pcm16_from_samples(audio.samples).tobytes(), audio.sample_rate)

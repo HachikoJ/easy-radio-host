@@ -140,6 +140,8 @@ python3 -m venv .venv-tts
 
 在运行配置中设置 `LOCAL_TTS_URL=http://127.0.0.1:8101` 后重启主应用，口播顺序变为 `本地 MeloTTS -> Qwen -> MiniMax -> edge-tts`。模型文件约 163 MB，加载后 systemd cgroup 常驻约 490 MiB、峰值约 500 MiB，不需要 GPU；2 vCPU 上实测合成速度约为实时的两倍，中英混读可用，英文单词按中英混合音素读出、不等同英语母语发音，因此只作为低成本首选而不是高质量替代。`scripts/install-local-tts.sh` 从 `hf-mirror.com` 下载 `csukuangfj/vits-melo-tts-zh_en` 并用 SHA256 校验，已有同哈希文件会跳过下载。systemd 部署见[部署手册](DEPLOY-HANDOFF.md)。
 
+`vits-melo-tts-zh_en` 是单风格 VITS，sherpa-onnx 只暴露语速参数，没有情感标签、风格向量或参考音频接口，模型自己无法按文案切换情绪。本地服务因此增加了韵律渲染：口播先按标点切成 6–28 字的分句，逐句用不同语速与增益合成，再按标点写入差异化停顿后拼接，最后仍由主应用统一做响度归一化。`POST /synthesize` 默认 `style=expressive`，传 `style=plain` 可退回整段一次合成，便于 A/B 对比。该处理改善的是节奏、停顿和重音，不改变音色，也不具备 Qwen-TTS 那样的自然语言情感指令能力。
+
 ### 无密钥体验界面
 
 已安装 Node.js 22+ 时，可直接启动不依赖第三方服务的本地演示：
@@ -165,7 +167,7 @@ node scripts/serve-demo.mjs
 | `QWEN_TTS_VOICE` | Qwen 音色，默认 `Cherry` |
 | `QWEN_TTS_INSTRUCTIONS` | Qwen 口播风格指令 |
 | `LOCAL_TTS_URL` | 本地 TTS 服务地址，默认空值即关闭；设为 `http://127.0.0.1:8101` 时启用 |
-| `LOCAL_TTS_CACHE_ID` | 本地模型标识，参与固定播报的缓存版本，默认 `sherpa-melo-zh-en-v1` |
+| `LOCAL_TTS_CACHE_ID` | 本地模型标识，参与固定播报的缓存版本，默认 `sherpa-melo-zh-en-expressive-v1` |
 | `LOCAL_TTS_TIMEOUT` | 单次本地合成超时秒数，默认 60 |
 | `LOCAL_TTS_SPEED` | 本地语速，取值 0.5–1.5，默认 1.0 |
 | `MINIMAX_KEY` | 可选备用 MiniMax API Key |

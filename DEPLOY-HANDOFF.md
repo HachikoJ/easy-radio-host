@@ -93,7 +93,7 @@ QWEN_TTS_MODEL=qwen3-tts-instruct-flash
 QWEN_TTS_VOICE=Cherry
 QWEN_TTS_INSTRUCTIONS=温暖亲切、自然松弛，中速，吐字清晰，像真实电台主持人
 LOCAL_TTS_URL=http://127.0.0.1:8101
-LOCAL_TTS_CACHE_ID=sherpa-melo-zh-en-v1
+LOCAL_TTS_CACHE_ID=sherpa-melo-zh-en-expressive-v1
 LOCAL_TTS_TIMEOUT=60
 LOCAL_TTS_SPEED=1.0
 EDGE_TTS_VOICE=zh-CN-XiaoxiaoNeural
@@ -190,7 +190,9 @@ sudo ss -ltnp
 sudo systemctl status tingjian tingjian-musiclib tingjian-tts --no-pager
 ```
 
-检查 HTTP 跳转 HTTPS、证书域名及有效期、首页 200、曲库非空、限流陪伴清单正好包含 8 项，以及 8100/8001/8101 只监听 `127.0.0.1`。`/health` 返回 `sample_rate` 44100、`num_threads` 2 时表示本地模型已就绪。逐项读取清单中的 `url`，确认返回可播放 MP3；文件未生成时清单不会虚报该项，可结合主服务日志定位本地 TTS、Qwen、MiniMax 或 edge-tts 失败原因，修复后重启主服务补齐缺失文件。
+检查 HTTP 跳转 HTTPS、证书域名及有效期、首页 200、曲库非空、限流陪伴清单正好包含 8 项，以及 8100/8001/8101 只监听 `127.0.0.1`。`/health` 返回 `sample_rate` 44100、`num_threads` 2、`style` expressive 时表示本地模型已就绪并启用韵律渲染。逐项读取清单中的 `url`，确认返回可播放 MP3；文件未生成时清单不会虚报该项，可结合主服务日志定位本地 TTS、Qwen、MiniMax 或 edge-tts 失败原因，修复后重启主服务补齐缺失文件。
+
+本地服务的 `POST /synthesize` 接受 `text`、`speed` 和 `style`；`style` 默认 `expressive`（分句渲染韵律），传 `plain` 可对比整段一次合成。可直接用两种风格合成同一句文案做 A/B：`curl --fail --silent -X POST http://127.0.0.1:8101/synthesize -H 'Content-Type: application/json' -d '{"text":"晚上好，欢迎收听。","style":"plain"}' -o /tmp/plain.wav`。韵律渲染只改变节奏、停顿和重音，不改变音色；若需按文案切换情绪，本机 2 vCPU / 1.9 GiB 资源不足以运行带情感指令的大模型，应改用云端 Qwen-TTS。
 
 本地 TTS 启用后，用一次真实节目验证口播确实由本机生成：`sudo journalctl -u tingjian-tts -n 30 --no-pager` 应出现该次合成请求，主服务日志 `sudo journalctl -u tingjian -n 100 --no-pager` 不应出现 `Local TTS 失败`。若出现失败，先按第 8 节定位；本地服务不可用时主应用会自动降级到云端链，但发布验收要求本地链路本身通过。实测 cgroup 常驻约 489 MiB、峰值约 501 MiB，可结合 `systemctl show tingjian-tts -p MemoryPeak` 与 `free -m` 一起核对，1.9 GiB 机型上不应出现 OOM。
 
