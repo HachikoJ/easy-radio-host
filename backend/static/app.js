@@ -1,6 +1,6 @@
 import { createLyricsExperience } from './lyrics.js?v=20260909-3';
 import { createRecommendationExperience } from './recommendations.js?v=20260909-3';
-import { createQuietLayout } from './layout.js?v=20260910-2';
+import { createQuietLayout } from './layout.js?v=20260911-1';
 const { themes, scheduledTheme } = globalThis.TingjianThemeSchedule;
 
 const $ = id => document.getElementById(id);

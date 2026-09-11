@@ -92,7 +92,7 @@ class FrontendContract(unittest.IsolatedAsyncioTestCase):
         status, content = await request("/")
         self.assertEqual(status, 200)
         Links().feed(content.decode("utf-8"))
-        self.assertEqual(links["author-link"]["href"], "https://github.com/HachikoJ")
+        self.assertEqual(links["author-link"]["href"], "https://github.com/HachikoJ/easy-radio-host")
         self.assertEqual(links["credits-link"]["href"], "credits.html")
         for link in links.values():
             self.assertEqual(link["target"], "_blank")
@@ -112,9 +112,13 @@ class FrontendContract(unittest.IsolatedAsyncioTestCase):
         Scripts().feed(html)
         self.assertEqual(len(scripts), 1)
         self.assertNotIn("type", scripts[0])
-        self.assertIn('class="theme-booting"', html)
+        self.assertIn('class="theme-booting" data-appearance="dark"', html)
+        self.assertIn('<meta name="theme-color" content="#17191c">', html)
+        self.assertLess(html.index("tingjian.appearance.v1"), html.index('href="style.css'))
         self.assertIn("html.theme-booting #cover", html)
-        self.assertIn('src="app.js?v=20260910-3" type="module"', html)
+        self.assertIn('href="quiet.css?v=20260911-2"', html)
+        self.assertIn('src="listening.js?v=20260911-2" defer', html)
+        self.assertIn('src="app.js?v=20260911-1" type="module"', html)
         self.assertLess(html.index('id="mini-cover"'), html.index('src="theme-schedule.js?v=20260910-3"'))
 
     async def test_show_keeps_theme_and_song_text_contract_when_tts_unavailable(self):

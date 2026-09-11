@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="zh-CN" class="theme-booting">
+<html lang="zh-CN" class="theme-booting" data-appearance="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f6f7f9">
+  <meta name="theme-color" content="#17191c">
   <meta name="description" content="听间：小蓝主持的在线 AI 音乐电台，主题节目、点歌互动与连续播放。">
   <meta property="og:title" content="听间 Tingjian · AI 音乐电台">
   <meta property="og:description" content="选一个主题，把接下来的时间交给音乐。">
@@ -11,15 +11,16 @@
   <meta property="og:image" content="https://raw.githubusercontent.com/HachikoJ/easy-radio-host/main/docs/radio-desktop.png">
   <meta name="twitter:card" content="summary_large_image">
   <title>听间 Tingjian · 你的 AI 音乐电台</title>
+  <script>try{if(localStorage.getItem('tingjian.appearance.v1')==='light'){document.documentElement.dataset.appearance='light';document.querySelector('meta[name="theme-color"]').content='#f6f7f9'}}catch{}</script>
   <style>html.theme-booting #cover,html.theme-booting #mini-cover,html.theme-booting #show-theme,html.theme-booting #show-slogan,html.theme-booting #now-title{visibility:hidden}</style>
   <link rel="icon" href="assets/brand.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css?v=20260909-3">
   <link rel="stylesheet" href="listening.css?v=20260909-3">
   <link rel="stylesheet" href="lyrics.css?v=20260909-3">
   <link rel="stylesheet" href="recommendations.css?v=20260909-3">
-  <link rel="stylesheet" href="quiet.css?v=20260910-2">
-  <script src="listening.js?v=20260909-3" defer></script>
-  <script src="app.js?v=20260910-3" type="module"></script>
+  <link rel="stylesheet" href="quiet.css?v=20260911-2">
+  <script src="listening.js?v=20260911-2" defer></script>
+  <script src="app.js?v=20260911-1" type="module"></script>
 </head>
 <body id="top">
   <a class="skip-link" href="#listening">跳到播放器</a>
@@ -35,7 +36,7 @@
   </aside>
 
   <main>
-    <header class="page-header"><div class="page-greeting"><p class="eyebrow" id="today"></p><h1>留一点时间，给音乐。</h1></div><span class="demo-badge" id="demo-badge" hidden>演示节目</span><div class="view-actions"><button class="icon-button" id="lyrics-toggle" aria-label="查看歌词" aria-controls="lyrics-lines" data-tip="查看歌词"><span class="icon" style="--icon:url(assets/Captions.svg)"></span></button><button class="icon-button" id="appearance" aria-label="切换深色模式" aria-pressed="false" data-tip="切换深色模式"><span class="icon" id="appearance-icon" style="--icon:url(assets/Moon.svg)"></span></button><a class="icon-button" href="https://github.com/HachikoJ/easy-radio-host" target="_blank" rel="noopener noreferrer" aria-label="GitHub 项目" data-tip="GitHub 项目"><span class="icon" style="--icon:url(assets/ArrowUpRight.svg)"></span></a></div></header>
+    <header class="page-header"><div class="page-greeting"><p class="eyebrow" id="today"></p><h1>留一点时间，给音乐。</h1></div><span class="demo-badge" id="demo-badge" hidden>演示节目</span><div class="view-actions"><button class="icon-button" id="lyrics-toggle" aria-label="查看歌词" aria-controls="lyrics-lines" data-tip="查看歌词"><span class="icon" style="--icon:url(assets/Captions.svg)"></span></button><button class="icon-button" id="appearance" aria-label="切换浅色模式" aria-pressed="true" data-tip="切换浅色模式"><span class="icon" id="appearance-icon" style="--icon:url(assets/Sun.svg)"></span></button><a class="icon-button" href="https://github.com/HachikoJ/easy-radio-host" target="_blank" rel="noopener noreferrer" aria-label="GitHub 项目" data-tip="GitHub 项目"><span class="icon" style="--icon:url(assets/ArrowUpRight.svg)"></span></a></div></header>
     <div class="workspace">
       <div class="listen-column">
         <section class="listening" id="listening" aria-label="正在收听">
@@ -88,7 +89,7 @@
         </div>
       </aside>
     </div>
-    <footer class="page-footer"><span>TINGJIAN / 听间</span><a id="credits-link" href="credits.html" target="_blank" rel="noopener noreferrer">开源致谢</a><a id="author-link" href="https://github.com/HachikoJ" target="_blank" rel="noopener noreferrer">联系作者 · GitHub</a><a class="icon-button" href="#top" aria-label="返回顶部" data-tip="返回顶部"><span class="icon" style="--icon:url(assets/ChevronDown.svg);transform:rotate(180deg)"></span></a></footer>
+    <footer class="page-footer"><span>TINGJIAN / 听间</span><a id="credits-link" href="credits.html" target="_blank" rel="noopener noreferrer">开源致谢</a><a id="author-link" href="https://github.com/HachikoJ/easy-radio-host" target="_blank" rel="noopener noreferrer">GitHub 项目</a><a class="icon-button" href="#top" aria-label="返回顶部" data-tip="返回顶部"><span class="icon" style="--icon:url(assets/ChevronDown.svg);transform:rotate(180deg)"></span></a></footer>
   </main>
 
   <footer class="player-bar" aria-label="播放控制">

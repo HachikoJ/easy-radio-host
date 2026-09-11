@@ -6,7 +6,7 @@ export function createQuietLayout({ icon }) {
   const viewActions = document.querySelector('.view-actions');
   for (const [id, label, symbol] of [
     ['credits-link', '开源致谢', 'BookOpen'],
-    ['author-link', '联系作者 · GitHub', 'Github']
+    ['author-link', 'GitHub 项目', 'Github']
   ]) {
     const link = get(id);
     link.className = 'icon-button header-resource'; link.dataset.tip = label;

@@ -94,22 +94,16 @@ function createListeningExperience(actions) {
     get('appearance-icon').style.setProperty('--icon', `url(assets/${appearance === 'dark' ? 'Sun' : 'Moon'}.svg)`);
     document.querySelector('meta[name="theme-color"]').content = appearance === 'dark' ? '#17191c' : '#f6f7f9';
   }
-  const systemAppearance = matchMedia('(prefers-color-scheme: dark)');
   let storedAppearance = null;
   try {
     const saved = localStorage.getItem('tingjian.appearance.v1');
     if (saved === 'light' || saved === 'dark') storedAppearance = saved;
   } catch { /* Storage is optional. */ }
-  let appearance = storedAppearance || (systemAppearance.matches ? 'dark' : 'light');
+  let appearance = storedAppearance || 'dark';
   setAppearance(appearance);
-  systemAppearance.addEventListener('change', event => {
-    if (storedAppearance) return;
-    appearance = event.matches ? 'dark' : 'light';
-    setAppearance(appearance);
-  });
   get('appearance').addEventListener('click', () => {
     appearance = appearance === 'dark' ? 'light' : 'dark'; storedAppearance = appearance; setAppearance(appearance);
-    try { localStorage.setItem('tingjian.appearance.v1', appearance); } catch { actions.notify('当前浏览器无法记住配色，下次打开将跟随系统设置。'); }
+    try { localStorage.setItem('tingjian.appearance.v1', appearance); } catch { actions.notify('当前浏览器无法记住配色，下次打开将恢复默认深色模式。'); }
   });
   function seekBy(delta) { actions.seek((document.getElementById('audio').currentTime || 0) + delta); }
   document.addEventListener('keydown', event => {

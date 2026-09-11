@@ -2,7 +2,7 @@
 .quiet-ui .sidebar,.quiet-ui .page-greeting,.quiet-ui .focus-brand,.quiet-ui .brand small,.quiet-ui .host-byline,.quiet-ui .cover-caption,.quiet-ui .show-slogan{display:none}
 .quiet-ui main,.quiet-ui.focus-mode main{margin:0 auto;padding:0 36px;max-width:1440px}
 .quiet-ui .page-header,.quiet-ui.focus-mode .page-header{display:flex;align-items:center;gap:28px;height:80px;margin:0;border-bottom:1px solid var(--line);position:relative;z-index:25;flex-wrap:nowrap}
-.quiet-ui .brand{display:flex;margin:0;gap:9px;flex:none}.quiet-ui .brand img{width:30px;height:30px}.quiet-ui .brand strong{font-size:25px}
+.quiet-ui .brand{display:flex;margin:0;gap:10px;flex:none}.quiet-ui .brand img{width:38px;height:38px}.quiet-ui .brand strong{font-size:25px}
 .quiet-ui .page-header nav{display:flex;gap:8px;margin:auto}.quiet-ui .nav-link{min-height:44px;padding:8px 12px;font-size:13px;border:0;border-radius:4px;gap:6px;white-space:nowrap}.quiet-ui .nav-link .icon{width:17px;height:17px}
 .quiet-ui .nav-link.active{background:none;color:var(--ink);font-weight:600}.quiet-ui .nav-link:not(.active){color:var(--secondary)}
 .quiet-ui .view-actions{margin:0;gap:2px}.quiet-ui .view-actions>a,.quiet-ui #lyrics-toggle{display:none}.quiet-ui .demo-badge{margin:0;padding:3px 6px;font-size:10px;white-space:nowrap}
@@ -70,7 +70,7 @@
 @media(max-width:800px){
   .quiet-ui{--player:128px;--lyrics-height:max(260px,calc(100dvh - 470px))}.quiet-ui.focus-mode{--lyrics-height:max(280px,calc(100dvh - 410px))}
   .quiet-ui main,.quiet-ui.focus-mode main{padding:0 18px}.quiet-ui .page-header,.quiet-ui.focus-mode .page-header{height:100px;display:grid;grid-template-columns:1fr auto auto;grid-template-rows:54px 44px;gap:0 10px}
-  .quiet-ui .brand{grid-column:1;grid-row:1}.quiet-ui .brand strong{font-size:23px}.quiet-ui .brand img{width:28px;height:28px}.quiet-ui .page-header nav{grid-column:1/-1;grid-row:2;width:100%;justify-content:space-between;margin:0}
+  .quiet-ui .brand{grid-column:1;grid-row:1}.quiet-ui .brand strong{font-size:23px}.quiet-ui .brand img{width:34px;height:34px}.quiet-ui .page-header nav{grid-column:1/-1;grid-row:2;width:100%;justify-content:space-between;margin:0}
   .quiet-ui .page-header .demo-badge{grid-column:2;grid-row:1;justify-self:end}.quiet-ui .view-actions{grid-column:3;grid-row:1}.quiet-ui .nav-link{padding:8px 10px;font-size:12px}.quiet-ui .nav-link .icon{display:inline-block}
   .quiet-ui .listening{grid-template-columns:116px minmax(0,1fr);grid-template-rows:auto auto;gap:0 16px;min-height:0;padding-top:8px}
   .quiet-ui .cover-wrap{grid-column:1;grid-row:1;width:116px;align-self:center}.quiet-ui .show-summary{grid-column:2;grid-row:1;text-align:left;padding:0;align-self:center;position:relative;min-height:140px;display:flex;flex-direction:column;justify-content:center}
@@ -92,7 +92,7 @@
 .quiet-ui{--header:64px;padding-bottom:0}
 .quiet-ui main{width:100%}
 .quiet-ui .page-header,.quiet-ui.focus-mode .page-header{height:var(--header)}
-.quiet-ui .view-actions .header-resource{display:inline-flex}
+.quiet-ui .view-actions .header-resource{display:inline-grid;place-items:center}
 .quiet-ui .page-footer,.quiet-ui.focus-mode .page-footer{display:none}
 .quiet-ui:not(.focus-mode) main{height:calc(100dvh - var(--player) - env(safe-area-inset-bottom));display:grid;grid-template-rows:var(--header) minmax(0,1fr)}
 .quiet-ui:not(.focus-mode) .workspace,.quiet-ui:not(.focus-mode) .listen-column{height:100%;min-height:0}
@@ -105,7 +105,7 @@
 .quiet-ui .record-column .cover-wrap{width:min(100%,430px,var(--record-room,430px));max-width:none;flex:none;align-self:center}
 .quiet-ui .record-column .show-summary{width:min(100%,440px);padding:0;min-height:0;flex:none;align-self:center}
 .quiet-ui .record-column .show-status{margin:0;min-height:20px}
-.quiet-ui .record-column .selected-theme{margin:0;font-size:11px}
+.quiet-ui .record-column .selected-theme{display:none}
 .quiet-ui .record-column .now-heading{display:none}
 .quiet-ui .record-column .show-actions{display:flex;align-items:center;justify-content:center;gap:8px;position:static;width:100%;min-height:44px;margin:6px 0 0}
 .quiet-ui.has-programme:not(.preparing-programme) .record-column .show-actions{position:static}
@@ -136,7 +136,7 @@
   .quiet-ui .page-header .view-actions{gap:0}
   .quiet-ui .page-header .icon-button{width:44px;height:44px}
   .quiet-ui .page-header .brand strong{font-size:21px}
-  .quiet-ui .page-header .brand img{width:25px;height:25px}
+  .quiet-ui .page-header .brand img{width:32px;height:32px}
   .quiet-ui .page-header .demo-badge{position:absolute;grid-column:1/-1;grid-row:1;left:100px;right:auto;top:19px;font-size:9px;padding:2px 3px}
   .quiet-ui:not(.focus-mode) .listening{grid-template-columns:minmax(0,1fr);grid-template-rows:auto 96px minmax(0,1fr);gap:4px;padding:6px 0}
   .quiet-ui .track-heading{gap:8px;min-height:44px}
