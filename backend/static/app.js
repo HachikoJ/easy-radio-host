@@ -22,6 +22,7 @@ let quotaUntil = 0, continuationFailure = null, pausedWaiting = false;
 let generation = null, chatRequest = null, retryAction = null;
 let programmeVersion = 0;
 let muted = false, volume = .75;
+let relayUrl = '', playbackSession = false, autoplayBlocked = false;
 let listening, lyrics, recommendations;
 let lastRecentItem = null;
 
@@ -46,13 +47,39 @@ function notify(message, retry = null) {
   $('retry').hidden = !retry;
 }
 function clearNotice() { $('notice').hidden = true; retryAction = null; }
-function primePlayback() {
-  if (!audio.getAttribute('src')) audio.muted = true;
-  else if (!audio.paused) return;
+function relaySource() {
+  if (!relayUrl) {
+    // 0.25 秒全零采样 WAV：点击开始时让主音频元素真的播起来一次，
+    // 之后在同一个元素上换源续播，后台标签页也不需要新的用户手势。
+    const rate = 8000, frames = rate / 4, bytes = new Uint8Array(44 + frames);
+    const view = new DataView(bytes.buffer);
+    const tag = (offset, text) => [...text].forEach((character, index) => view.setUint8(offset + index, character.charCodeAt(0)));
+    tag(0, 'RIFF'); view.setUint32(4, 36 + frames, true); tag(8, 'WAVE'); tag(12, 'fmt ');
+    view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+    view.setUint32(24, rate, true); view.setUint32(28, rate, true); view.setUint16(32, 1, true); view.setUint16(34, 8, true);
+    tag(36, 'data'); view.setUint32(40, frames, true); bytes.fill(128, 44);
+    relayUrl = URL.createObjectURL(new Blob([bytes], { type: 'audio/wav' }));
+  }
+  return relayUrl;
+}
+function stopRelay() { audio.loop = false; }
+function releaseAudio() { stopRelay(); audio.pause(); audio.removeAttribute('src'); audio.load(); }
+function endPlaybackSession() { playbackSession = false; autoplayBlocked = false; stopRelay(); }
+function armRelay() {
+  if (!playbackSession) return;
+  const relay = relaySource();
+  audio.loop = true;
+  if (audio.getAttribute('src') !== relay) audio.src = relay;
+  if (!audio.paused) return;
   try {
     const pending = audio.play();
     pending?.catch(() => {});
-  } catch { /* Older browsers may reject an empty media element synchronously. */ }
+  } catch { /* Older browsers may reject the silent relay synchronously. */ }
+}
+function primePlayback() {
+  playbackSession = true;
+  if (mode === 'media' && audio.getAttribute('src')) return;
+  armRelay();
 }
 function normalizeItems(items) {
   if (!Array.isArray(items)) return [];
@@ -184,10 +211,11 @@ function renderPlayback() {
   renderQueue(); renderProgress();
 }
 function renderProgress() {
-  const total = mode === 'text' ? textDuration : Number.isFinite(audio.duration) ? audio.duration : 0;
-  const elapsed = current() ? position() : 0;
+  const active = mode === 'text' || mode === 'media';
+  const total = mode === 'text' ? textDuration : mode === 'media' && Number.isFinite(audio.duration) ? audio.duration : 0;
+  const elapsed = current() && active ? position() : 0;
   $('elapsed').textContent = formatTime(elapsed); $('duration').textContent = formatTime(current() ? total : 0);
-  $('seek').disabled = !current() || mode === 'text' || !total;
+  $('seek').disabled = !current() || mode !== 'media' || !total;
   $('seek').value = total ? Math.min(1000, elapsed / total * 1000) : 0;
   $('seek').setAttribute('aria-valuetext', `${formatTime(elapsed)} / ${formatTime(total)}`);
   listening?.updatePosition(total, elapsed);
@@ -402,7 +430,9 @@ function resetMedia(preserveRecovery = false) {
   mediaGeneration++;
   clearTimeout(mediaRetryTimer); mediaRetryTimer = null;
   clearInterval(timer); timer = null; mode = 'none'; playing = false;
-  audio.pause(); audio.removeAttribute('src'); audio.load();
+  autoplayBlocked = false;
+  if (playbackSession) armRelay();
+  else releaseAudio();
 }
 function startText(item, offset, autoplay) {
   mode = 'text'; textDuration = Math.min(18, Math.max(6, item.text.length / 8)); textPosition = Math.min(offset, textDuration); playing = autoplay;
@@ -410,6 +440,8 @@ function startText(item, offset, autoplay) {
   timer = setInterval(() => { const now = performance.now(); if (playing) textPosition += (now - lastTick) / 1000; lastTick = now; renderProgress(); if (playing && textPosition >= textDuration) advance(); }, 100);
 }
 function activate(offset = 0, autoplay = true, recovering = false, refresh = false) {
+  // 恢复到暂停状态时不需要静音接力，避免后台无声空转。
+  if (!autoplay) endPlaybackSession();
   resetMedia(recovering);
   pausedOffset = offset; pausedWaiting = false;
   lyrics?.resume();
@@ -426,7 +458,7 @@ function activate(offset = 0, autoplay = true, recovering = false, refresh = fal
     if (item.kind === 'song' && (audio.captureStream || audio.mozCaptureStream)) audio.crossOrigin = 'anonymous';
     else audio.removeAttribute('crossorigin');
     if (refresh) { url.searchParams.set('refresh', '1'); url.searchParams.set('_retry', String(Date.now())); }
-    mode = 'media'; nextSeek = offset; audio.src = url.href;
+    mode = 'media'; nextSeek = offset; stopRelay(); audio.src = url.href;
     updateVolume();
     if (autoplay) playMedia();
   }
@@ -438,7 +470,10 @@ function playMedia() {
   audio.play().then(() => { if (token === mediaGeneration && mode === 'media') { playing = !audio.paused; renderPlayback(); } }).catch(error => {
     if (token !== mediaGeneration || error.name === 'AbortError') return;
     playing = false;
-    if (error.name === 'NotAllowedError') notify('浏览器暂停了自动播放，点击播放继续。');
+    if (error.name === 'NotAllowedError') {
+      autoplayBlocked = true;
+      notify('浏览器拦截了自动播放，回到本页会自动重试。');
+    }
     else handleMediaError();
     renderPlayback();
   });
@@ -449,6 +484,7 @@ function pausePlayback() {
   programmeVersion++;
   generation?.abort(); generation = null;
   chatRequest?.abort(); chatRequest = null;
+  endPlaybackSession();
   resetMedia();
   lyrics?.suspend();
   updateChatComposer();
@@ -478,9 +514,11 @@ function advance(allowAuto = true, recovering = false) {
   }
   index++;
   if (index < queue.length) { activate(); return; }
+  const continues = recovering || ($('auto').checked && allowAuto);
+  if (!continues) endPlaybackSession();
   resetMedia(); renderPlayback();
   if (recovering) scheduleRecommendation();
-  else if ($('auto').checked && allowAuto) {
+  else if (continues) {
     if (quotaUntil > Date.now()) scheduleRecommendation(0);
     else generateShow();
   }
@@ -494,11 +532,17 @@ function previous() {
 function stop() {
   programmeVersion++;
   generation?.abort(); generation = null; chatRequest?.abort(); chatRequest = null;
-  interrupt = null; queue = []; index = -1; pausedWaiting = false; pausedOffset = 0; resetMedia(); renderPlayback();
+  interrupt = null; queue = []; index = -1; pausedWaiting = false; pausedOffset = 0;
+  endPlaybackSession(); resetMedia(); renderPlayback();
   lyrics?.suspend(); updateChatComposer();
 }
 function insert(items, after) {
-  if (!items.length) { after(); return; }
+  if (!items.length) {
+    after();
+    // 纯文字回复不会接上播放：结束静音接力，避免音频元素在后台无声空转。
+    if (playbackSession && mode === 'none' && !current() && !generation) { endPlaybackSession(); releaseAudio(); renderPlayback(); }
+    return;
+  }
   if (interrupt) { interrupt.items.push(...items); interrupt.after.push(after); renderPlayback(); return; }
   interrupt = { items, index: 0, originalIndex: index, position: position(), wasPlaying: playing, after: [after] };
   activate();
@@ -722,8 +766,9 @@ audio.addEventListener('error', handleMediaError);
 audio.addEventListener('pause', () => { if (mode === 'media' && audio.paused) { playing = false; renderPlayback(); } });
 audio.addEventListener('playing', () => {
   if (mode !== 'media' || audio.paused) return;
-  playing = true;
-  if (mediaRetryUsed && ['音源连接中断，正在重新获取可用地址…', '已找到其他渠道音源，正在连接…'].includes($('notice-text').textContent)) clearNotice();
+  playing = true; autoplayBlocked = false;
+  const notice = $('notice-text').textContent;
+  if (notice === '浏览器拦截了自动播放，回到本页会自动重试。' || mediaRetryUsed && ['音源连接中断，正在重新获取可用地址…', '已找到其他渠道音源，正在连接…'].includes(notice)) clearNotice();
   const item = current();
   if (item?.kind === 'song') { consecutiveUnavailable = 0; item.unavailable = false; }
   if (item?.kind === 'song' && item !== lastRecentItem) {
@@ -754,5 +799,8 @@ createQuietLayout({ icon });
 updateVolume(); selectTheme(selected);
 setInterval(syncThemeWithSystemTime, 60000);
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) syncThemeWithSystemTime();
+  if (document.hidden) return;
+  syncThemeWithSystemTime();
+  // 浏览器若在后台拒绝了真正的音源，回到本页时自动续播，不需要再次点击。
+  if (autoplayBlocked && mode === 'media' && current()) { autoplayBlocked = false; playMedia(); }
 });

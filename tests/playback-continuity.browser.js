@@ -4,10 +4,16 @@ async (page) => {
   page.on('pageerror', error => errors.push(error.message));
   await page.addInitScript(() => {
     window.playEvents = [];
+    window.mainAudioLoads = 0;
     window.holdAnnouncement = false;
     window.holdCooldown = false;
     window.abortedRequests = [];
     window.autoplayUnlocked = false;
+    window.__testHidden = false;
+    window.forceBackgroundReject = false;
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => window.__testHidden });
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => window.__testHidden ? 'hidden' : 'visible' });
+    window.setTestHidden = value => { window.__testHidden = value; document.dispatchEvent(new Event('visibilitychange')); };
     let transientPlaybackGesture = false;
     document.addEventListener('click', () => {
       transientPlaybackGesture = true;
@@ -23,12 +29,28 @@ async (page) => {
     Object.defineProperty(proto, 'currentTime', { get() { return this._time || 0; }, set(value) { this._time = value; } });
     Object.defineProperty(proto, 'duration', { get() { return 180; } });
     proto.pause = function () { this._paused = true; this.dispatchEvent(new Event('pause')); };
-    proto.load = function () { this._time = 0; };
+    // 媒体重新加载会结束浏览器的播放授权；仅切换地址不会。
+    proto.load = function () { this._time = 0; this._userUnlocked = false; if (this.id === 'audio') window.mainAudioLoads++; };
+    // 真实浏览器在设置新 src 后会回到 paused，等待下一次 play()。
+    const src = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'src');
+    Object.defineProperty(proto, 'src', {
+      get() { return src.get.call(this); },
+      set(value) { src.set.call(this, value); this._paused = true; }
+    });
     proto.play = function () {
       const url = this.src;
-      if (!window.autoplayUnlocked && !transientPlaybackGesture) return Promise.reject(new DOMException('User gesture required', 'NotAllowedError'));
-      if (!window.autoplayUnlocked && transientPlaybackGesture && !url) window.autoplayUnlocked = true;
-      window.playEvents.push({ url, time: Date.now() });
+      // 模拟：即使元素已解锁，浏览器在后台仍可能拒绝这一次播放；回到前台重试必须成功。
+      if (window.forceBackgroundReject && document.hidden && !url.startsWith('blob:')) {
+        window.forceBackgroundReject = false;
+        return Promise.reject(new DOMException('User gesture required', 'NotAllowedError'));
+      }
+      // 真实的浏览器策略：用户手势能激活一次播放；页面进入后台后，
+      // 已经由手势解锁且没有重新加载的媒体元素仍可继续播放。
+      if (!this._userUnlocked && !transientPlaybackGesture && (document.hidden || !window.autoplayUnlocked)) {
+        return Promise.reject(new DOMException('User gesture required', 'NotAllowedError'));
+      }
+      if (!this._userUnlocked) { this._userUnlocked = true; window.autoplayUnlocked = true; }
+      window.playEvents.push({ url, time: Date.now(), hidden: document.hidden });
       this._paused = false;
       if (url.includes('/bad.mp3')) {
         queueMicrotask(() => this.dispatchEvent(new Event('error')));
@@ -88,7 +110,7 @@ async (page) => {
   await page.locator('#generate').click();
   check(await page.waitForFunction(() => window.autoplayUnlocked), 'start click primes browser playback permission');
   await page.waitForFunction(() => window.playEvents.some(event => event.url.includes('/announcement/limited.mp3')));
-  check(!(await page.locator('audio').getAttribute('src')), 'failed audio unloads during announcement');
+  check((await page.locator('audio').getAttribute('src') || '').startsWith('blob:'), 'failed audio is replaced by the inaudible relay during announcement');
   check((await page.locator('#track-title').textContent()).includes('指定歌曲'), 'reason announcement precedes next track');
   await page.waitForFunction(() => document.querySelector('audio').src.includes('/good.mp3'));
   check(resolveCalls === 1, 'duplicate media errors merge into a single recovery');
@@ -201,7 +223,7 @@ async (page) => {
   await page.waitForFunction(() => document.querySelector('audio').src.includes('/good.mp3'));
   const beforeManualQuotaShow = showCalls;
   await page.locator('#generate').click();
-  check(!(await page.locator('audio').getAttribute('src')), 'known quota announcement does not overlap current song');
+  check((await page.locator('audio').getAttribute('src') || '').startsWith('blob:'), 'known quota announcement replaces current song with the inaudible relay');
   await page.waitForFunction(() => document.querySelector('audio').src.includes('/third.mp3'));
   check(showCalls === beforeManualQuotaShow, 'manual generation during known quota continues cached queue without calling show');
   await page.locator('#stop').click();
@@ -212,6 +234,38 @@ async (page) => {
   await page.waitForTimeout(900);
   check(availabilityCalls === beforeLongCooldownAvailability, '640-second cooldown never probes availability early');
   await page.locator('#stop').click();
+
+  // 用户点击开始后切到后台：节目加载完成必须自动续播，不能再要一次点击。
+  showDelay = 900; showFailure = null; resolveStatus = 'unavailable'; availabilityStatus = 'ready';
+  songIds = ['background'];
+  await reset();
+  await page.locator('#generate').click();
+  await page.evaluate(() => window.setTestHidden(true));
+  check(await page.waitForFunction(() => {
+    const audio = document.querySelector('audio');
+    return audio.src.startsWith('blob:') && !audio.paused;
+  }), 'silent relay keeps the playback session alive while the show is generated in the background');
+  await page.waitForFunction(() => document.querySelector('audio').src.includes('/background.mp3') && !document.querySelector('audio').paused, null, { timeout: 6000 });
+  const backgroundPlay = await page.evaluate(() => window.playEvents.find(event => event.url.includes('/background.mp3')));
+  check(backgroundPlay?.hidden === true, 'real audio starts while the tab stays in the background');
+  check(await page.evaluate(() => window.mainAudioLoads === 0), 'background handoff never unloads the unlocked audio element');
+  await page.evaluate(() => window.setTestHidden(false));
+
+  // 后台播放仍被拒绝时，回到本页要自动重试并清除提示，不能要求再点一次。
+  showDelay = 600; showFailure = null; resolveStatus = 'unavailable'; songIds = ['retry'];
+  await reset();
+  await page.locator('#generate').click();
+  await page.evaluate(() => { window.forceBackgroundReject = true; window.setTestHidden(true); });
+  await page.waitForFunction(() => document.querySelector('audio').src.includes('/retry.mp3'));
+  await page.waitForFunction(() => document.querySelector('#notice-text').textContent.includes('回到本页会自动重试'));
+  check(await page.evaluate(() => document.querySelector('audio').paused), 'background rejection leaves audio paused without another gesture');
+  await page.evaluate(() => window.setTestHidden(false));
+  await page.waitForFunction(() => {
+    const audio = document.querySelector('audio');
+    return audio.src.includes('/retry.mp3') && !audio.paused;
+  }, null, { timeout: 6000 });
+  check(await page.evaluate(() => document.querySelector('#notice').hidden), 'returning to the page clears the autoplay-blocked notice');
+
   check(errors.length === 0, `page errors: ${errors.join(', ')}`);
-  return { audibleReasons: ['limited', 'unavailable', 'temporary'], announcementBeforeNext: true, missingRequestNotice: true, pauseUnloadAndResumePosition: true, cancelledAnnouncement: true, quotaResume: true, noEarlyQuotaRequests: true, pauseCancelsWait: true, pagehideRelease: true, emptyQueueRequestRecovery: true, temporaryAvailabilityBackoff: true, abortPendingGenerationAndIntent: true, cooldownLocalPeriod: true, cooldownManifestFallback: true, showCalls, resolveCalls, availabilityCalls, cooldownManifestCalls, errors };
+  return { audibleReasons: ['limited', 'unavailable', 'temporary'], announcementBeforeNext: true, missingRequestNotice: true, pauseUnloadAndResumePosition: true, cancelledAnnouncement: true, quotaResume: true, noEarlyQuotaRequests: true, pauseCancelsWait: true, pagehideRelease: true, emptyQueueRequestRecovery: true, temporaryAvailabilityBackoff: true, abortPendingGenerationAndIntent: true, cooldownLocalPeriod: true, cooldownManifestFallback: true, backgroundAutoplay: true, backgroundVisibleRetry: true, showCalls, resolveCalls, availabilityCalls, cooldownManifestCalls, errors };
 }
