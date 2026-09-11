@@ -1,4 +1,4 @@
-import { parseLyrics, activeLine, lyricEndpoint, lyricRetryAfter } from './lyrics-data.js?v=20260911-6';
+import { parseLyrics, activeLine, lyricEndpoint, lyricRetryAfter, lyricRetryCountdown } from './lyrics-data.js?v=20260912-1';
 import { createRecordMotion } from './record-motion.js?v=20260911-6';
 
 export function createLyricsExperience({ audio, state, seek, demo }) {
@@ -14,7 +14,7 @@ export function createLyricsExperience({ audio, state, seek, demo }) {
   const recordMotion = createRecordMotion([...document.querySelectorAll('.record-stage')], audio);
   let itemKey = null, controller = null, lines = [], timed = false, active = -2;
   let translations = [], offset = 0, ready = false, motion = true;
-  let browseTimer = null, retryTimer = null, suspended = false;
+  let browseTimer = null, retryTimer = null, retryCountdownTimer = null, suspended = false;
   try { motion = localStorage.getItem('tingjian.motion.v1') !== 'off'; } catch { /* Optional preference. */ }
   get('motion-enabled').checked = motion;
 
@@ -85,21 +85,35 @@ export function createLyricsExperience({ audio, state, seek, demo }) {
   function itemIdentity(item) {
     return item?.kind === 'song' ? `${item.url}|${item.title}|${item.artist || ''}|${item.source || ''}|${item.lyric_id || ''}` : item?.kind || '';
   }
+  function clearRetryTimers() {
+    clearTimeout(retryTimer); retryTimer = null;
+    clearInterval(retryCountdownTimer); retryCountdownTimer = null;
+  }
   function scheduleRetry(item, wait) {
-    clearTimeout(retryTimer);
+    clearRetryTimers();
     const key = itemIdentity(item);
-    status(`歌词接口正在冷却，将在 ${wait} 秒后自动重试`);
-    panel.dataset.state = 'loading';
+    const deadline = Date.now() + wait * 1000;
+    const refreshCountdown = () => {
+      if (suspended || key !== itemKey || key !== itemIdentity(state())) {
+        clearRetryTimers();
+        return;
+      }
+      const remaining = lyricRetryCountdown(deadline);
+      status(remaining > 0 ? `歌词接口正在冷却，将在 ${remaining} 秒后自动重试` : '歌词接口冷却结束，正在自动重试…');
+      panel.dataset.state = 'loading';
+    };
+    refreshCountdown();
     get('lyrics-retry').hidden = true;
+    retryCountdownTimer = setInterval(refreshCountdown, 1000);
     retryTimer = setTimeout(() => {
-      retryTimer = null;
+      clearRetryTimers();
       if (!suspended && key === itemKey && key === itemIdentity(state())) load(state());
     }, wait * 1000);
   }
   async function load(item) {
     if (suspended) return;
     controller?.abort();
-    clearTimeout(retryTimer); retryTimer = null;
+    clearRetryTimers();
     clearTimeout(browseTimer); browseTimer = null;
     const request = new AbortController(); controller = request;
     lines = []; translations = []; timed = false; active = -2; offset = 0;
@@ -184,7 +198,7 @@ export function createLyricsExperience({ audio, state, seek, demo }) {
       suspended = true;
       controller?.abort(); controller = null;
       clearTimeout(browseTimer); browseTimer = null;
-      clearTimeout(retryTimer); retryTimer = null;
+      clearRetryTimers();
       recordMotion.setPlaying(false);
       if (!lines.length) itemKey = null;
     },

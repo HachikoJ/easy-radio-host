@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseLyrics, activeLine, lyricEndpoint, lyricIdentityTitle, lyricRetryAfter } from '../backend/static/lyrics-data.js';
+import { parseLyrics, activeLine, lyricEndpoint, lyricIdentityTitle, lyricRetryAfter, lyricRetryCountdown } from '../backend/static/lyrics-data.js';
 
 test('LRC supports multiple timestamps, metadata offset, blank instrumental lines and translations', () => {
   const { lines, timed } = parseLyrics('[ar:Example]\n[offset:500]\n[00:03.00][00:08.00]Original\n[00:03.00]Translation\n[00:05.00]\n[00:00.00]Intro');
@@ -55,4 +55,15 @@ test('lyric retry delay prefers structured retry_after and understands HTTP date
   assert.equal(lyricRetryAfter(response, {}), 45);
   assert.equal(lyricRetryAfter({ headers: { get: () => 'Thu, 01 Jan 2026 00:01:00 GMT' } }, {}, Date.UTC(2026, 0, 1)), 60);
   assert.equal(lyricRetryAfter({ headers: { get: () => null } }, {}), 300);
+});
+
+test('lyric retry countdown derives a live non-negative value from its deadline', () => {
+  const now = Date.UTC(2026, 8, 12, 0, 0, 0);
+  const deadline = now + 233000;
+  assert.equal(lyricRetryCountdown(deadline, now), 233);
+  assert.equal(lyricRetryCountdown(deadline, now + 1000), 232);
+  assert.equal(lyricRetryCountdown(deadline, now + 232001), 1);
+  assert.equal(lyricRetryCountdown(deadline, now + 233000), 0);
+  assert.equal(lyricRetryCountdown(deadline, now + 240000), 0);
+  assert.equal(lyricRetryCountdown('invalid', now), 0);
 });

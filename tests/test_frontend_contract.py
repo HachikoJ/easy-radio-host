@@ -157,7 +157,7 @@ class FrontendContract(unittest.IsolatedAsyncioTestCase):
         self.assertIn('id="visit-stats"', html)
         self.assertIn('href="quiet.css?v=20260911-6"', html)
         self.assertIn('src="listening.js?v=20260911-6" defer', html)
-        self.assertIn('src="app.js?v=20260911-6" type="module"', html)
+        self.assertIn('src="app.js?v=20260912-1" type="module"', html)
         self.assertLess(html.index('id="mini-cover"'), html.index('src="theme-schedule.js?v=20260911-6"'))
 
         layout = (ROOT / "backend" / "static" / "layout.js").read_text()

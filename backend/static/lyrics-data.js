@@ -66,3 +66,8 @@ export function lyricRetryAfter(response, payload, now = Date.now()) {
   if (Number.isFinite(date)) return Math.max(1, Math.ceil((date - now) / 1000));
   return 300;
 }
+
+export function lyricRetryCountdown(deadline, now = Date.now()) {
+  const remaining = Math.ceil((Number(deadline) - Number(now)) / 1000);
+  return Number.isFinite(remaining) ? Math.max(0, remaining) : 0;
+}
