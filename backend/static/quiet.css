@@ -40,7 +40,7 @@
 .quiet-ui .recommendation-options h3{font-size:12px;font-weight:600;margin:0 0 5px}.quiet-ui .recommendation-options h3:not(:first-child){border-top:1px solid var(--line);padding-top:14px;margin-top:10px}
 .quiet-ui .recommendation-options .toggle-label{font-size:12px;min-height:44px}.quiet-ui .recommendation-consent{font-size:11px;line-height:1.9;margin:5px 0 10px}
 .quiet-ui .lyrics-timing{display:flex;flex-direction:column;align-items:stretch;gap:0}.quiet-ui .lyrics-timing label{justify-content:space-between;font-size:12px;min-height:44px}.quiet-ui .lyrics-timing input[type=number]{min-height:36px}
-.quiet-ui .page-footer{border:0;margin:0;padding:4px 0 10px;min-height:28px;font-size:10px;justify-content:center;gap:18px}.quiet-ui .page-footer>span:not(.visit-stats){display:none}.quiet-ui .page-footer .icon-button{display:none}
+.quiet-ui .page-footer{display:none}
 .quiet-ui .player-bar{z-index:50}.quiet-ui .notice,.quiet-ui.focus-mode .notice{position:fixed;bottom:calc(var(--player) + 12px);left:50%;transform:translateX(-50%);width:min(560px,calc(100% - 32px));z-index:60;margin:0}
 .quiet-ui .drawer-shade{position:fixed;inset:80px 0 var(--player);background:#11182720;z-index:30;backdrop-filter:blur(2px)}
 .quiet-ui .utility-drawer{position:fixed;inset:92px 14px calc(var(--player) + 12px) auto;margin:0;padding:0;width:440px;max-width:calc(100vw - 28px);height:auto;max-height:none;border:1px solid var(--line);border-radius:8px;background:var(--white);color:var(--ink);box-shadow:0 12px 44px #0002;z-index:40;overflow:hidden}
@@ -59,7 +59,6 @@
 .quiet-ui .focus-art figcaption,.quiet-ui .focus-copy>.eyebrow,.quiet-ui .focus-copy>.focus-subtitle,.quiet-ui .focus-copy>.up-next,.quiet-ui .focus-copy>.recommendation-reason{display:none}
 .quiet-ui .focus-copy>h1{font-size:24px;line-height:1.5;margin:0 24px}.quiet-ui .focus-copy>.song-actions{margin:0 24px}.quiet-ui .focus-copy>.focus-note{margin:0 24px;padding:10px 0;max-height:130px;overflow:auto;border:0}.quiet-ui .focus-note>p:last-child{font-size:15px;line-height:1.8}
 .quiet-ui.focus-mode{--lyrics-height:min(650px,calc(100dvh - 390px))}.quiet-ui .focus-copy .lyrics-panel{margin:0}
-.quiet-ui.focus-mode .page-footer{display:flex}
 .quiet-ui .page-header [data-tip]:after,.quiet-ui .listening-tools [data-tip]:after{top:calc(100% + 5px);bottom:auto;right:0;left:auto;transform:none}
 ::view-transition-old(root),::view-transition-new(root){animation-duration:240ms}
 @media(max-width:1000px){
@@ -80,7 +79,7 @@
   .quiet-ui .lyric-column{grid-column:1/-1;grid-row:2;margin-top:6px}.quiet-ui .lyrics-panel{padding:0 6px}.quiet-ui .lyrics-heading{height:38px}.quiet-ui .listening-tools{gap:12px}.quiet-ui .listening-tools>label{min-height:38px}.quiet-ui .recommendation-settings>summary{height:38px;min-height:38px;width:32px}
   .quiet-ui .lyric-line,.quiet-ui .focus-copy .lyric-line{font-size:19px;line-height:1.8;min-height:58px;padding:12px 2px}.quiet-ui .lyric-line small{font-size:12px}.quiet-ui .lyrics-source{font-size:9px;margin-top:3px;min-height:16px}
   .quiet-ui .player-bar{padding-top:7px;padding-bottom:calc(7px + env(safe-area-inset-bottom));height:calc(var(--player) + env(safe-area-inset-bottom));row-gap:0}.quiet-ui .player-lyric{min-height:32px}.quiet-ui .volume .icon-button{height:32px}.quiet-ui .volume input{height:24px}
-  .quiet-ui .page-footer{padding:4px 0 8px;font-size:9px}.quiet-ui .drawer-shade{top:100px}.quiet-ui .utility-drawer{top:108px;right:8px;bottom:calc(var(--player) + 8px);max-width:calc(100vw - 16px);width:440px}.quiet-ui .drawer-content{padding:16px}.quiet-ui .drawer-heading{padding:8px 16px}
+  .quiet-ui .drawer-shade{top:100px}.quiet-ui .utility-drawer{top:108px;right:8px;bottom:calc(var(--player) + 8px);max-width:calc(100vw - 16px);width:440px}.quiet-ui .drawer-content{padding:16px}.quiet-ui .drawer-heading{padding:8px 16px}
   .quiet-ui .focus-stage,.quiet-ui.focus-mode .focus-stage{display:grid;grid-template-columns:90px minmax(0,1fr);gap:0 12px;padding:10px 0 0;min-height:0}
   .quiet-ui .focus-art,.quiet-ui.focus-mode .focus-art,.quiet-ui.focus-mode .focus-art:has(.record-webgl){grid-column:1;grid-row:1/3;width:90px;max-width:90px;margin:0;align-self:center}
   .quiet-ui .focus-copy{display:contents}.quiet-ui .focus-copy>h1,.quiet-ui.focus-mode .focus-copy>h1{grid-column:2;grid-row:1;font-size:18px;margin:0;align-self:end}.quiet-ui .focus-copy>.song-actions,.quiet-ui.focus-mode .focus-copy>.song-actions{grid-column:2;grid-row:2;margin:0;align-self:start}
@@ -93,10 +92,10 @@
 .quiet-ui main{width:100%}
 .quiet-ui .page-header,.quiet-ui.focus-mode .page-header{height:var(--header)}
 .quiet-ui .view-actions .header-resource{display:inline-grid;place-items:center}
-.quiet-ui:not(.focus-mode) .page-footer{display:flex;align-items:center;justify-content:center;margin:0;padding:0;border:0;height:18px;min-height:18px;font-size:9px;line-height:1;color:var(--secondary)}
-.quiet-ui.focus-mode .page-footer{display:none}
-.quiet-ui .page-footer>*{display:none}.quiet-ui .page-footer .visit-stats{margin:0}.quiet-ui .page-footer .visit-stats:not([hidden]){display:block}
-.quiet-ui:not(.focus-mode) main{height:calc(100dvh - var(--player) - env(safe-area-inset-bottom));display:grid;grid-template-rows:var(--header) minmax(0,1fr) 18px}
+.quiet-ui .page-header .visit-stats{flex:none;min-width:146px;justify-content:center}
+/* 计数返回前先占住位置，避免标签出现时挤动中间导航。 */
+.quiet-ui .page-header .visit-stats[hidden]{display:inline-flex!important;visibility:hidden}
+.quiet-ui:not(.focus-mode) main{height:calc(100dvh - var(--player) - env(safe-area-inset-bottom));display:grid;grid-template-rows:var(--header) minmax(0,1fr)}
 .quiet-ui:not(.focus-mode) .workspace,.quiet-ui:not(.focus-mode) .listen-column{height:100%;min-height:0}
 .quiet-ui:not(.focus-mode) .listening{height:100%;min-height:0;padding:12px 0;grid-template-columns:minmax(200px,.8fr) minmax(0,1.4fr);grid-template-rows:auto minmax(0,1fr);gap:8px 40px}
 .quiet-ui .track-heading{grid-column:1/-1;grid-row:1;display:flex;align-items:center;gap:16px;min-height:44px;min-width:0;position:relative;z-index:20}
@@ -140,6 +139,8 @@
   .quiet-ui .page-header .brand strong{font-size:21px}
   .quiet-ui .page-header .brand img{width:32px;height:32px}
   .quiet-ui .page-header .demo-badge{position:absolute;grid-column:1/-1;grid-row:1;left:100px;right:auto;top:19px;font-size:9px;padding:2px 3px}
+  .quiet-ui .page-header .visit-stats{grid-column:2;grid-row:1;justify-self:end;min-width:0;padding:4px 9px;gap:6px}
+  .quiet-ui .page-header .visit-stats .visit-label-tail{display:none}
   .quiet-ui:not(.focus-mode) .listening{grid-template-columns:minmax(0,1fr);grid-template-rows:auto 96px minmax(0,1fr);gap:4px;padding:6px 0}
   .quiet-ui .track-heading{gap:8px;min-height:44px}
   .quiet-ui .track-heading h2{font-size:17px;max-height:51px;line-height:1.5}

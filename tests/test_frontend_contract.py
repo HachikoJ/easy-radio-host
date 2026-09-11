@@ -119,6 +119,21 @@ class FrontendContract(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(link["target"], "_blank")
             self.assertTrue({"noopener", "noreferrer"} <= set(link["rel"].split()))
 
+    async def test_visit_counter_tag_sits_between_tabs_and_header_actions(self):
+        status, content = await request("/")
+        self.assertEqual(status, 200)
+        html = content.decode("utf-8")
+        header = html[html.index('<header class="page-header">'):html.index("</header>")]
+        footer = html[html.index('<footer class="page-footer">'):html.index("</footer>")]
+        self.assertIn('id="visit-stats"', header)
+        self.assertIn('id="visit-today"', header)
+        self.assertIn('id="visit-total"', header)
+        self.assertNotIn("visit-stats", footer)
+        self.assertLess(header.index('id="visit-stats"'), header.index('class="view-actions"'))
+        quiet = (ROOT / "backend" / "static" / "quiet.css").read_text()
+        self.assertIn(".quiet-ui .page-header .visit-stats{", quiet)
+        self.assertIn(".quiet-ui .page-footer{display:none}", quiet)
+
     async def test_scheduled_theme_is_ready_before_the_module_app_runs(self):
         class Scripts(HTMLParser):
             def handle_starttag(self, tag, attrs):
@@ -140,10 +155,10 @@ class FrontendContract(unittest.IsolatedAsyncioTestCase):
         self.assertIn("html.theme-booting #cover", html)
         self.assertIn("document.documentElement.classList.remove('app-booting','theme-booting')", html)
         self.assertIn('id="visit-stats"', html)
-        self.assertIn('href="quiet.css?v=20260911-5"', html)
-        self.assertIn('src="listening.js?v=20260911-5" defer', html)
-        self.assertIn('src="app.js?v=20260911-5" type="module"', html)
-        self.assertLess(html.index('id="mini-cover"'), html.index('src="theme-schedule.js?v=20260911-5"'))
+        self.assertIn('href="quiet.css?v=20260911-6"', html)
+        self.assertIn('src="listening.js?v=20260911-6" defer', html)
+        self.assertIn('src="app.js?v=20260911-6" type="module"', html)
+        self.assertLess(html.index('id="mini-cover"'), html.index('src="theme-schedule.js?v=20260911-6"'))
 
         layout = (ROOT / "backend" / "static" / "layout.js").read_text()
         self.assertIn("requestAnimationFrame(() => requestAnimationFrame(() => {", layout)
