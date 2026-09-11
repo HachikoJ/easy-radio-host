@@ -1,6 +1,6 @@
-import { createLyricsExperience } from './lyrics.js?v=20260911-4';
-import { createRecommendationExperience } from './recommendations.js?v=20260911-4';
-import { createQuietLayout } from './layout.js?v=20260911-4';
+import { createLyricsExperience } from './lyrics.js?v=20260911-5';
+import { createRecommendationExperience } from './recommendations.js?v=20260911-5';
+import { createQuietLayout } from './layout.js?v=20260911-5';
 const { themes, scheduledTheme } = globalThis.TingjianThemeSchedule;
 
 const $ = id => document.getElementById(id);
@@ -101,7 +101,7 @@ async function request(path, body, controller) {
   const timeout = setTimeout(() => controller.abort('timeout'), path === '/api/playback/resolve' ? 60000 : 240000);
   try {
     if (demo) {
-      const { respond } = await import('./demo.js?v=20260911-4');
+      const { respond } = await import('./demo.js?v=20260911-5');
       return await respond(path, body, controller.signal);
     }
     const response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: controller.signal });
@@ -122,6 +122,43 @@ async function request(path, body, controller) {
     if (error instanceof TypeError) throw new Error('无法连接电台服务，请检查网络后重试。');
     throw error;
   } finally { clearTimeout(timeout); }
+}
+function visitorToken() {
+  const key = 'tingjian.visits.v1';
+  const random = () => {
+    if (globalThis.crypto?.getRandomValues) {
+      return [...crypto.getRandomValues(new Uint8Array(16))]
+        .map(byte => byte.toString(16).padStart(2, '0')).join('');
+    }
+    return `t-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 14)}`;
+  };
+  try {
+    const saved = localStorage.getItem(key);
+    if (/^[A-Za-z0-9._-]{8,128}$/.test(saved || '')) return saved;
+    const token = random();
+    localStorage.setItem(key, token);
+    return token;
+  } catch { return random(); }
+}
+async function loadVisitStats() {
+  const node = $('visit-stats');
+  if (demo || !node) return;
+  try {
+    const response = await fetch('/api/visits', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: visitorToken() }),
+      cache: 'no-store',
+      keepalive: true
+    });
+    if (!response.ok) return;
+    const data = await response.json();
+    if (!Number.isFinite(data.today) || !Number.isFinite(data.total)) return;
+    const format = new Intl.NumberFormat('zh-CN');
+    $('visit-today').textContent = format.format(data.today);
+    $('visit-total').textContent = format.format(data.total);
+    node.hidden = false;
+  } catch { /* 访问统计失败不影响电台。 */ }
 }
 function renderThemes() {
   $('theme-list').replaceChildren(...themes.map(theme => {
@@ -796,6 +833,7 @@ recommendations = createRecommendationExperience({ demo, icon, notify,
   related: seed => generateShow({ seed })
 });
 createQuietLayout({ icon });
+loadVisitStats();
 updateVolume(); selectTheme(selected);
 setInterval(syncThemeWithSystemTime, 60000);
 document.addEventListener('visibilitychange', () => {

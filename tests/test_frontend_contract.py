@@ -81,6 +81,27 @@ class FrontendContract(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(content[:4], b"RIFF")
         self.assertEqual(len(content), 44)
 
+    async def test_visits_are_idempotent_per_browser_and_day(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = Path(tmp) / "visits.sqlite3"
+            with patch.object(radio, "VISITS_DB", db), patch.object(radio, "visit_day", return_value="2026-09-11"):
+                status, content, headers = await request("/api/visits", {"token": "browser-token-a"}, include_headers=True)
+                self.assertEqual(status, 200)
+                self.assertEqual(headers[b"cache-control"], b"no-store")
+                self.assertEqual(json.loads(content), {"today": 1, "total": 1})
+                status, content = await request("/api/visits", {"token": "browser-token-a"})
+                self.assertEqual(status, 200)
+                self.assertEqual(json.loads(content), {"today": 1, "total": 1})
+                status, content = await request("/api/visits", {"token": "browser-token-b"})
+                self.assertEqual(status, 200)
+                self.assertEqual(json.loads(content), {"today": 2, "total": 2})
+                status, content = await request("/api/visits", {"token": "bad token"})
+                self.assertEqual(status, 422)
+            with patch.object(radio, "VISITS_DB", db), patch.object(radio, "visit_day", return_value="2026-09-12"):
+                status, content = await request("/api/visits", {"token": "browser-token-a"})
+                self.assertEqual(status, 200)
+                self.assertEqual(json.loads(content), {"today": 1, "total": 3})
+
     async def test_resource_links_preserve_the_player_tab(self):
         class Links(HTMLParser):
             def handle_starttag(self, tag, attrs):
@@ -118,10 +139,11 @@ class FrontendContract(unittest.IsolatedAsyncioTestCase):
         self.assertIn("html.app-booting body", html)
         self.assertIn("html.theme-booting #cover", html)
         self.assertIn("document.documentElement.classList.remove('app-booting','theme-booting')", html)
-        self.assertIn('href="quiet.css?v=20260911-4"', html)
-        self.assertIn('src="listening.js?v=20260911-4" defer', html)
-        self.assertIn('src="app.js?v=20260911-4" type="module"', html)
-        self.assertLess(html.index('id="mini-cover"'), html.index('src="theme-schedule.js?v=20260911-4"'))
+        self.assertIn('id="visit-stats"', html)
+        self.assertIn('href="quiet.css?v=20260911-5"', html)
+        self.assertIn('src="listening.js?v=20260911-5" defer', html)
+        self.assertIn('src="app.js?v=20260911-5" type="module"', html)
+        self.assertLess(html.index('id="mini-cover"'), html.index('src="theme-schedule.js?v=20260911-5"'))
 
         layout = (ROOT / "backend" / "static" / "layout.js").read_text()
         self.assertIn("requestAnimationFrame(() => requestAnimationFrame(() => {", layout)

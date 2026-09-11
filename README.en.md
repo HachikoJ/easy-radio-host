@@ -173,6 +173,7 @@ Normalization uses two-pass ffmpeg `loudnorm`, targeting -14 LUFS with a -1.5 dB
 | Main app :8100 | POST | `/api/intent` | Frontend chat, song requests, and playback controls |
 | Main app :8100 | POST | `/api/chat` | Retained compatibility endpoint for chat and song requests |
 | Main app :8100 | POST | `/api/playback/resolve` | Verify or recover a requested track source |
+| Main app :8100 | POST | `/api/visits` | Record an anonymous browser visit and return today's and cumulative counts |
 | Main app :8100 | GET | `/api/playback/availability` | Query quota and waiting time without consuming GD requests |
 | Main app :8100 | GET | `/api/playback/announcement/{reason}.mp3` | Play a cached failure announcement |
 | Main app :8100 | GET | `/api/playback/cooldown/content.json` | List cooldown companion segments that have been generated |
@@ -181,6 +182,8 @@ Normalization uses two-pass ffmpeg `loudnorm`, targeting -14 LUFS with a -1.5 dB
 | Library proxy :8001 | GET | `/songs.txt` | Online playlist metadata |
 | Library proxy :8001 | GET | `/s/<source>/<id>.mp3` | Resolve a track URL and redirect |
 | Same-origin `/music/` → library proxy :8001 | GET | `/music/lyrics/{source}/{song_id}.json` | Fetch lyrics and translations; optional `title/artist` enables strict cross-channel lookup |
+
+Visit counts are deduplicated per browser and Asia/Shanghai calendar day. The server stores only a SHA-256 hash of the browser's anonymous identifier, never its IP address.
 
 `POST /api/show` retains `theme` and `exclude`, and adds an optional `recommendation` object:
 

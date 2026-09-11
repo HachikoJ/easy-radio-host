@@ -9,10 +9,11 @@ import hashlib
 import json
 import os
 import re
+import sqlite3
 import time
 import urllib.parse
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
@@ -61,6 +62,31 @@ VOICE_DIR = DATA_DIR / "voice"
 VOICE_DIR.mkdir(parents=True, exist_ok=True)
 
 PROFILE_FILE = DATA_DIR / "profile.json"
+VISITS_DB = DATA_DIR / "visits.sqlite3"
+
+def visit_day():
+    """访问统计固定按东八区自然日切分。"""
+    return (datetime.now(timezone.utc) + timedelta(hours=8)).date().isoformat()
+
+def record_visit(token):
+    visitor_hash = hashlib.sha256(f"tingjian:{token}".encode("utf-8")).hexdigest()
+    day = visit_day()
+    with contextlib.closing(sqlite3.connect(VISITS_DB, timeout=5)) as conn:
+        conn.execute("PRAGMA busy_timeout=5000")
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS visits ("
+            "day TEXT NOT NULL, visitor_hash TEXT NOT NULL, "
+            "PRIMARY KEY (day, visitor_hash))"
+        )
+        conn.execute(
+            "INSERT OR IGNORE INTO visits (day, visitor_hash) VALUES (?, ?)",
+            (day, visitor_hash),
+        )
+        conn.commit()
+        today = conn.execute("SELECT COUNT(*) FROM visits WHERE day = ?", (day,)).fetchone()[0]
+        total = conn.execute("SELECT COUNT(*) FROM visits").fetchone()[0]
+    return today, total
 
 def load_profile():
     """听众口味画像 (由网易云数据归纳), 文件缺失返回空 dict"""
@@ -1291,6 +1317,23 @@ async def api_talk(request: Request):
 @app.get("/api/themes")
 def api_themes():
     return THEMES
+
+class VisitReq(BaseModel):
+    token: str = ""
+
+@app.post("/api/visits")
+def api_visits(req: VisitReq, response: Response):
+    """匿名记录一次浏览器当日访问，不保存原始标识或 IP。"""
+    token = req.token.strip()
+    if not re.fullmatch(r"[A-Za-z0-9._-]{8,128}", token):
+        raise HTTPException(422, "访客标识无效")
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        today, total = record_visit(token)
+    except sqlite3.Error as e:
+        print("访问统计失败:", e)
+        raise HTTPException(503, "访问统计暂不可用")
+    return {"today": today, "total": total}
 
 @app.get("/voice/{name}")
 def voice_file(name: str):

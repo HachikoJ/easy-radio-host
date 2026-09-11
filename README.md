@@ -173,6 +173,7 @@ node scripts/serve-demo.mjs
 | 主应用 :8100 | POST | `/api/intent` | 前端对话、点歌与播放控制 |
 | 主应用 :8100 | POST | `/api/chat` | 保留的对话与点歌兼容接口 |
 | 主应用 :8100 | POST | `/api/playback/resolve` | 校验或恢复指定歌曲的音源 |
+| 主应用 :8100 | POST | `/api/visits` | 匿名记录浏览器当日访问并返回今日/累计访问量 |
 | 主应用 :8100 | GET | `/api/playback/availability` | 查询额度与等待时间，不消耗 GD 请求额度 |
 | 主应用 :8100 | GET | `/api/playback/announcement/{reason}.mp3` | 播放缓存的故障原因播报 |
 | 主应用 :8100 | GET | `/api/playback/cooldown/content.json` | 返回已经生成的限流陪伴内容清单 |
@@ -181,6 +182,8 @@ node scripts/serve-demo.mjs
 | 曲库代理 :8001 | GET | `/songs.txt` | 在线歌单元数据 |
 | 曲库代理 :8001 | GET | `/s/<source>/<id>.mp3` | 获取直链并跳转 |
 | 同域 `/music/` → 曲库代理 :8001 | GET | `/music/lyrics/{source}/{song_id}.json` | 获取当前歌曲歌词及可用译文；可带 `title/artist` 启用严格跨渠道补找 |
+
+访问统计按东八区日期以浏览器本地匿名标识去重；服务端只保存该标识的 SHA-256，不保存 IP。
 
 `POST /api/show` 保留原有 `theme` 和 `exclude`，新增可选 `recommendation`：
 

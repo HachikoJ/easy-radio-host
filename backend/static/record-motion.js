@@ -148,7 +148,7 @@ export function createRecordMotion(stages, audio) {
     window.dispatchEvent(new Event('tingjian:record-ready'));
   };
   // Three.js 首次绘制前保持隐藏；若加载失败则只显示一次普通唱片，之后不再替换。
-  import('./record-scene.js?v=20260911-4').then(({ createRecordScene }) => {
+  import('./record-scene.js?v=20260911-5').then(({ createRecordScene }) => {
     for (const surface of surfaces) {
       const canvas = surface.canvas.cloneNode(false);
       try {
