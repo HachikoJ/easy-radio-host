@@ -82,11 +82,20 @@ Original attribution and ownership are retained. The original source's complete 
 
 UI icons come from Lucide under ISC. Theme photos are documented individually and are not presented as actual album artwork. Tingjian reuses this project's existing speech-wave mark. Demo audio is original synthesized instrumental music; text in the demo lyrics view is original and explicitly labeled as demo copy, not the song's lyrics. Fixed responses are limited to explicit demo mode.
 
+## 本地 TTS / Local TTS
+
+- 推理运行时 / Runtime: [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)，**Copyright (c) 2023-2024 k2-fsa 团队**，Apache-2.0；通过 PyPI 包 `sherpa-onnx==1.13.8` 安装，不随仓库分发。
+- 模型权重 / Model weights: [csukuangfj/vits-melo-tts-zh_en](https://huggingface.co/csukuangfj/vits-melo-tts-zh_en)，源自 [MeloTTS](https://github.com/myshell-ai/MeloTTS)，**Copyright (c) 2024 MyShell.ai**，MIT。权重由部署者通过 `scripts/install-local-tts.sh` 单独下载，不进入 Git。
+
+本地 TTS 服务只做文本转语音，未包含上游源代码副本。安装脚本在落盘前校验四个文件的 SHA256，模型目录保留下载到的 MIT 许可原文；启用与停用由 `LOCAL_TTS_URL` 控制。英文单词按模型的中英混合音素读出，不等同英语母语发音，本项目未逐词评测英文质量，因此该模型是低成本首选而非高质量多语言方案。
+
+The local TTS service calls the PyPI `sherpa-onnx` package (Apache-2.0) and a MeloTTS `zh_en` checkpoint published by csukuangfj and derived from MeloTTS (MIT, Copyright (c) 2024 MyShell.ai). Weights are downloaded per deployment by `scripts/install-local-tts.sh` with SHA256 verification, and the downloaded license text is retained in the model directory; they are not committed. English words are read with the model's mixed Chinese-English phonemes rather than native English pronunciation, and this project does not claim per-word English quality, so the model is a low-cost first choice rather than a high-quality multilingual voice.
+
 ## 服务 / Services
 
-DeepSeek、阿里云百炼 Qwen-TTS、MiniMax、edge-tts、在线音乐 API 及其依赖继续遵循各自的授权、服务与音乐使用条款。项目致谢不表示获得额外音源再分发权，也不表示第三方对本项目背书。
+DeepSeek、阿里云百炼 Qwen-TTS、MiniMax、edge-tts、sherpa-onnx、MeloTTS 模型、在线音乐 API 及其依赖继续遵循各自的授权、服务与音乐使用条款。项目致谢不表示获得额外音源再分发权，也不表示第三方对本项目背书。
 
-DeepSeek, Alibaba Cloud Model Studio Qwen-TTS, MiniMax, edge-tts, the online music API, and their dependencies remain governed by their respective licenses and service/music terms. Attribution does not grant additional music redistribution rights or imply endorsement.
+DeepSeek, Alibaba Cloud Model Studio Qwen-TTS, MiniMax, edge-tts, sherpa-onnx, the MeloTTS model, the online music API, and their dependencies remain governed by their respective licenses and service/music terms. Attribution does not grant additional music redistribution rights or imply endorsement.
 
 歌词通过现有 GD 音乐 API 代理按当前歌曲的来源和 ID 获取，并展示来源说明。代理仅在内存中缓存最多 128 条结果、每条 300 秒，不写入磁盘，不随仓库再分发歌词库。歌词与译文版权归原权利人；软件 MIT 许可不授予歌词、歌曲或封面的使用权。
 

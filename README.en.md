@@ -35,7 +35,7 @@ Tingjian is an AI music radio for listeners who enjoy themed listening and are c
 - **Multiple recommendation sources:** Combine themes, favorite tracks, favorite artists, artist preferences configured by the deployment owner, and exploration candidates. Extend a current track with more works by the same artist and see the actual selection reasons.
 - **Deduplication and variety:** No repeated tracks within a show; recent tracks are avoided where possible and artists are spread out. Shows shorten when candidates are scarce, and any recent-track reuse or relaxed artist limits are disclosed.
 - **Optional preferences:** Listening settings bring together continuous playback, translations, lyric timing, and song preferences. "按我的偏好选歌" (Use my preferences) is off by default. Enabling it allows local favorites, history, and "Recommend less" titles to inform the current recommendation, with privacy details available before opting in. "Recommend less" can be undone; ordinary skips and playback failures are not treated as dislikes, and explicit song requests remain available.
-- **Host narration:** Narration prefers Alibaba Cloud Model Studio `qwen3-tts-instruct-flash` with the `Cherry` voice, then falls back to MiniMax and edge-tts. ffmpeg balances newly generated narration, while songs play at 85% of the master volume to reduce level differences between speech and music. Original narration is retained when ffmpeg is unavailable or processing fails.
+- **Host narration:** Narration is synthesized on the server CPU with sherpa-onnx running MeloTTS (`vits-melo-tts-zh_en`, mixed Chinese and English) and incurs no third-party call charges. If the local service is unavailable, narration falls back through Alibaba Cloud Model Studio `qwen3-tts-instruct-flash` with the `Cherry` voice, then MiniMax, then edge-tts. ffmpeg balances newly generated narration, while songs play at 85% of the master volume to reduce level differences between speech and music. Original narration is retained when ffmpeg is unavailable or processing fails.
 - **Continuous playback:** A show queue, previous/next segments, seeking and volume, automatic continuation, and stop controls. Missing sources, rate limits, and temporary failures display and announce the reason before automatically trying the next recommendation. When no playable track remains during a quota cooldown, the player rotates through eight pre-generated companion segments about mood, relaxation, conditional weather, and the time of day, then resumes music as soon as the quota recovers. Waiting does not request weather or location data or call GD, DeepSeek, or cloud TTS. Pausing or closing the page cancels requests, lyric recovery, waiting timers, and announcements, and releases audio connections.
 - **Focused listening:** A single listening view adapts the disc and lyrics to viewport height to keep the main experience on one screen. Idle and programme-generation states collapse the empty lyric area; playback restores the two-column lyric layout. The track title shares a row with right-aligned following, animation, and settings controls. Theme stations, the queue/favorites/history, and chat open on demand while the bottom player preserves playback context. Appearance follows the system when no preference is saved. Keyboard controls cover Space for play/pause, Left/Right for seeking, and Up/Down for volume; supported browsers also expose system media controls. Credits and the author's GitHub open in new tabs from the top right; credits display Chinese by default, with English shown after selecting English.
 - **Favorites and history:** Store up to 100 favorites and 50 recent tracks locally in your browser, deduplicated by title; history records songs only once playback actually starts.
@@ -99,7 +99,7 @@ Browser
   → Main app :8100
       → Candidate fusion, recent-track filtering, deduplication, and artist variety
       → DeepSeek writes narration in the selected track order
-      → Qwen / MiniMax / edge-tts synthesizes narration
+      → Local sherpa-onnx MeloTTS synthesizes narration (Qwen / MiniMax / edge-tts as fallbacks)
       → Online library proxy :8001 reads the playlist
   ← Narration and song playback queue
   → Proxy validates and streams audio with seeking support
@@ -124,8 +124,21 @@ python -m pip install -r backend/requirements.txt zhconv
 ```
 
 1. Follow the deployment guide to create `/etc/tingjian/radio.env` with DeepSeek, Model Studio Qwen-TTS, and service URLs, using file permissions of 600. MiniMax is an optional fallback provider.
-2. Start the main app (8100) and online library proxy (8001), both listening only on `127.0.0.1`.
+2. Start the main app (8100), the online library proxy (8001), and the optional local TTS service (8101), all listening only on `127.0.0.1`.
 3. Configure Nginx and HTTPS to serve the page, `/api/`, `/voice/`, and `/music/` on the same domain, then generate a show. Only ports 80 and 443 need public access.
+
+### Local TTS (optional)
+
+Without a local service, narration goes straight to the cloud fallback chain. To synthesize offline on your own server, install the model weights and a separate virtual environment, then start the local synthesis service:
+
+```bash
+sudo bash scripts/install-local-tts.sh
+python3 -m venv .venv-tts
+.venv-tts/bin/pip install -r tts/requirements.txt
+.venv-tts/bin/uvicorn tts.server:app --host 127.0.0.1 --port 8101
+```
+
+Set `LOCAL_TTS_URL=http://127.0.0.1:8101` in the runtime configuration and restart the main app; narration order becomes `local MeloTTS -> Qwen -> MiniMax -> edge-tts`. The model files are about 163 MB and stay around 490 MiB resident memory in the systemd cgroup, peaking near 500 MiB, with no GPU required. On two vCPUs, measured synthesis speed is roughly twice real time and mixed Chinese-English text works; English words use the model's mixed phonemes rather than native English pronunciation, so this is a low-cost first choice rather than a high-fidelity replacement. `scripts/install-local-tts.sh` downloads `csukuangfj/vits-melo-tts-zh_en` from `hf-mirror.com` and verifies SHA256 checksums, skipping files that already match. See the [deployment guide](DEPLOY-HANDOFF.md) for the systemd setup.
 
 ### Try the interface without API keys
 
@@ -151,6 +164,10 @@ The demo uses original synthesized instrumental music and clearly labeled origin
 | `QWEN_TTS_MODEL` | Qwen-TTS model, defaulting to `qwen3-tts-instruct-flash` |
 | `QWEN_TTS_VOICE` | Qwen voice, defaulting to `Cherry` |
 | `QWEN_TTS_INSTRUCTIONS` | Qwen narration style instruction |
+| `LOCAL_TTS_URL` | Local TTS service URL; empty by default (disabled), set to `http://127.0.0.1:8101` to enable |
+| `LOCAL_TTS_CACHE_ID` | Local model identifier that feeds the cached narration version, defaulting to `sherpa-melo-zh-en-v1` |
+| `LOCAL_TTS_TIMEOUT` | Per-request local synthesis timeout in seconds, defaulting to 60 |
+| `LOCAL_TTS_SPEED` | Local speech rate between 0.5 and 1.5, defaulting to 1.0 |
 | `MINIMAX_KEY` | Optional MiniMax fallback API key |
 | `MINIMAX_VOICE` | MiniMax fallback voice, defaulting to `Chinese (Mandarin)_Warm_Girl` |
 | `EDGE_TTS_VOICE` | Final edge-tts fallback voice, defaulting to `zh-CN-XiaoxiaoNeural` |
@@ -161,7 +178,7 @@ The demo uses original synthesized instrumental music and clearly labeled origin
 
 The `NAS_*` names are retained for compatibility and point to the online library proxy. A remote browser cannot reach the server through the server's own `127.0.0.1`; use reachable server URLs for playback.
 
-Cloud narration follows `Qwen -> MiniMax -> edge-tts`, and configuring any one provider is sufficient. For a dedicated Model Studio workspace, set `DASHSCOPE_BASE` to the DashScope URL ending in `/api/v1` shown in its console.
+Narration follows `local MeloTTS -> Qwen -> MiniMax -> edge-tts`; leaving `LOCAL_TTS_URL` unset skips the local service, and configuring any one cloud provider is sufficient. For a dedicated Model Studio workspace, set `DASHSCOPE_BASE` to the DashScope URL ending in `/api/v1` shown in its console.
 
 Normalization uses two-pass ffmpeg `loudnorm`, targeting -14 LUFS with a -1.5 dBTP true-peak limit and `dual_mono` enabled. Missing ffmpeg, timeouts, or processing failures retain the original audio without blocking narration playback. This applies only to newly generated narration, without reprocessing existing narration or third-party songs. The 0.85 song volume factor leaves the displayed master volume unchanged and does not guarantee identical perceived loudness across all sources.
 
@@ -246,7 +263,7 @@ The script rewrites the resolved playlist, searches multiple sources, filters ve
 - [lrc-kit 1.2.1](https://www.npmjs.com/package/lrc-kit/v/1.2.1), Copyright (c) 2016 Weirong Xu, MIT; used for LRC parsing with the [full license](backend/static/vendor/lrc-kit/LICENSE) and [source modification record](THIRD_PARTY_NOTICES.md#lrc-kit) retained.
 - [Three.js 0.170.0](https://github.com/mrdoob/three.js/tree/r170), Copyright © 2010-2024 three.js authors, MIT; a local module renders the 3D disc and waves, with the [full license](backend/static/vendor/three/LICENSE) retained.
 - [Lucide](https://lucide.dev) provides UI icons under ISC; [Unsplash](https://unsplash.com) provides theme photography. See [individual asset sources](backend/static/assets/SOURCES.md).
-- DeepSeek, [Alibaba Cloud Model Studio](https://help.aliyun.com/zh/model-studio/qwen-tts), MiniMax, edge-tts, and other dependencies; their rights and terms remain with their respective owners.
+- DeepSeek, [Alibaba Cloud Model Studio](https://help.aliyun.com/zh/model-studio/qwen-tts), MiniMax, edge-tts, [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx), the MeloTTS model (`csukuangfj/vits-melo-tts-zh_en`), and other dependencies; their rights and terms remain with their respective owners.
 
 ## GitHub activity
 

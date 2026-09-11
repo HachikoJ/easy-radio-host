@@ -1,0 +1,30 @@
+[Unit]
+Description=Tingjian local CPU text-to-speech
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=tingjian
+Group=tingjian
+WorkingDirectory=/opt/easy-radio-host
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=PYTHONPATH=/opt/easy-radio-host
+Environment=LOCAL_TTS_MODEL_DIR=/opt/easy-radio-host/models/vits-melo-tts-zh_en
+Environment=LOCAL_TTS_THREADS=2
+Environment=LOCAL_TTS_SPEED=1.0
+ExecStart=/opt/easy-radio-host/.venv-tts/bin/uvicorn tts.server:app --host 127.0.0.1 --port 8101
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+CPUQuota=160%
+MemoryHigh=500M
+MemoryMax=650M
+OOMPolicy=stop
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+
+[Install]
+WantedBy=multi-user.target

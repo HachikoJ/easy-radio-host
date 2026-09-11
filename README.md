@@ -35,7 +35,7 @@
 - **多路推荐**：融合主题、收藏歌曲、收藏歌手、部署者配置的歌手偏好及探索候选；支持从当前歌曲延伸同歌手作品，展示实际选歌依据。
 - **去重与多样性**：一期内歌曲不重复，优先避开最近播放并分散歌手；候选不足时缩短节目，必要的近期回补和歌手限制放宽会标明。
 - **自主偏好**：收听设置集中放置连续播放、译文、歌词时差与选歌偏好。「按我的偏好选歌」默认关闭；开启后才将本地收藏、历史和「少推荐」标题用于本次推荐，开启前可查看隐私说明。「少推荐」可撤回，普通跳过与播放失败不视为不喜欢，主动点歌仍可播放指定歌曲。
-- **主持人口播**：优先使用阿里云百炼 `qwen3-tts-instruct-flash` 的 `Cherry`（芊悦）音色，支持 MiniMax 与 edge-tts 逐级降级。新生成的口播通过 ffmpeg 平衡响度，歌曲以主音量的 85% 播放，减少口播与歌曲切换时的音量落差；缺少 ffmpeg 或处理失败时保留原口播。
+- **主持人口播**：优先在服务器本机 CPU 上用 sherpa-onnx 运行 MeloTTS（`vits-melo-tts-zh_en`，中英混读）合成，不产生第三方调用费用；本地服务不可用时按阿里云百炼 `qwen3-tts-instruct-flash` 的 `Cherry`（芊悦）、MiniMax、edge-tts 逐级降级。新生成的口播通过 ffmpeg 平衡响度，歌曲以主音量的 85% 播放，减少口播与歌曲切换时的音量落差；缺少 ffmpeg 或处理失败时保留原口播。
 - **连续播放**：节目单、上一段与下一段、进度和音量控制，支持自动续播与停止。无音源、限流或临时故障时，文字提示并播报原因后自动尝试下一首推荐；暂无可播歌曲且额度冷却时，从 8 条预生成的陪伴话题中轮播心情、放松、条件式天气和时段内容，额度恢复后立即继续音乐。等待期间不请求天气或位置，也不调用 GD、DeepSeek 或云端 TTS。暂停或关闭页面会取消请求、歌词恢复、等待计时及播报，释放音频连接。
 - **专注收听**：统一的收听页随视口高度分配唱片与歌词空间，主要内容保持一屏；待机和节目生成时收起空歌词区，播放后恢复双栏歌词。歌曲标题与右对齐的跟随、动效和设置同处一行。主题电台、节目/收藏/历史与点歌互动按需展开，底部播放控制始终保留播放上下文。明暗配色在没有保存偏好时跟随系统；支持空格播放、左右键快进退、上下键调音量及兼容浏览器的系统媒体控制。右上角的致谢和作者 GitHub 在新标签页打开，致谢默认中文，点击 English 后展示英文。
 - **收藏与历史**：浏览器本地保存最多 100 首收藏、50 条按标题去重的收听历史；歌曲实际开始播放后才记入历史。
@@ -99,7 +99,7 @@
   → 主应用 :8100
       → 多路候选融合、近期过滤、去重与歌手分散
       → DeepSeek 按选定歌曲顺序编排口播
-      → Qwen / MiniMax / edge-tts 合成口播
+      → 本地 sherpa-onnx MeloTTS（Qwen / MiniMax / edge-tts 备用）合成口播
       → 在线曲库代理 :8001 读取歌单
   ← 口播与歌曲播放清单
   → 曲库代理复核音频并流转发，支持进度拖动
@@ -124,8 +124,21 @@ python -m pip install -r backend/requirements.txt zhconv
 ```
 
 1. 按部署手册创建 `/etc/tingjian/radio.env`，配置 DeepSeek、百炼 Qwen-TTS 和服务地址，密钥文件权限设为 600。MiniMax 可作为可选备用渠道。
-2. 启动主应用（8100）与在线曲库代理（8001），两项服务仅监听 `127.0.0.1`。
+2. 启动主应用（8100）、在线曲库代理（8001）与可选的本地 TTS 服务（8101），三项服务仅监听 `127.0.0.1`。
 3. 配置 Nginx 与 HTTPS，通过同一域名访问页面、`/api/`、`/voice/` 和 `/music/`，生成一期节目。公网只需开放 80、443。
+
+### 本地 TTS（可选）
+
+不配置本地服务时，口播直接走云端降级链。要在自己的服务器上离线合成，先安装模型权重和独立虚拟环境，再启动本地合成服务：
+
+```bash
+sudo bash scripts/install-local-tts.sh
+python3 -m venv .venv-tts
+.venv-tts/bin/pip install -r tts/requirements.txt
+.venv-tts/bin/uvicorn tts.server:app --host 127.0.0.1 --port 8101
+```
+
+在运行配置中设置 `LOCAL_TTS_URL=http://127.0.0.1:8101` 后重启主应用，口播顺序变为 `本地 MeloTTS -> Qwen -> MiniMax -> edge-tts`。模型文件约 163 MB，加载后 systemd cgroup 常驻约 490 MiB、峰值约 500 MiB，不需要 GPU；2 vCPU 上实测合成速度约为实时的两倍，中英混读可用，英文单词按中英混合音素读出、不等同英语母语发音，因此只作为低成本首选而不是高质量替代。`scripts/install-local-tts.sh` 从 `hf-mirror.com` 下载 `csukuangfj/vits-melo-tts-zh_en` 并用 SHA256 校验，已有同哈希文件会跳过下载。systemd 部署见[部署手册](DEPLOY-HANDOFF.md)。
 
 ### 无密钥体验界面
 
@@ -151,6 +164,10 @@ node scripts/serve-demo.mjs
 | `QWEN_TTS_MODEL` | Qwen-TTS 模型，默认 `qwen3-tts-instruct-flash` |
 | `QWEN_TTS_VOICE` | Qwen 音色，默认 `Cherry` |
 | `QWEN_TTS_INSTRUCTIONS` | Qwen 口播风格指令 |
+| `LOCAL_TTS_URL` | 本地 TTS 服务地址，默认空值即关闭；设为 `http://127.0.0.1:8101` 时启用 |
+| `LOCAL_TTS_CACHE_ID` | 本地模型标识，参与固定播报的缓存版本，默认 `sherpa-melo-zh-en-v1` |
+| `LOCAL_TTS_TIMEOUT` | 单次本地合成超时秒数，默认 60 |
+| `LOCAL_TTS_SPEED` | 本地语速，取值 0.5–1.5，默认 1.0 |
 | `MINIMAX_KEY` | 可选备用 MiniMax API Key |
 | `MINIMAX_VOICE` | MiniMax 备用音色，默认 `Chinese (Mandarin)_Warm_Girl` |
 | `EDGE_TTS_VOICE` | 本地 edge-tts 最终降级音色，默认 `zh-CN-XiaoxiaoNeural` |
@@ -161,7 +178,7 @@ node scripts/serve-demo.mjs
 
 `NAS_*` 是保留的兼容变量名，指向在线曲库代理。远程浏览器无法访问服务器自身的 `127.0.0.1`，对外播放地址须使用服务器的可访问地址。
 
-云端口播按 `Qwen -> MiniMax -> edge-tts` 顺序调用；只配置其中一项也会正常工作。使用百炼专属业务空间时，将 `DASHSCOPE_BASE` 设为控制台给出的带 `/api/v1` 的 DashScope 地址。
+口播按 `本地 MeloTTS -> Qwen -> MiniMax -> edge-tts` 顺序调用；不配置 `LOCAL_TTS_URL` 时跳过本地，云端只配置其中一项也会正常工作。使用百炼专属业务空间时，将 `DASHSCOPE_BASE` 设为控制台给出的带 `/api/v1` 的 DashScope 地址。
 
 响度处理使用 ffmpeg 两遍 `loudnorm`，目标为 -14 LUFS、真峰值上限 -1.5 dBTP，并启用 `dual_mono`。缺少 ffmpeg、处理超时或失败时使用原音，不阻断口播播放。此处理只作用于新生成的口播，不重新处理旧口播或第三方歌曲；歌曲的 0.85 音量系数不改变音量滑杆显示值，也不保证所有音源听感完全一致。
 
@@ -246,7 +263,7 @@ node scripts/serve-demo.mjs
 - [lrc-kit 1.2.1](https://www.npmjs.com/package/lrc-kit/v/1.2.1)，Copyright (c) 2016 Weirong Xu，MIT；用于解析 LRC，保留[完整许可](backend/static/vendor/lrc-kit/LICENSE)和[源码改动记录](THIRD_PARTY_NOTICES.md#lrc-kit)。
 - [Three.js 0.170.0](https://github.com/mrdoob/three.js/tree/r170)，Copyright © 2010-2024 three.js authors，MIT；本地模块用于渲染立体唱片与波幕，保留[完整许可](backend/static/vendor/three/LICENSE)。
 - [Lucide](https://lucide.dev) 提供 ISC 授权的界面图标；[Unsplash](https://unsplash.com) 提供主题摄影，逐图来源见[资产来源](backend/static/assets/SOURCES.md)。
-- DeepSeek、[阿里云百炼](https://help.aliyun.com/zh/model-studio/qwen-tts)、MiniMax、edge-tts 及其他第三方依赖；其权利和使用条款归各自权利人。
+- DeepSeek、[阿里云百炼](https://help.aliyun.com/zh/model-studio/qwen-tts)、MiniMax、edge-tts、[sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) 与 MeloTTS 模型（`csukuangfj/vits-melo-tts-zh_en`）及其他第三方依赖；其权利和使用条款归各自权利人。
 
 ## GitHub 关注度
 

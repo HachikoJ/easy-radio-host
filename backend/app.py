@@ -1,6 +1,6 @@
 # AI 电台主持人 v2 · 后端 (FastAPI 单文件)
 # 主题化节目 / 生动口播 / 点歌互动 / 栏目包装 / 防重复
-# 曲库来自在线音乐代理; DeepSeek 编排; Qwen/MiniMax/edge-tts 合成口播
+# 曲库来自在线音乐代理; DeepSeek 编排; 本地 TTS/Qwen/MiniMax/edge-tts 合成口播
 import asyncio
 import base64
 import contextlib
@@ -44,6 +44,10 @@ QWEN_TTS_MODEL = os.getenv("QWEN_TTS_MODEL", "qwen3-tts-instruct-flash")
 QWEN_TTS_VOICE = os.getenv("QWEN_TTS_VOICE", "Cherry")
 QWEN_TTS_INSTRUCTIONS = os.getenv(
     "QWEN_TTS_INSTRUCTIONS", "温暖亲切、自然松弛，中速，吐字清晰，像真实电台主持人")
+LOCAL_TTS_URL = os.getenv("LOCAL_TTS_URL", "").rstrip("/")
+LOCAL_TTS_CACHE_ID = os.getenv("LOCAL_TTS_CACHE_ID", "sherpa-melo-zh-en-v1")
+LOCAL_TTS_TIMEOUT = max(1.0, float(os.getenv("LOCAL_TTS_TIMEOUT", "60")))
+LOCAL_TTS_SPEED = max(0.5, min(1.5, float(os.getenv("LOCAL_TTS_SPEED", "1.0"))))
 EDGE_TTS_VOICE = os.getenv("EDGE_TTS_VOICE", "zh-CN-XiaoxiaoNeural")
 MINIMAX_KEY = os.getenv("MINIMAX_KEY", "").strip()
 MINIMAX_GROUP = os.getenv("MINIMAX_GROUP", "").strip()
@@ -269,7 +273,28 @@ def template_show(library, theme, tod):
                      {"type": "song", "title": song["title"], "rel": song["rel"]}])
     return show
 
-# ---------------- TTS (Qwen 主; MiniMax/edge-tts 备用) ----------------
+# ---------------- TTS (本地主; Qwen/MiniMax/edge-tts 备用) ----------------
+async def local_synth(text, path):
+    if not LOCAL_TTS_URL:
+        return False
+    try:
+        timeout = aiohttp.ClientTimeout(total=LOCAL_TTS_TIMEOUT)
+        async with aiohttp.ClientSession(timeout=timeout) as client:
+            async with client.post(
+                    f"{LOCAL_TTS_URL}/synthesize",
+                    json={"text": text, "speed": LOCAL_TTS_SPEED}) as response:
+                response.raise_for_status()
+                audio_data = await response.read()
+        if not audio_data:
+            raise ValueError("empty local TTS response")
+        normalized_audio = await asyncio.to_thread(normalize_speech, audio_data)
+        Path(path).write_bytes(normalized_audio)
+        return True
+    except Exception as e:
+        print("Local TTS 失败:", type(e).__name__, str(e)[:160])
+        return False
+
+
 async def _download_audio(url):
     async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=45)) as client:
         async with client.get(url) as response:
@@ -354,6 +379,8 @@ async def minimax_synth(text, path):
         print("MiniMax 解析失败:", e, str(data[:160])); return False
 
 async def tts_to_mp3(text, path):
+    if LOCAL_TTS_URL and await local_synth(text, str(path)):
+        return True
     if DASHSCOPE_API_KEY:
         # 静默重试最多 3 次 (不通报), 偶发失败/限流可恢复
         for attempt in range(3):
@@ -408,11 +435,19 @@ COOLDOWN_LINES = (
 def _cooldown_revision(qwen_model=QWEN_TTS_MODEL, qwen_voice=QWEN_TTS_VOICE,
                        qwen_instructions=QWEN_TTS_INSTRUCTIONS,
                        model=MINIMAX_MODEL, voice_setting=MINIMAX_VOICE_SETTING,
-                       audio_setting=MINIMAX_AUDIO_SETTING, lines=COOLDOWN_LINES):
+                       audio_setting=MINIMAX_AUDIO_SETTING, lines=COOLDOWN_LINES,
+                       local_url=LOCAL_TTS_URL, local_cache_id=LOCAL_TTS_CACHE_ID,
+                       local_speed=LOCAL_TTS_SPEED):
     contract = {"qwen_model": qwen_model, "qwen_voice": qwen_voice,
                 "qwen_instructions": qwen_instructions, "model": model,
                 "voice_setting": voice_setting, "audio_setting": audio_setting,
                 "edge_voice": EDGE_TTS_VOICE, "lines": lines}
+    if local_url:
+        contract["local_tts"] = {
+            "url": local_url,
+            "cache_id": local_cache_id,
+            "speed": local_speed,
+        }
     digest = hashlib.sha256(json.dumps(contract, ensure_ascii=False, sort_keys=True).encode()).hexdigest()[:12]
     return f"v1-{digest}"
 
@@ -439,7 +474,7 @@ async def prepare_playback_audio():
         path = _announcement_path(reason)
         if not path.is_file() or not path.stat().st_size:
             await tts_to_mp3(text, path)
-    if not (DASHSCOPE_API_KEY or MINIMAX_KEY):
+    if not (LOCAL_TTS_URL or DASHSCOPE_API_KEY or MINIMAX_KEY):
         return
     for item in COOLDOWN_LINES:
         path = _cooldown_path(item["id"])
@@ -506,7 +541,7 @@ async def ensure_fallback_voice():
         if _fb_ready is not None:
             return _fb_ready
         ok = False
-        if DASHSCOPE_API_KEY or MINIMAX_KEY:
+        if LOCAL_TTS_URL or DASHSCOPE_API_KEY or MINIMAX_KEY:
             for i, line in enumerate(FALLBACK_LINES):
                 if await tts_to_mp3(line, _fallback_path(i)):
                     ok = True

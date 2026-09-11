@@ -54,6 +54,24 @@ class QwenSynthesis(unittest.IsolatedAsyncioTestCase):
 
 
 class TTSRouting(unittest.IsolatedAsyncioTestCase):
+    async def test_local_tts_precedes_cloud_providers(self):
+        with patch.object(radio, "LOCAL_TTS_URL", "http://127.0.0.1:8101"), \
+                patch.object(radio, "local_synth", new=AsyncMock(return_value=True)) as local, \
+                patch.object(radio, "qwen_synth", new=AsyncMock(return_value=True)) as qwen:
+            ok = await radio.tts_to_mp3("欢迎收听", "/tmp/voice.mp3")
+        self.assertTrue(ok)
+        local.assert_awaited_once()
+        qwen.assert_not_awaited()
+
+    async def test_local_tts_failure_falls_back_to_qwen(self):
+        with patch.object(radio, "LOCAL_TTS_URL", "http://127.0.0.1:8101"), \
+                patch.object(radio, "DASHSCOPE_API_KEY", "qwen-key"), \
+                patch.object(radio, "local_synth", new=AsyncMock(return_value=False)), \
+                patch.object(radio, "qwen_synth", new=AsyncMock(return_value=True)) as qwen:
+            ok = await radio.tts_to_mp3("欢迎收听", "/tmp/voice.mp3")
+        self.assertTrue(ok)
+        qwen.assert_awaited_once()
+
     async def test_qwen_failure_falls_back_to_minimax(self):
         with patch.object(radio, "DASHSCOPE_API_KEY", "qwen-key"), \
                 patch.object(radio, "MINIMAX_KEY", "minimax-key"), \
@@ -84,6 +102,11 @@ class TTSRouting(unittest.IsolatedAsyncioTestCase):
     def test_cooldown_revision_tracks_qwen_voice(self):
         self.assertNotEqual(radio.COOLDOWN_CONTENT_VERSION,
                             radio._cooldown_revision(qwen_voice="Serena"))
+
+    def test_cooldown_revision_tracks_local_tts_model(self):
+        self.assertNotEqual(radio.COOLDOWN_CONTENT_VERSION,
+                            radio._cooldown_revision(local_url="http://127.0.0.1:8101",
+                                                     local_cache_id="sherpa-melo-zh-en-v2"))
 
     def test_cached_announcements_and_fallback_lines_are_voice_versioned(self):
         notice = radio._announcement_path("limited").name

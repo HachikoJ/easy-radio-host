@@ -19,3 +19,6 @@ musiclib/voice_*.mp3
 __pycache__/
 *.pyc
 .nogit
+
+# 本地 TTS 模型权重（由 scripts/install-local-tts.sh 部署）
+models/

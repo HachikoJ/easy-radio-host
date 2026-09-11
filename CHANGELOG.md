@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-09-11 · 本地 TTS 主渠道
+
+- 主持人口播改为优先调用服务器本机的 sherpa-onnx MeloTTS 服务（`vits-melo-tts-zh_en`，44.1 kHz 单声道，中英混读），通过 `LOCAL_TTS_URL` 指向 `127.0.0.1:8101`；本地服务未配置或调用失败时，仍按 `Qwen -> MiniMax -> edge-tts` 逐级降级。本地输出与云端口播一样经过 `backend/speech_audio.py` 的两遍 ffmpeg 响度归一化。
+- 新增单能力服务 `tts/server.py`（`GET /health`、`POST /synthesize`，单并发）、systemd 单元 `deploy/tingjian-tts.service`（`CPUQuota=160%`、`MemoryMax=650M`）、模型安装脚本 `scripts/install-local-tts.sh`（SHA256 校验、可重复执行）与 `tts/requirements.txt`。主服务在本地 TTS 已配置时最多等待 20 秒健康就绪，超时仍按云端链启动，避免把降级音频误存为本地版本。
+- 选型实测（2 vCPU / 1.9 GiB、无 GPU）：FP32 模型 163 MB、独立基准进程峰值 RSS 约 373 MB、2 线程 RTF 0.50–0.55，可用；部署后的 systemd 服务实测常驻约 489 MiB、峰值约 501 MiB。同模型 INT8 量化 RTF 2.5–3.0，慢约 5 倍，未采用；AISHELL-3 虽然 RTF 0.19，但采样率仅 8 kHz 且丢弃英文，未采用。英文按模型的中英混合音素读出，不等同英语母语发音，属已知质量边界。
+- 影响范围：口播生成链路、固定播报的缓存版本摘要（新增 `LOCAL_TTS_URL`、`LOCAL_TTS_CACHE_ID`、`LOCAL_TTS_SPEED`）、systemd 单元和部署文档。回退时把 `LOCAL_TTS_URL` 留空并重启主服务即回到纯云端链路，再按需 `systemctl disable --now tingjian-tts`；模型文件与 `.venv-tts` 可保留，歌单、收藏和用户数据无需迁移。
+
 ## 2026-09-10 · Qwen-TTS 主渠道
 
 - 主持人口播改为优先调用阿里云百炼 `qwen3-tts-instruct-flash`，默认使用 `Cherry`（芊悦）音色与温暖自然的电台口播指令；原 MiniMax 和 edge-tts 保留为逐级降级渠道。配置 `DASHSCOPE_API_KEY` 后启用 Qwen，专属业务空间可通过 `DASHSCOPE_BASE` 指向控制台提供的 `/api/v1` 地址。

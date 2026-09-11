@@ -9,15 +9,16 @@
            ├─ /、/api/、/voice/ → 127.0.0.1:8100 主应用
            └─ /music/          → 127.0.0.1:8001 在线曲库代理
 
-主应用 → Command Code（DeepSeek）编排节目 → Qwen-TTS（MiniMax / edge-tts 备用）合成口播
+主应用 → Command Code（DeepSeek）编排节目 → 本地 TTS :8101（sherpa-onnx MeloTTS）合成口播，失败时降级到 Qwen / MiniMax / edge-tts
 曲库代理 → 在线音乐 API → 校验音频、同源流转发（旧 307 跳转兼容）
 ```
 
 | 资源 | 位置 |
 | --- | --- |
-| 代码和虚拟环境 | `/opt/easy-radio-host`、`/opt/easy-radio-host/.venv` |
+| 代码和虚拟环境 | `/opt/easy-radio-host`、`/opt/easy-radio-host/.venv`、本地 TTS 的 `/opt/easy-radio-host/.venv-tts` |
 | 运行用户 | `tingjian` |
-| 系统服务 | `tingjian.service`、`tingjian-musiclib.service` |
+| 系统服务 | `tingjian.service`、`tingjian-musiclib.service`、`tingjian-tts.service`（可选） |
+| 本地 TTS 模型 | `/opt/easy-radio-host/models/vits-melo-tts-zh_en`，163 MB 权重，由 `scripts/install-local-tts.sh` 安装 |
 | 运行配置 | `/etc/tingjian/radio.env`，root 所有、权限 600 |
 | 运行数据 | `/var/lib/tingjian` |
 | GD 额度状态 | `/var/lib/tingjian/gd-quota.sqlite3`，计数与冷却跨重启保留 |
@@ -91,6 +92,10 @@ DASHSCOPE_BASE=https://dashscope.aliyuncs.com/api/v1
 QWEN_TTS_MODEL=qwen3-tts-instruct-flash
 QWEN_TTS_VOICE=Cherry
 QWEN_TTS_INSTRUCTIONS=温暖亲切、自然松弛，中速，吐字清晰，像真实电台主持人
+LOCAL_TTS_URL=http://127.0.0.1:8101
+LOCAL_TTS_CACHE_ID=sherpa-melo-zh-en-v1
+LOCAL_TTS_TIMEOUT=60
+LOCAL_TTS_SPEED=1.0
 EDGE_TTS_VOICE=zh-CN-XiaoxiaoNeural
 MINIMAX_BASE=https://api.minimaxi.com
 MINIMAX_MODEL=speech-02-turbo
@@ -101,15 +106,34 @@ MINIMAX_VOICE="Chinese (Mandarin)_Warm_Girl"
 
 百炼专属业务空间使用控制台给出的 DashScope 地址，即 `https://<业务空间主机>/api/v1`；没有专属地址时使用上面的公共地址。`DASHSCOPE_API_KEY` 与可选 `MINIMAX_KEY` 只放服务器运行配置，不放入 Git、前端或命令行参数。systemd 管理器读取 root 所有的环境文件后，以 `tingjian` 用户启动主服务；曲库服务不读取带密钥的配置。
 
-云端口播按 `Qwen -> MiniMax -> edge-tts` 调用。只配置 Qwen，或只配置 MiniMax，都能工作；两者都未配置时直接使用 edge-tts。`QWEN_TTS_VOICE` 默认 `Cherry`，`MINIMAX_VOICE` 默认 `Chinese (Mandarin)_Warm_Girl`。已有环境文件中的显式值优先于代码默认值，更新代码不会自动覆盖；修改任一声音相关参数并重启后，节目口播、故障播报和固定串场都会使用新的版本文件。
+口播按 `本地 MeloTTS -> Qwen -> MiniMax -> edge-tts` 调用。`LOCAL_TTS_URL` 留空时跳过本地服务；云端只配置 Qwen，或只配置 MiniMax，都能工作；两者都未配置时直接使用 edge-tts。`QWEN_TTS_VOICE` 默认 `Cherry`，`MINIMAX_VOICE` 默认 `Chinese (Mandarin)_Warm_Girl`。已有环境文件中的显式值优先于代码默认值，更新代码不会自动覆盖；修改任一声音相关参数并重启后，节目口播、故障播报和固定串场都会使用新的版本文件。
 
-新生成的 Qwen、MiniMax 或 edge-tts 口播通过 `backend/speech_audio.py` 做两遍 ffmpeg `loudnorm`：目标 -14 LUFS、真峰值上限 -1.5 dBTP、LRA 7，启用 `dual_mono`，每遍最长 20 秒。输出为 32 kHz、单声道、128 kbps MP3；缺少 ffmpeg、分析值无效、超时或编码失败时保留原音。处理不改写旧口播，也不下载或归一化第三方歌曲。前端歌曲播放音量为主音量乘以 0.85，口播使用主音量，滑杆数值仍表示主音量。
+新生成的口播，包括本地 MeloTTS 输出，都通过 `backend/speech_audio.py` 做两遍 ffmpeg `loudnorm`：目标 -14 LUFS、真峰值上限 -1.5 dBTP、LRA 7，启用 `dual_mono`，每遍最长 20 秒。输出为 32 kHz、单声道、128 kbps MP3；缺少 ffmpeg、分析值无效、超时或编码失败时保留原音。处理不改写旧口播，也不下载或归一化第三方歌曲。前端歌曲播放音量为主音量乘以 0.85，口播使用主音量，滑杆数值仍表示主音量。
 
-供应商调用可能产生费用。缺少配置或调用失败时可能走模板节目、edge-tts 或纯文字降级，HTTP 200 不能单独证明 DeepSeek、Qwen 或 MiniMax 调用成功。
+供应商调用可能产生费用，本地 TTS 正常工作时口播不产生供应商费用，节目编排仍调用 DeepSeek。缺少配置或调用失败时可能走模板节目、云端 TTS 或纯文字降级，HTTP 200 不能单独证明任一渠道调用成功。
 
-主服务启动后在后台检查故障播报和 8 条限流陪伴音频，只生成当前版本中缺失的文件；陪伴音频在配置 Qwen 或 MiniMax 后生成，每项沿用最多 3 次启动期重试。版本形如 `v1-{12位摘要}`，由 Qwen/MiniMax 模型、音色、指令、音频参数、edge-tts 音色和文案共同确定，修改任一项会生成新版本，不会在用户已经进入限流等待后临时调用供应商。`/api/playback/cooldown/content.json` 只列出已经成功生成的文件；单项失败不会虚报，清单为空时前端使用固定等待播报及浏览器语音降级，恢复计时仍继续。首次启动或版本变化后须等待清单完整再完成发布验收。
+主服务启动后在后台检查故障播报和 8 条限流陪伴音频，只生成当前版本中缺失的文件；陪伴音频在配置本地 TTS、Qwen 或 MiniMax 后生成，每项沿用最多 3 次启动期重试。版本形如 `v1-{12位摘要}`，由本地 TTS 地址与模型标识、Qwen/MiniMax 模型、音色、指令、音频参数、edge-tts 音色和文案共同确定，修改任一项会生成新版本，不会在用户已经进入限流等待后临时调用供应商。`/api/playback/cooldown/content.json` 只列出已经成功生成的文件；单项失败不会虚报，清单为空时前端使用固定等待播报及浏览器语音降级，恢复计时仍继续。首次启动或版本变化后须等待清单完整再完成发布验收。
 
 ## 4. 启动服务
+
+### 本地 TTS 服务（可选）
+
+本地口播需要独立虚拟环境和约 163 MB 的模型权重，不需要 GPU；加载后 systemd cgroup 常驻约 490 MiB、峰值约 500 MiB，2 vCPU 上实测合成速度约为实时的两倍。只使用云端降级链时跳过本节，并在 `radio.env` 中留空 `LOCAL_TTS_URL`。
+
+```bash
+sudo bash /opt/easy-radio-host/scripts/install-local-tts.sh
+sudo python3 -m venv /opt/easy-radio-host/.venv-tts
+sudo /opt/easy-radio-host/.venv-tts/bin/pip install -r /opt/easy-radio-host/tts/requirements.txt
+sudo install -m 644 /opt/easy-radio-host/deploy/tingjian-tts.service /etc/systemd/system/tingjian-tts.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now tingjian-tts
+sudo systemctl is-active tingjian-tts
+curl --fail --silent http://127.0.0.1:8101/health
+```
+
+首次启动要等模型加载完成才会返回健康状态；模型缺失时进程退出并在 `journalctl -u tingjian-tts` 中留下 `missing local TTS model files`。安装脚本用 SHA256 校验四个模型文件，重复执行只补齐缺失或损坏的部分；`hf-mirror.com` 不可用时可通过 `HF_MIRROR_BASE` 指向其他镜像。`tingjian.service` 通过 `Wants=tingjian-tts.service` 关注本地服务，并在 `LOCAL_TTS_URL` 非空时最多等待 20 秒让 8101 通过健康检查，避免冷启动时把云端音频误存为本地版本；等待超时后主应用仍继续启动并降级到云端 TTS。
+
+### 主应用
 
 ```bash
 sudo install -m 644 /opt/easy-radio-host/deploy/tingjian.service /etc/systemd/system/tingjian.service
@@ -161,11 +185,14 @@ curl --fail --silent https://audio.deline.top/music/_health
 curl --fail --silent https://audio.deline.top/api/playback/availability
 curl --fail --silent https://audio.deline.top/api/playback/cooldown/content.json | python3 -c \
   'import json,sys; d=json.load(sys.stdin); assert len(d["items"]) == 8; print(d["version"], len(d["items"]))'
+curl --fail --silent http://127.0.0.1:8101/health
 sudo ss -ltnp
-sudo systemctl status tingjian tingjian-musiclib --no-pager
+sudo systemctl status tingjian tingjian-musiclib tingjian-tts --no-pager
 ```
 
-检查 HTTP 跳转 HTTPS、证书域名及有效期、首页 200、曲库非空、限流陪伴清单正好包含 8 项，以及 8100/8001 只监听 `127.0.0.1`。逐项读取清单中的 `url`，确认返回可播放 MP3；文件未生成时清单不会虚报该项，可结合主服务日志定位 Qwen、MiniMax 或 edge-tts 失败原因，修复后重启主服务补齐缺失文件。
+检查 HTTP 跳转 HTTPS、证书域名及有效期、首页 200、曲库非空、限流陪伴清单正好包含 8 项，以及 8100/8001/8101 只监听 `127.0.0.1`。`/health` 返回 `sample_rate` 44100、`num_threads` 2 时表示本地模型已就绪。逐项读取清单中的 `url`，确认返回可播放 MP3；文件未生成时清单不会虚报该项，可结合主服务日志定位本地 TTS、Qwen、MiniMax 或 edge-tts 失败原因，修复后重启主服务补齐缺失文件。
+
+本地 TTS 启用后，用一次真实节目验证口播确实由本机生成：`sudo journalctl -u tingjian-tts -n 30 --no-pager` 应出现该次合成请求，主服务日志 `sudo journalctl -u tingjian -n 100 --no-pager` 不应出现 `Local TTS 失败`。若出现失败，先按第 8 节定位；本地服务不可用时主应用会自动降级到云端链，但发布验收要求本地链路本身通过。实测 cgroup 常驻约 489 MiB、峰值约 501 MiB，可结合 `systemctl show tingjian-tts -p MemoryPeak` 与 `free -m` 一起核对，1.9 GiB 机型上不应出现 OOM。
 
 真实节目验证会调用供应商服务：
 
@@ -176,7 +203,7 @@ curl --fail --silent --show-error --max-time 360 \
   -d '{"theme":"午后咖啡","exclude":[]}'
 ```
 
-检查返回的 `items` 中有歌曲和口播；歌曲地址应以 `https://audio.deline.top/music/` 开头并带 `stream=1`，口播使用本站 `/voice/`。对歌曲发送小范围 GET，验证 206、音频文件头及 Content-Range，并在浏览器确认实际播放时间前进与拖动。原不带 `stream` 的歌曲地址保留 307 兼容。结合供应商请求结果与服务日志确认真实模型、语音调用，不能用降级结果代替验证。音源状态与完整恢复规则见 [音源检索与恢复](docs/MUSIC-SOURCES.md)。
+检查返回的 `items` 中有歌曲和口播；歌曲地址应以 `https://audio.deline.top/music/` 开头并带 `stream=1`，口播使用本站 `/voice/`。对歌曲发送小范围 GET，验证 206、音频文件头及 Content-Range，并在浏览器确认实际播放时间前进与拖动。原不带 `stream` 的歌曲地址保留 307 兼容。结合本地 TTS 服务日志、供应商请求结果与服务日志确认真实模型、语音调用，不能用降级结果代替验证；中英混读文本（例如「今天放一首 City Pop」）需实听确认英文按中文音系发音、无明显断句错误。音源状态与完整恢复规则见 [音源检索与恢复](docs/MUSIC-SOURCES.md)。
 
 在桌面和手机浏览器打开正式入口，验证主题生成、口播到歌曲连续播放、暂停与恢复、下一首、点歌、聊天、收藏和历史。使用受控模拟验证无音源、限流与临时故障的文字说明、原因播报、自动下一曲及等待恢复；不能为验收主动向上游发送 45 次请求触发限额。限流模拟应覆盖时段内容优先、通用内容轮播、距恢复不足 6 秒不启新段、`ready` 后立即卸载陪伴音频并生成节目，以及再次返回 `limited/retry_after` 时继续等待。等待期间不得出现天气、定位、GD、DeepSeek 或云端 TTS 请求。
 
@@ -203,8 +230,9 @@ backup_dir="/var/backups/tingjian/$(date +%Y%m%d-%H%M%S)"
 sudo install -d -m 700 "$backup_dir"
 sudo cp -a /etc/tingjian "$backup_dir/config"
 sudo cp -a /etc/nginx/conf.d/audio.deline.top.conf "$backup_dir/nginx.conf"
-sudo cp -a /etc/systemd/system/tingjian.service /etc/systemd/system/tingjian-musiclib.service "$backup_dir/"
-sudo tar -czf "$backup_dir/code.tar.gz" --exclude=.venv -C /opt easy-radio-host
+sudo cp -a /etc/systemd/system/tingjian.service /etc/systemd/system/tingjian-musiclib.service \
+  /etc/systemd/system/tingjian-tts.service "$backup_dir/"
+sudo tar -czf "$backup_dir/code.tar.gz" --exclude=.venv --exclude=.venv-tts -C /opt easy-radio-host
 sudo tar -czf "$backup_dir/data.tar.gz" -C /var/lib tingjian
 ```
 
@@ -214,7 +242,11 @@ sudo tar -czf "$backup_dir/data.tar.gz" -C /var/lib tingjian
 sudo systemctl stop tingjian tingjian-musiclib
 sudo tar -xzf /tmp/tingjian-release.tar.gz -C /opt/easy-radio-host
 sudo /opt/easy-radio-host/.venv/bin/pip install -r /opt/easy-radio-host/backend/requirements.txt
+sudo /opt/easy-radio-host/.venv-tts/bin/pip install -r /opt/easy-radio-host/tts/requirements.txt
+sudo systemctl restart tingjian-tts
 ```
+
+未启用本地 TTS 的部署跳过 `.venv-tts` 与 `tingjian-tts` 两行；启用后主服务会在重启期间继续使用云端降级链，不会因为本地服务正在重启而中断口播。
 
 如果更新涉及 `deploy/`，审阅后重新安装对应配置，再执行 `systemctl daemon-reload` 或 `nginx -t` 与 reload。保留真实 `radio.env`，只补齐必要变量。
 
@@ -237,7 +269,9 @@ curl --fail --silent http://127.0.0.1:8100/api/playback/availability
 
 从未安装 ffmpeg 的版本更新时，安装系统包 `ffmpeg` 后可启用新口播响度处理；暂未安装仍会保留原音播放。需要采用新的默认音色时，应同时审阅现有 `QWEN_TTS_VOICE` 和 `MINIMAX_VOICE`，不能只依赖更新代码。音色配置恢复使用更新前的环境文件备份；代码回退不会自动改变已显式配置的音色。
 
-若新版未通过验收，停止本项目两项服务，将当前代码目录改名保留，然后从 `code.tar.gz` 恢复 `/opt/easy-radio-host`，按旧版 requirements 重建 venv。必要时恢复备份中的 systemd/Nginx 配置，校验后启动服务并复验。改名后的目录保留到恢复确认完成，不直接删除。用户口播等数据独立存放，普通代码回退无需回退数据；涉及数据迁移时先核对兼容性再恢复备份。版本化限流陪伴文件可保留，旧代码不会引用它们；歌词只在内存缓存，无数据回退步骤。
+本地 TTS 的回退不需要改代码：把 `LOCAL_TTS_URL` 留空并重启主服务即回到 `Qwen -> MiniMax -> edge-tts`，再执行 `sudo systemctl disable --now tingjian-tts` 释放约 490 MiB 内存。模型文件与 `.venv-tts` 可留在磁盘上，重新启用只需恢复 `LOCAL_TTS_URL` 并启动服务。切换渠道后固定播报的版本摘要会变化，主服务会重新生成故障播报和 8 条限流陪伴音频，旧文件保留但不再被引用。
+
+若新版未通过验收，停止 `tingjian`、`tingjian-musiclib` 与 `tingjian-tts`，将当前代码目录改名保留，然后从 `code.tar.gz` 恢复 `/opt/easy-radio-host`，按旧版 requirements 重建 venv。必要时恢复备份中的 systemd/Nginx 配置，校验后启动服务并复验。改名后的目录保留到恢复确认完成，不直接删除。用户口播等数据独立存放，普通代码回退无需回退数据；涉及数据迁移时先核对兼容性再恢复备份。版本化限流陪伴文件可保留，旧代码不会引用它们；歌词只在内存缓存，无数据回退步骤。
 
 额度数据库例外：始终保留最新 `gd-quota.sqlite3` 及当前冷却，不用旧数据备份覆盖它。优先保留兼容的持久额度模块，仅回退播放行为。若必须运行不读取 SQLite 的旧代理，先确认已记录冷却结束，且最后一次 GD 请求已过去 300 秒，再启动；旧代码的预算也必须保持每 300 秒最多 45 次，不能恢复为 50 次。回退不是重新获得请求额度的方式。
 
@@ -256,6 +290,8 @@ sudo certbot certificates
 | --- | --- |
 | 首页可开，生成超时 | 主服务日志、供应商连通性、额度、Nginx 超时 |
 | 只有文字或模板节目 | DeepSeek/Qwen/MiniMax 调用结果、`QWEN_TTS_VOICE` 与备用音色配置、edge-tts 网络 |
+| 口播回退到云端渠道 | `curl --fail http://127.0.0.1:8101/health`、`journalctl -u tingjian-tts -n 50`、主服务日志中的 `Local TTS 失败`；模型缺失时重跑安装脚本，改配置后重启 `tingjian-tts` |
+| 口播合成变慢或内存告警 | 本地服务是否在用 FP32 `model.onnx`、`systemctl show tingjian-tts -p MemoryPeak`、`free -m`；检查是否改过 `LOCAL_TTS_THREADS`、`LOCAL_TTS_MAX_TEXT_CHARS`，必要时先置空 `LOCAL_TTS_URL` 回到云端链 |
 | 歌曲不播放 | 公网 `NAS_BASE_URL`、`/music/` 映射、歌曲源与最终音频 HTTPS |
 | 曲库为空 | `playlist.tsv` 路径、权限、TSV 格式 |
 | 口播 404 | `DATA_DIR`、服务写权限、`/voice/` 转发 |
@@ -269,7 +305,7 @@ sudo certbot certificates
 
 排障时不要公开包含凭证、用户输入或个人数据的完整日志。AI 编排内容不保证事实准确；公开服务会使用部署者的供应商额度，应按访问规模配置预算和访问范围。
 
-当前 Nginx 限制按访客 IP 生效，不能约束大量不同来源的总 TTS 调用量。若要向所有人开放，应在上线前增加跨请求的 Qwen 字符预算、并发/RPM 闸门和短文本限制，并监控实际用量；仅保留 `DASHSCOPE_API_KEY` 而不设总额度会直接消耗部署者账户余额。
+当前 Nginx 限制按访客 IP 生效，不能约束大量不同来源的总请求量。常规口播由本地 TTS 承担，`Qwen` 与 `MiniMax` 只在本地服务不可用时才会被调用，但公开服务仍应在上线前增加跨请求的字符预算、并发/RPM 闸门和短文本限制，并监控实际用量；仅保留 `DASHSCOPE_API_KEY` 而不设总额度，会在本地服务持续故障时直接消耗部署者账户余额。本地 TTS 只降低口播成本，不改变 DeepSeek 编排、在线曲库和歌词的用量边界。
 
 ## 版权与致谢
 
