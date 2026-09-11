@@ -174,4 +174,12 @@ export function createQuietLayout({ icon }) {
   document.body.classList.add('quiet-ui');
   updateBackdrop();
   window.dispatchEvent(new Event('tingjian:layout'));
+  // 等安静布局和唱片首帧都提交后再揭示，避免旧版页面或水平唱片先被画出来。
+  const reveal = () => requestAnimationFrame(() => requestAnimationFrame(() => {
+    document.documentElement.classList.remove('app-booting', 'theme-booting');
+  }));
+  if (document.querySelector('.record-stage.record-booting')) {
+    window.addEventListener('tingjian:record-ready', reveal, { once: true });
+    setTimeout(reveal, 8000);
+  } else reveal();
 }

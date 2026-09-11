@@ -139,20 +139,28 @@ export function createRecordMotion(stages, audio) {
   });
   surfaces.forEach(({ canvas }) => observer.observe(canvas));
   new MutationObserver(paint).observe(document.documentElement, { attributes: true, attributeFilter: ['data-appearance'] });
-  import('./record-scene.js?v=20260909-3').then(({ createRecordScene }) => {
+  const revealed = new WeakSet();
+  const reveal = (surface, webgl = false) => {
+    if (revealed.has(surface)) return;
+    revealed.add(surface);
+    if (webgl) surface.stage.classList.add('record-webgl');
+    surface.stage.classList.remove('record-booting');
+    window.dispatchEvent(new Event('tingjian:record-ready'));
+  };
+  // Three.js 首次绘制前保持隐藏；若加载失败则只显示一次普通唱片，之后不再替换。
+  import('./record-scene.js?v=20260911-4').then(({ createRecordScene }) => {
     for (const surface of surfaces) {
       const canvas = surface.canvas.cloneNode(false);
       try {
-        const renderer = createRecordScene(canvas, surface.stage.querySelector('img'));
+        const renderer = createRecordScene(canvas, surface.stage.querySelector('img'), () => reveal(surface, true));
         observer.unobserve(surface.canvas);
         surface.canvas.replaceWith(canvas);
         surface.canvas = canvas; surface.context = null; surface.renderer = renderer;
-        surface.stage.classList.add('record-webgl');
         observer.observe(canvas);
         if (surface.size) { renderer.resize(surface.size, Math.min(devicePixelRatio || 1, 2)); draw(surface); }
-      } catch { /* Keep the canvas fallback when WebGL is unavailable. */ }
+      } catch { reveal(surface); } /* Keep the canvas fallback when WebGL is unavailable. */
     }
-  }).catch(() => { /* Rendering dependencies must never prevent playback. */ });
+  }).catch(() => surfaces.forEach(surface => reveal(surface)));
 
   return {
     setPlaying(value) {

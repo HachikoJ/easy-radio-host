@@ -61,7 +61,7 @@ function ribbonMaterial(glow, opacity) {
   });
 }
 
-export function createRecordScene(canvas, artworkImage) {
+export function createRecordScene(canvas, artworkImage, onReady) {
   const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: true, powerPreference: 'low-power' });
   renderer.setClearColor(0x000000, 0);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -75,6 +75,12 @@ export function createRecordScene(canvas, artworkImage) {
   let disposed = false;
   let initialized = false;
   let lastState = { phase: 0, energy: 0, bass: 0, bands: EMPTY_BANDS, moving: false };
+  let sized = false, artworkSettled = false, readySignalled = false;
+  function signalReady() {
+    if (readySignalled || !sized || !artworkSettled) return;
+    readySignalled = true;
+    onReady?.();
+  }
 
   function mesh(geometry, material, parent = scene) {
     const object = new THREE.Mesh(geometry, material);
@@ -110,9 +116,14 @@ export function createRecordScene(canvas, artworkImage) {
   spindle.position.y = .034;
 
   let textureRequest = 0;
+  function settleArtwork() {
+    artworkSettled = true;
+    renderer.render(scene, camera);
+    signalReady();
+  }
   function updateArtwork() {
     const url = artworkImage?.currentSrc || artworkImage?.src;
-    if (!url) return;
+    if (!url) { settleArtwork(); return; }
     const request = ++textureRequest;
     new THREE.TextureLoader().load(url, texture => {
       if (disposed || request !== textureRequest) { texture.dispose(); return; }
@@ -123,10 +134,17 @@ export function createRecordScene(canvas, artworkImage) {
       else { texture.repeat.y = image.width / image.height; texture.offset.y = (1 - texture.repeat.y) / 2; }
       artworkMaterial.map?.dispose();
       artworkMaterial.map = texture;
+      artworkMaterial.color.set(0xffffff);
       artworkMaterial.needsUpdate = true;
-      renderer.render(scene, camera);
-    }, undefined, () => {});
+      settleArtwork();
+    }, undefined, () => { if (!disposed && request === textureRequest) settleArtwork(); });
   }
+  // 素材加载过慢时先显示唱片本体，避免封面区域长时间空白。
+  const artworkTimeout = setTimeout(() => {
+    if (disposed || artworkSettled) return;
+    artworkMaterial.color.set(0x1d2436);
+    settleArtwork();
+  }, 1500);
   const artworkObserver = new MutationObserver(updateArtwork);
   if (artworkImage) {
     artworkObserver.observe(artworkImage, { attributes: true, attributeFilter: ['src', 'srcset'] });
@@ -230,10 +248,13 @@ export function createRecordScene(canvas, artworkImage) {
       if (disposed || !size) return;
       renderer.setPixelRatio(Math.min(ratio, 2));
       renderer.setSize(size, size, false);
+      sized = true;
       render(lastState);
+      signalReady();
     },
     dispose() {
       disposed = true;
+      clearTimeout(artworkTimeout);
       canvas.removeEventListener('webglcontextrestored', restoreContext);
       artworkObserver.disconnect();
       artworkImage?.removeEventListener('load', updateArtwork);

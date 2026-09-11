@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN" class="theme-booting" data-appearance="dark">
+<html lang="zh-CN" class="theme-booting app-booting" data-appearance="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -11,16 +11,17 @@
   <meta property="og:image" content="https://raw.githubusercontent.com/HachikoJ/easy-radio-host/main/docs/radio-desktop.png">
   <meta name="twitter:card" content="summary_large_image">
   <title>听间 Tingjian · 你的 AI 音乐电台</title>
-  <script>try{if(localStorage.getItem('tingjian.appearance.v1')==='light'){document.documentElement.dataset.appearance='light';document.querySelector('meta[name="theme-color"]').content='#f6f7f9'}}catch{}</script>
-  <style>html.theme-booting #cover,html.theme-booting #mini-cover,html.theme-booting #show-theme,html.theme-booting #show-slogan,html.theme-booting #now-title{visibility:hidden}</style>
+  <script>try{if(localStorage.getItem('tingjian.appearance.v1')==='light'){document.documentElement.dataset.appearance='light';document.querySelector('meta[name="theme-color"]').content='#f6f7f9'}}catch{}setTimeout(function(){document.documentElement.classList.remove('app-booting','theme-booting')},10000)</script>
+  <style>html{background:#17191c}html[data-appearance=light]{background:#f6f7f9}html.app-booting body{visibility:hidden}html.theme-booting #cover,html.theme-booting #mini-cover,html.theme-booting #show-theme,html.theme-booting #show-slogan,html.theme-booting #now-title{visibility:hidden}</style>
+  <noscript><style>html.app-booting body,html.theme-booting #cover,html.theme-booting #mini-cover,html.theme-booting #show-theme,html.theme-booting #show-slogan,html.theme-booting #now-title{visibility:visible}</style></noscript>
   <link rel="icon" href="assets/brand.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=20260909-3">
-  <link rel="stylesheet" href="listening.css?v=20260909-3">
-  <link rel="stylesheet" href="lyrics.css?v=20260909-3">
-  <link rel="stylesheet" href="recommendations.css?v=20260909-3">
-  <link rel="stylesheet" href="quiet.css?v=20260911-2">
-  <script src="listening.js?v=20260911-2" defer></script>
-  <script src="app.js?v=20260911-1" type="module"></script>
+  <link rel="stylesheet" href="style.css?v=20260911-4">
+  <link rel="stylesheet" href="listening.css?v=20260911-4">
+  <link rel="stylesheet" href="lyrics.css?v=20260911-4">
+  <link rel="stylesheet" href="recommendations.css?v=20260911-4">
+  <link rel="stylesheet" href="quiet.css?v=20260911-4">
+  <script src="listening.js?v=20260911-4" defer></script>
+  <script src="app.js?v=20260911-4" type="module"></script>
 </head>
 <body id="top">
   <a class="skip-link" href="#listening">跳到播放器</a>
@@ -98,6 +99,6 @@
     <div class="volume"><button class="icon-button" id="mute" aria-label="静音" data-tip="静音"><span class="icon" id="volume-icon" style="--icon:url(assets/Volume2.svg)"></span></button><input id="volume" type="range" min="0" max="100" value="75" aria-label="音量"><span id="volume-value">75%</span></div>
   </footer>
   <audio id="audio" preload="metadata"></audio>
-  <script src="theme-schedule.js?v=20260910-3"></script>
+  <script src="theme-schedule.js?v=20260911-4"></script>
 </body>
 </html>

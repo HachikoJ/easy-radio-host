@@ -1,5 +1,5 @@
-import { parseLyrics, activeLine, lyricEndpoint, lyricRetryAfter } from './lyrics-data.js?v=20260909-3';
-import { createRecordMotion } from './record-motion.js?v=20260909-3';
+import { parseLyrics, activeLine, lyricEndpoint, lyricRetryAfter } from './lyrics-data.js?v=20260911-4';
+import { createRecordMotion } from './record-motion.js?v=20260911-4';
 
 export function createLyricsExperience({ audio, state, seek, demo }) {
   const get = id => document.getElementById(id);
@@ -7,7 +7,7 @@ export function createLyricsExperience({ audio, state, seek, demo }) {
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   for (const target of document.querySelectorAll('.cover-wrap')) {
     const artwork = target.querySelector('img');
-    const stage = document.createElement('div'); stage.className = 'record-stage';
+    const stage = document.createElement('div'); stage.className = 'record-stage record-booting';
     const disc = document.createElement('div'); disc.className = 'record-disc';
     target.insertBefore(stage, artwork); disc.append(artwork); stage.append(disc);
   }

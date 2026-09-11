@@ -1,6 +1,6 @@
-import { createLyricsExperience } from './lyrics.js?v=20260909-3';
-import { createRecommendationExperience } from './recommendations.js?v=20260909-3';
-import { createQuietLayout } from './layout.js?v=20260911-1';
+import { createLyricsExperience } from './lyrics.js?v=20260911-4';
+import { createRecommendationExperience } from './recommendations.js?v=20260911-4';
+import { createQuietLayout } from './layout.js?v=20260911-4';
 const { themes, scheduledTheme } = globalThis.TingjianThemeSchedule;
 
 const $ = id => document.getElementById(id);
@@ -101,7 +101,7 @@ async function request(path, body, controller) {
   const timeout = setTimeout(() => controller.abort('timeout'), path === '/api/playback/resolve' ? 60000 : 240000);
   try {
     if (demo) {
-      const { respond } = await import('./demo.js?v=20260909-3');
+      const { respond } = await import('./demo.js?v=20260911-4');
       return await respond(path, body, controller.signal);
     }
     const response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: controller.signal });

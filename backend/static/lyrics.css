@@ -24,3 +24,4 @@
 .record-webgl .record-disc{visibility:hidden}.record-webgl .record-ripple,.motion-disabled .record-webgl .record-ripple{opacity:1}
 @media(max-width:800px){.focus-mode .focus-art:has(.record-webgl){width:270px}}
 @media(max-width:800px){.focus-mode .focus-stage{padding-top:0}.focus-mode .focus-art{width:200px;margin-bottom:8px}.focus-mode .focus-copy>.focus-note{margin:0;padding:10px 0;border-top:0}.focus-mode .focus-copy .lyrics-panel{margin-top:8px;padding-top:8px}.focus-mode .focus-copy .lyrics-lines{height:200px;padding-block:36px}.focus-mode .focus-copy>h1{font-size:22px}.focus-mode .focus-copy>.focus-subtitle{margin:4px 0}}
+.record-stage.record-booting{visibility:hidden}

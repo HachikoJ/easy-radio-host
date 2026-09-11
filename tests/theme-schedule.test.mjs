@@ -44,7 +44,7 @@ test('returns the complete scheduled theme object for the current time', () => {
   assert.equal(scheduledTheme(themes, now).name, '午后咖啡');
 });
 
-test('prepaints the scheduled theme and clears the boot guard', () => {
+test('prepaints the scheduled theme and leaves the boot guard for layout', () => {
   const nodes = Object.fromEntries(['cover', 'show-theme', 'show-slogan', 'now-title', 'mini-cover'].map(id => [id, {}]));
   const classes = new Set(['theme-booting']);
   const targetDocument = {
@@ -64,5 +64,5 @@ test('prepaints the scheduled theme and clears the boot guard', () => {
   assert.equal(nodes['now-title'].textContent, '深夜安眠');
   assert.equal(nodes['mini-cover'].src, 'assets/night.jpg');
   assert.equal(targetDocument.documentElement.dataset.scheduledTheme, '深夜安眠');
-  assert.equal(classes.has('theme-booting'), false);
+  assert.equal(classes.has('theme-booting'), true);
 });

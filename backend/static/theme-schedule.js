@@ -49,7 +49,7 @@
     set('now-title', 'title', theme.name);
     set('mini-cover', 'src', `assets/${theme.image}.jpg`);
     targetDocument.documentElement.dataset.scheduledTheme = theme.name;
-    targetDocument.documentElement.classList.remove('theme-booting');
+    // 启动遮罩由 layout.js 在真实布局提交后统一解除，避免旧版结构先被绘制。
     return theme;
   }
 
