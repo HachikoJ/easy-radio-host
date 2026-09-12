@@ -1,8 +1,7 @@
 export function createQuietLayout({ icon }) {
   const get = id => document.getElementById(id);
   const header = document.querySelector('.page-header');
-  const nav = document.querySelector('.sidebar nav');
-  header.prepend(document.querySelector('.sidebar .brand'), nav);
+  const nav = header.querySelector('nav');
   const viewActions = document.querySelector('.view-actions');
   for (const [id, label, symbol] of [
     ['credits-link', '开源致谢', 'BookOpen'],
@@ -171,7 +170,6 @@ export function createQuietLayout({ icon }) {
   };
   new MutationObserver(updateBackdrop).observe(get('cover'), { attributes: true, attributeFilter: ['src'] });
   window.addEventListener('tingjian:layout', updateBackdrop);
-  document.body.classList.add('quiet-ui');
   updateBackdrop();
   window.dispatchEvent(new Event('tingjian:layout'));
   // 等安静布局和唱片首帧都提交后再揭示，避免旧版页面或水平唱片先被画出来。
