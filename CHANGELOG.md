@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-09-16 · 官网入口
+
+- 收听页右上角新增「访问官网」图标入口，地址为 `https://www.deline.top/`，位于外观切换与开源致谢之间，并在新标签页打开。
+- 影响范围为前端头部图标入口与对应文档；不改接口、配置或数据格式，回退本次提交即可恢复。
+
 ## 2026-09-11 · 本地 TTS 主渠道
 
 - 主持人口播改为优先调用服务器本机的 sherpa-onnx MeloTTS 服务（`vits-melo-tts-zh_en`，44.1 kHz 单声道，中英混读），通过 `LOCAL_TTS_URL` 指向 `127.0.0.1:8101`；本地服务未配置或调用失败时，仍按 `Qwen -> MiniMax -> edge-tts` 逐级降级。本地输出与云端口播一样经过 `backend/speech_audio.py` 的两遍 ffmpeg 响度归一化。

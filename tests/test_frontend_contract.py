@@ -106,18 +106,22 @@ class FrontendContract(unittest.IsolatedAsyncioTestCase):
         class Links(HTMLParser):
             def handle_starttag(self, tag, attrs):
                 values = dict(attrs)
-                if tag == "a" and values.get("id") in ("credits-link", "author-link"):
+                if tag == "a" and values.get("id") in ("website-link", "credits-link", "author-link"):
                     links[values["id"]] = values
 
         links = {}
         status, content = await request("/")
         self.assertEqual(status, 200)
-        Links().feed(content.decode("utf-8"))
+        html = content.decode("utf-8")
+        Links().feed(html)
+        self.assertEqual(links["website-link"]["href"], "https://www.deline.top/")
         self.assertEqual(links["author-link"]["href"], "https://github.com/HachikoJ/easy-radio-host")
         self.assertEqual(links["credits-link"]["href"], "credits.html")
         for link in links.values():
             self.assertEqual(link["target"], "_blank")
             self.assertTrue({"noopener", "noreferrer"} <= set(link["rel"].split()))
+        header = html[html.index('<header class="page-header">'):html.index("</header>")]
+        self.assertLess(header.index('id="appearance"'), header.index('id="website-link"'))
 
     async def test_visit_counter_tag_sits_between_tabs_and_header_actions(self):
         status, content = await request("/")
