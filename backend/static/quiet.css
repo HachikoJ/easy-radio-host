@@ -40,7 +40,10 @@
 .quiet-ui .recommendation-options h3{font-size:12px;font-weight:600;margin:0 0 5px}.quiet-ui .recommendation-options h3:not(:first-child){border-top:1px solid var(--line);padding-top:14px;margin-top:10px}
 .quiet-ui .recommendation-options .toggle-label{font-size:12px;min-height:44px}.quiet-ui .recommendation-consent{font-size:11px;line-height:1.9;margin:5px 0 10px}
 .quiet-ui .lyrics-timing{display:flex;flex-direction:column;align-items:stretch;gap:0}.quiet-ui .lyrics-timing label{justify-content:space-between;font-size:12px;min-height:44px}.quiet-ui .lyrics-timing input[type=number]{min-height:36px}
-.quiet-ui .page-footer{display:none}
+.quiet-ui .page-footer{display:flex;justify-content:flex-end;align-items:center;min-height:24px;margin:0;padding:0 0 4px;border:0;font-size:10px;line-height:1.4}
+.quiet-ui .page-footer>span,.quiet-ui .page-footer>.icon-button{display:none}
+.quiet-ui .page-footer #icp-link{display:inline-flex;align-items:center;min-height:20px;color:var(--secondary);text-decoration:none}
+.quiet-ui .page-footer #icp-link:hover{color:var(--ink);text-decoration:underline}
 .quiet-ui .player-bar{z-index:50}.quiet-ui .notice,.quiet-ui.focus-mode .notice{position:fixed;bottom:calc(var(--player) + 12px);left:50%;transform:translateX(-50%);width:min(560px,calc(100% - 32px));z-index:60;margin:0}
 .quiet-ui .drawer-shade{position:fixed;inset:80px 0 var(--player);background:#11182720;z-index:30;backdrop-filter:blur(2px)}
 .quiet-ui .utility-drawer{position:fixed;inset:92px 14px calc(var(--player) + 12px) auto;margin:0;padding:0;width:440px;max-width:calc(100vw - 28px);height:auto;max-height:none;border:1px solid var(--line);border-radius:8px;background:var(--white);color:var(--ink);box-shadow:0 12px 44px #0002;z-index:40;overflow:hidden}
@@ -95,7 +98,7 @@
 .quiet-ui .page-header .visit-stats{flex:none;min-width:146px;justify-content:center}
 /* 计数返回前先占住位置，避免标签出现时挤动中间导航。 */
 .quiet-ui .page-header .visit-stats[hidden]{display:inline-flex!important;visibility:hidden}
-.quiet-ui:not(.focus-mode) main{height:calc(100dvh - var(--player) - env(safe-area-inset-bottom));display:grid;grid-template-rows:var(--header) minmax(0,1fr)}
+.quiet-ui:not(.focus-mode) main{height:calc(100dvh - var(--player) - env(safe-area-inset-bottom));display:grid;grid-template-rows:var(--header) minmax(0,1fr) auto}
 .quiet-ui:not(.focus-mode) .workspace,.quiet-ui:not(.focus-mode) .listen-column{height:100%;min-height:0}
 .quiet-ui:not(.focus-mode) .listening{height:100%;min-height:0;padding:12px 0;grid-template-columns:minmax(200px,.8fr) minmax(0,1.4fr);grid-template-rows:auto minmax(0,1fr);gap:8px 40px}
 .quiet-ui .track-heading{grid-column:1/-1;grid-row:1;display:flex;align-items:center;gap:16px;min-height:44px;min-width:0;position:relative;z-index:20}

@@ -106,7 +106,7 @@ class FrontendContract(unittest.IsolatedAsyncioTestCase):
         class Links(HTMLParser):
             def handle_starttag(self, tag, attrs):
                 values = dict(attrs)
-                if tag == "a" and values.get("id") in ("website-link", "credits-link", "author-link"):
+                if tag == "a" and values.get("id") in ("website-link", "credits-link", "author-link", "icp-link"):
                     links[values["id"]] = values
 
         links = {}
@@ -117,6 +117,7 @@ class FrontendContract(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(links["website-link"]["href"], "https://www.deline.top/")
         self.assertEqual(links["author-link"]["href"], "https://github.com/HachikoJ/easy-radio-host")
         self.assertEqual(links["credits-link"]["href"], "credits.html")
+        self.assertEqual(links["icp-link"]["href"], "https://beian.miit.gov.cn/")
         for link in links.values():
             self.assertEqual(link["target"], "_blank")
             self.assertTrue({"noopener", "noreferrer"} <= set(link["rel"].split()))
@@ -136,7 +137,17 @@ class FrontendContract(unittest.IsolatedAsyncioTestCase):
         self.assertLess(header.index('id="visit-stats"'), header.index('class="view-actions"'))
         quiet = (ROOT / "backend" / "static" / "quiet.css").read_text()
         self.assertIn(".quiet-ui .page-header .visit-stats{", quiet)
-        self.assertIn(".quiet-ui .page-footer{display:none}", quiet)
+        self.assertIn('id="icp-link"', footer)
+        self.assertIn("粤ICP备2025449309号-2", footer)
+        self.assertIn(".quiet-ui .page-footer #icp-link{", quiet)
+        self.assertNotIn(".quiet-ui .page-footer{display:none}", quiet)
+
+    async def test_credits_page_contains_registration_link(self):
+        status, content = await request("/credits.html")
+        self.assertEqual(status, 200)
+        html = content.decode("utf-8")
+        self.assertIn('id="icp-link" href="https://beian.miit.gov.cn/"', html)
+        self.assertIn("粤ICP备2025449309号-2", html)
 
     async def test_scheduled_theme_is_ready_before_the_module_app_runs(self):
         class Scripts(HTMLParser):
