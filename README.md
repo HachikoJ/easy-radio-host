@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/Python-3.10%2B-3776AB" alt="Python 3.10+">
   <img src="https://img.shields.io/badge/FastAPI-009688" alt="FastAPI">
   <img src="https://img.shields.io/badge/DeepSeek-AI-1677E8" alt="DeepSeek AI">
-  <a href="https://github.com/HachikoJ/easy-radio-host"><img src="https://img.shields.io/github/stars/HachikoJ/easy-radio-host?style=flat" alt="GitHub stars"></a>
+  <a href="https://github.com/HachikoJ/tingjian"><img src="https://img.shields.io/github/stars/HachikoJ/tingjian?style=flat" alt="GitHub stars"></a>
 </p>
 
 <p align="center">
@@ -25,7 +25,7 @@
 
 听间是一个面向喜欢主题听歌、愿意自行部署的听众的 AI 音乐电台。推荐引擎结合主题和可选偏好选歌，主持人「小蓝」串联话题并合成口播，浏览器连续播放「口播 → 歌曲 → 口播」。歌曲来自在线音乐 API，无需准备本地音乐文件。
 
-**项目地址：** [HachikoJ/easy-radio-host](https://github.com/HachikoJ/easy-radio-host)
+**项目地址：** [HachikoJ/tingjian](https://github.com/HachikoJ/tingjian)
 
 **在线收听：** [audio.deline.top](https://audio.deline.top)，选择主题后点击「开始收听」。也可按下方步骤自行部署。
 
@@ -116,8 +116,8 @@ GD Studio 列出的 10 个渠道会按实际开放情况参与检索，并不代
 需要 Python 3.10+；安装 ffmpeg 可启用新口播的响度归一化。完整的 Linux 部署步骤、systemd 配置和故障排查见 [部署手册](DEPLOY-HANDOFF.md)。
 
 ```bash
-git clone https://github.com/HachikoJ/easy-radio-host.git
-cd easy-radio-host
+git clone https://github.com/HachikoJ/tingjian.git
+cd tingjian
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r backend/requirements.txt zhconv
@@ -256,7 +256,7 @@ node scripts/serve-demo.mjs
 - [更新记录](CHANGELOG.md) · [协作约定](AGENTS.md)。
 - [设计约定](DESIGN.md) · [第三方来源与许可记录](THIRD_PARTY_NOTICES.md)。
 - [推荐设计与 Embeat 参考说明](docs/EMBEAT-ADAPTATION.md)：候选融合、边界、降级规则与评测。
-- [持续集成](https://github.com/HachikoJ/easy-radio-host/actions)：Python 语法、接口契约及前端静态服务检查。
+- [持续集成](https://github.com/HachikoJ/tingjian/actions)：Python 语法、接口契约及前端静态服务检查。
 
 ## 致谢
 
@@ -269,16 +269,16 @@ node scripts/serve-demo.mjs
 
 ## GitHub 关注度
 
-[![Star History Chart](https://api.star-history.com/svg?repos=HachikoJ/easy-radio-host&type=Date)](https://star-history.com/#HachikoJ/easy-radio-host&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=HachikoJ/tingjian&type=Date)](https://star-history.com/#HachikoJ/tingjian&Date)
 
-[查看独立 Star History](https://star-history.com/#HachikoJ/easy-radio-host&Date)
+[查看独立 Star History](https://star-history.com/#HachikoJ/tingjian&Date)
 
 ## 联系作者
 
 交流 AI 音乐产品、反馈使用体验或支持项目，可以通过以下方式联系：
 
 - 个人官网：[www.deline.top](https://www.deline.top)
-- GitHub：[HachikoJ](https://github.com/HachikoJ) · [提交问题](https://github.com/HachikoJ/easy-radio-host/issues)
+- GitHub：[HachikoJ](https://github.com/HachikoJ) · [提交问题](https://github.com/HachikoJ/tingjian/issues)
 - 微信：`hostrow`，添加时请备注「听间」
 - 邮箱：[946106011@qq.com](mailto:946106011@qq.com)
 

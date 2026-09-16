@@ -1,6 +1,6 @@
 # Contributing
 
-感谢参与 `easy-radio-host`。请先通过 GitHub Issues 描述问题或建议，再提交 Pull Request。
+感谢参与听间（`tingjian`）。请先通过 GitHub Issues 描述问题或建议，再提交 Pull Request。
 
 ## 本地检查
 

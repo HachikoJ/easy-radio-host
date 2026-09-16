@@ -2,7 +2,7 @@
 
 ## 项目目标
 
-easy-radio-host 是一个基于 FastAPI 的在线 AI 音乐电台：使用 DeepSeek 编排节目，优先使用阿里云百炼 Qwen-TTS，并可按 MiniMax、edge-tts 降级合成口播，通过在线音乐 API 动态获取歌曲播放地址。项目不保存歌曲音频文件。
+tingjian（听间）是一个基于 FastAPI 的在线 AI 音乐电台：使用 DeepSeek 编排节目，优先使用阿里云百炼 Qwen-TTS，并可按 MiniMax、edge-tts 降级合成口播，通过在线音乐 API 动态获取歌曲播放地址。项目不保存歌曲音频文件。
 
 ## 变更边界
 

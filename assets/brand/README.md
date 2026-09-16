@@ -1,6 +1,6 @@
 # Tingjian Identity / 听间品牌
 
-- Product: Tingjian / 听间, an AI music radio. The presenter remains Xiaolan / 小蓝; the GitHub repository keeps the name `easy-radio-host`.
+- Product: Tingjian / 听间, an AI music radio. The presenter remains Xiaolan / 小蓝; the GitHub repository is named `tingjian`.
 - Master: `tingjian-logo.svg`, custom vector geometry created for this project.
 - README asset: `tingjian-logo.png`, 1024 x 1024 transparent PNG exported from the SVG.
 - App asset: `../../backend/static/assets/brand.svg`, an identical copy of the master for the page header and browser favicon; keep the SVG files in sync.

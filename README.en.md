@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/Python-3.10%2B-3776AB" alt="Python 3.10+">
   <img src="https://img.shields.io/badge/FastAPI-009688" alt="FastAPI">
   <img src="https://img.shields.io/badge/DeepSeek-AI-1677E8" alt="DeepSeek AI">
-  <a href="https://github.com/HachikoJ/easy-radio-host"><img src="https://img.shields.io/github/stars/HachikoJ/easy-radio-host?style=flat" alt="GitHub stars"></a>
+  <a href="https://github.com/HachikoJ/tingjian"><img src="https://img.shields.io/github/stars/HachikoJ/tingjian?style=flat" alt="GitHub stars"></a>
 </p>
 
 <p align="center">
@@ -25,7 +25,7 @@
 
 Tingjian is an AI music radio for listeners who enjoy themed listening and are comfortable hosting their own service. Its recommendation engine selects tracks using themes and optional preferences; the host, Xiaolan, connects them with commentary and synthesizes narration. Your browser plays narration and songs in sequence. Tracks come from an online music API, so no local music collection is required.
 
-**Repository:** [HachikoJ/easy-radio-host](https://github.com/HachikoJ/easy-radio-host)
+**Repository:** [HachikoJ/tingjian](https://github.com/HachikoJ/tingjian)
 
 **Listen online:** [audio.deline.top](https://audio.deline.top). Choose a theme and click "开始收听" (Start listening). You can also self-host using the steps below.
 
@@ -116,8 +116,8 @@ Recommendations use the current catalog and available metadata without connectin
 Requires Python 3.10+; install ffmpeg to normalize newly generated narration. See the [deployment guide](DEPLOY-HANDOFF.md) for Linux setup, systemd configuration, and troubleshooting. The detailed guide is currently in Chinese.
 
 ```bash
-git clone https://github.com/HachikoJ/easy-radio-host.git
-cd easy-radio-host
+git clone https://github.com/HachikoJ/tingjian.git
+cd tingjian
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r backend/requirements.txt zhconv
@@ -256,7 +256,7 @@ The script rewrites the resolved playlist, searches multiple sources, filters ve
 - [Changelog](CHANGELOG.md) · [Collaboration guidelines](AGENTS.md).
 - [Design guidelines](DESIGN.md) · [Third-party sources and license records](THIRD_PARTY_NOTICES.md).
 - [Recommendation design and Embeat reference record](docs/EMBEAT-ADAPTATION.md): candidate fusion, boundaries, fallback rules, and evaluation.
-- [Continuous integration](https://github.com/HachikoJ/easy-radio-host/actions): Python syntax, API contracts, and frontend static-server checks.
+- [Continuous integration](https://github.com/HachikoJ/tingjian/actions): Python syntax, API contracts, and frontend static-server checks.
 
 ## Credits
 
@@ -269,16 +269,16 @@ The script rewrites the resolved playlist, searches multiple sources, filters ve
 
 ## GitHub activity
 
-[![Star History Chart](https://api.star-history.com/svg?repos=HachikoJ/easy-radio-host&type=Date)](https://star-history.com/#HachikoJ/easy-radio-host&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=HachikoJ/tingjian&type=Date)](https://star-history.com/#HachikoJ/tingjian&Date)
 
-[Open Star History](https://star-history.com/#HachikoJ/easy-radio-host&Date)
+[Open Star History](https://star-history.com/#HachikoJ/tingjian&Date)
 
 ## Contact
 
 Get in touch to discuss AI music products, share feedback, or support the project:
 
 - Personal site: [www.deline.top](https://www.deline.top)
-- GitHub: [HachikoJ](https://github.com/HachikoJ) · [Report an issue](https://github.com/HachikoJ/easy-radio-host/issues)
+- GitHub: [HachikoJ](https://github.com/HachikoJ) · [Report an issue](https://github.com/HachikoJ/tingjian/issues)
 - WeChat: `hostrow`; please mention “Tingjian”
 - Email: [946106011@qq.com](mailto:946106011@qq.com)
 

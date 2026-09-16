@@ -115,7 +115,7 @@ class FrontendContract(unittest.IsolatedAsyncioTestCase):
         html = content.decode("utf-8")
         Links().feed(html)
         self.assertEqual(links["website-link"]["href"], "https://www.deline.top/")
-        self.assertEqual(links["author-link"]["href"], "https://github.com/HachikoJ/easy-radio-host")
+        self.assertEqual(links["author-link"]["href"], "https://github.com/HachikoJ/tingjian")
         self.assertEqual(links["credits-link"]["href"], "credits.html")
         self.assertEqual(links["icp-link"]["href"], "https://beian.miit.gov.cn/")
         for link in links.values():
