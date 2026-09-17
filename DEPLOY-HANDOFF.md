@@ -311,6 +311,6 @@ sudo certbot certificates
 
 ## 版权与致谢
 
-- 原始项目：[weak0001 / easy-radio-host](https://gitee.com/weak0001/easy-radio-host)。原始许可证尚未核实，不因此将整个仓库重新声明为 MIT。
+- 原始项目：[weak0001 / easy-radio-host](https://gitee.com/weak0001/easy-radio-host)。听间新增与修改的代码采用 [MIT 许可证](LICENSE)，保留原作者署名与版权归属；原始代码的授权条款尚未核实。
 - 交互参考：[hllqkb / Claudio](https://github.com/hllqkb/Claudio)，MIT 许可；参考范围与许可全文见 [第三方说明](THIRD_PARTY_NOTICES.md)。
 - 在线音乐 API：[GD 音乐台 API](https://music-api.gdstudio.xyz/api.php)。歌曲版权归来源平台和相应权利人，服务不提供自有音源或歌曲授权。

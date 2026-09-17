@@ -12,6 +12,7 @@
   <img src="https://img.shields.io/badge/Python-3.10%2B-3776AB" alt="Python 3.10+">
   <img src="https://img.shields.io/badge/FastAPI-009688" alt="FastAPI">
   <img src="https://img.shields.io/badge/DeepSeek-AI-1677E8" alt="DeepSeek AI">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-2f855a" alt="MIT License"></a>
   <a href="https://github.com/HachikoJ/tingjian"><img src="https://img.shields.io/github/stars/HachikoJ/tingjian?style=flat" alt="GitHub stars"></a>
 </p>
 
@@ -246,7 +247,7 @@ The script rewrites the resolved playlist, searches multiple sources, filters ve
 - AI narration is not guaranteed to be factual. Track availability, version matching, and response times depend on third-party services.
 - Lyrics and translations come from the existing GD music API and may be unavailable or differ from the audio version. Only timestamped lyrics are synchronized; plain text is not assigned estimated timings. Rate limits and temporary failures are not cached as empty results; only an empty 200 response can trigger cross-channel lookup under strict recording identity matching. The proxy holds at most 128 entries in memory: successful lyrics for six hours and an empty result for 60 seconds only after exhaustive cross-channel lookup. It does not save lyric files or distribute a lyric library in the repository. Lyrics belong to their respective rights holders.
 - The project is for personal learning and experimentation. Song rights belong to their respective owners; follow platform rules.
-- The project is experimental. The full upstream licensing terms have not been confirmed, and the repository does not yet declare a unified open-source license.
+- The project is experimental. Code added or modified for Tingjian is available under the [MIT License](LICENSE). Original easy-radio-host attribution and copyright, third-party components, music, lyrics, and images remain subject to their respective rights; see the [third-party notice](THIRD_PARTY_NOTICES.md#原始项目--original-project).
 
 ## Project resources
 
@@ -254,6 +255,7 @@ The script rewrites the resolved playlist, searches multiple sources, filters ve
 - [Contributing](CONTRIBUTING.md): validation commands and Pull Request guidelines.
 - [Code of Conduct](CODE_OF_CONDUCT.md) · [Security Policy](SECURITY.md).
 - [Changelog](CHANGELOG.md) · [Collaboration guidelines](AGENTS.md).
+- [MIT License](LICENSE).
 - [Design guidelines](DESIGN.md) · [Third-party sources and license records](THIRD_PARTY_NOTICES.md).
 - [Recommendation design and Embeat reference record](docs/EMBEAT-ADAPTATION.md): candidate fusion, boundaries, fallback rules, and evaluation.
 - [Continuous integration](https://github.com/HachikoJ/tingjian/actions): Python syntax, API contracts, and frontend static-server checks.

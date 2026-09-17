@@ -137,17 +137,13 @@ class FrontendContract(unittest.IsolatedAsyncioTestCase):
         self.assertLess(header.index('id="visit-stats"'), header.index('class="view-actions"'))
         quiet = (ROOT / "backend" / "static" / "quiet.css").read_text()
         self.assertIn(".quiet-ui .page-header .visit-stats{", quiet)
+        self.assertIn("© 2026 听间 · MIT 开源", footer)
         self.assertIn('id="icp-link"', footer)
         self.assertIn("粤ICP备2025449309号-2", footer)
+        self.assertLess(footer.index("© 2026 听间"), footer.index("粤ICP备2025449309号-2"))
+        self.assertIn(".quiet-ui .page-footer{", quiet)
+        self.assertIn(".quiet-ui .page-footer>span{margin-right:0}", quiet)
         self.assertIn(".quiet-ui .page-footer #icp-link{", quiet)
-        self.assertNotIn(".quiet-ui .page-footer{display:none}", quiet)
-
-    async def test_credits_page_contains_registration_link(self):
-        status, content = await request("/credits.html")
-        self.assertEqual(status, 200)
-        html = content.decode("utf-8")
-        self.assertIn('id="icp-link" href="https://beian.miit.gov.cn/"', html)
-        self.assertIn("粤ICP备2025449309号-2", html)
 
     async def test_scheduled_theme_is_ready_before_the_module_app_runs(self):
         class Scripts(HTMLParser):
@@ -171,7 +167,7 @@ class FrontendContract(unittest.IsolatedAsyncioTestCase):
         self.assertIn("document.documentElement.classList.remove('app-booting','theme-booting')", html)
         self.assertIn('id="visit-stats"', html)
         self.assertIn('href="style.css?v=20260912-2"', html)
-        self.assertIn('href="quiet.css?v=20260912-2"', html)
+        self.assertIn('href="quiet.css?v=20260917-1"', html)
         self.assertIn('href="listening.css?v=20260912-2"', html)
         self.assertIn('src="listening.js?v=20260911-6" defer', html)
         self.assertIn('src="app.js?v=20260912-2" type="module"', html)

@@ -7,9 +7,9 @@
 - 许可证 / License: [MIT 原文 / Full MIT text](backend/static/licenses/Claudio-MIT.txt)
 - 研究版本 / Reviewed revision: [`c2eb8111dfba34437c047315ab827cbc58e33761`](https://github.com/hllqkb/Claudio/tree/c2eb8111dfba34437c047315ab827cbc58e33761)，2026-09-08 核查。
 
-听间前端参考了 Claudio 的当前歌曲布局、明暗主题、收藏与播放历史、MediaSession 系统媒体控制交互。对应的 `backend/static/listening.js`、`backend/static/listening.css` 及页面接入由本项目独立实现，适配既有 FastAPI 接口和 song/talk/text 混合队列；没有复制其 React/Fastify 源文件。完整 MIT 文本随参考记录保留，不代表本仓库整体改用 MIT。
+听间前端参考了 Claudio 的当前歌曲布局、明暗主题、收藏与播放历史、MediaSession 系统媒体控制交互。对应的 `backend/static/listening.js`、`backend/static/listening.css` 及页面接入由本项目独立实现，适配既有 FastAPI 接口和 song/talk/text 混合队列；没有复制其 React/Fastify 源文件。完整 MIT 文本随参考记录保留；听间代码按根目录 [MIT 许可证](LICENSE)发布。
 
-The Tingjian frontend draws interaction ideas from Claudio's current-track layout, light/dark themes, favorites, listening history, and MediaSession controls. `backend/static/listening.js`, `backend/static/listening.css`, and the page integration were independently implemented for the existing FastAPI contracts and mixed song/talk/text queue. No React/Fastify source files were copied. The complete MIT notice accompanies this reference record and does not relicense this repository as a whole.
+The Tingjian frontend draws interaction ideas from Claudio's current-track layout, light/dark themes, favorites, listening history, and MediaSession controls. `backend/static/listening.js`, `backend/static/listening.css`, and the page integration were independently implemented for the existing FastAPI contracts and mixed song/talk/text queue. No React/Fastify source files were copied. The complete MIT notice accompanies this reference record; Tingjian code is released under the repository's root [MIT License](LICENSE).
 
 未复用 Claudio 的品牌、截图、歌曲、唱片封面、账号凭证或音源解锁逻辑。音乐、图片、商标及第三方服务另有权利与条款，MIT 许可不替代它们的授权。未来复制或改编其代码时，须更新来源文件映射并随副本保留版权与完整许可。
 
@@ -39,9 +39,9 @@ The rotating disc, center image, and surrounding motion draw on common interacti
 - 许可证 / License: [完整 MIT 文本 / Full MIT text](backend/static/vendor/three/LICENSE)
 - 本地模块 / Local module: `backend/static/vendor/three/three.module.min.js`
 
-Three.js 用于渲染旋转唱片与立体波幕，完整 MIT 许可随模块保留。唱片与波幕几何、Shader、音频分析接入和 Canvas 2D 回退由本项目实现；该依赖的 MIT 许可不改变整个仓库的授权状态。
+Three.js 用于渲染旋转唱片与立体波幕，完整 MIT 许可随模块保留。唱片与波幕几何、Shader、音频分析接入和 Canvas 2D 回退由本项目实现；听间代码按根目录 [MIT 许可证](LICENSE)发布。
 
-Three.js renders the rotating disc and 3D waves, with its complete MIT license retained alongside the module. This project implements the disc and wave geometry, shaders, audio-analysis integration, and Canvas 2D fallback. The dependency's MIT license does not relicense the repository as a whole.
+Three.js renders the rotating disc and 3D waves, with its complete MIT license retained alongside the module. This project implements the disc and wave geometry, shaders, audio-analysis integration, and Canvas 2D fallback. Tingjian code is released under the repository's root [MIT License](LICENSE).
 
 ## Embeat
 
@@ -69,9 +69,9 @@ These files parse LRC timestamps. The only upstream change adds the `.js` extens
 
 ## 原始项目 / Original Project
 
-[easy-radio-host](https://gitee.com/weak0001/easy-radio-host)，作者 / author **weak0001**。保留原作者署名和版权归属。原始代码的完整授权尚未核清，本仓库尚未声明统一开源许可证；Claudio 的 MIT 授权不改变这一状态。
+[easy-radio-host](https://gitee.com/weak0001/easy-radio-host)，作者 / author **weak0001**。听间项目经修改与新增的代码采用 [MIT 许可证](LICENSE)，并保留原作者署名和版权归属；原始代码的完整授权条款尚未核清，MIT 许可不替代其权利人可能主张的条款。
 
-Original attribution and ownership are retained. The original source's complete licensing terms have not been verified, and this repository does not currently declare a unified open-source license. Claudio's MIT license does not change that status.
+Code modified and added for Tingjian is available under the [MIT License](LICENSE), with the original author's attribution and copyright ownership retained. The original source's complete licensing terms have not been verified; the MIT License does not replace terms that its rights holder may assert.
 
 ## 前端资产 / Frontend Assets
 

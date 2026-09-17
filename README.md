@@ -12,6 +12,7 @@
   <img src="https://img.shields.io/badge/Python-3.10%2B-3776AB" alt="Python 3.10+">
   <img src="https://img.shields.io/badge/FastAPI-009688" alt="FastAPI">
   <img src="https://img.shields.io/badge/DeepSeek-AI-1677E8" alt="DeepSeek AI">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-2f855a" alt="MIT License"></a>
   <a href="https://github.com/HachikoJ/tingjian"><img src="https://img.shields.io/github/stars/HachikoJ/tingjian?style=flat" alt="GitHub stars"></a>
 </p>
 
@@ -246,7 +247,7 @@ node scripts/serve-demo.mjs
 - AI 生成的口播不保证事实准确；歌曲可用性、版本匹配和响应时间依赖第三方服务。
 - 歌词与译文来自现有 GD 音乐 API，可能缺失或与音频版本不匹配；有时间戳才启用同步，不推算纯文本歌词时间。429 和临时失败不缓存为空；200 空歌词才会在严格身份匹配下跨渠道补找。代理最多缓存 128 条，成功歌词在内存保留 6 小时，完整跨渠道未命中的空结果保留 60 秒；不保存歌词文件或随仓库再分发歌词库。歌词版权归原权利人。
 - 本项目用于个人学习与体验，歌曲版权归相应权利人，使用时须遵守平台规则。
-- 项目处于实验阶段，目前未确认上游代码的完整授权条款，仓库尚未声明统一开源许可证。
+- 项目处于实验阶段。听间新增与修改的代码采用 [MIT 许可证](LICENSE)；原始 easy-radio-host 的署名与版权归属、第三方组件、歌曲、歌词及图片权利不因此改变，详见[第三方来源与许可记录](THIRD_PARTY_NOTICES.md#原始项目--original-project)。
 
 ## 项目资料
 
@@ -254,6 +255,7 @@ node scripts/serve-demo.mjs
 - [贡献指南](CONTRIBUTING.md)：验证命令与 Pull Request 规范。
 - [行为准则](CODE_OF_CONDUCT.md) · [安全政策](SECURITY.md)。
 - [更新记录](CHANGELOG.md) · [协作约定](AGENTS.md)。
+- [MIT 许可证](LICENSE)。
 - [设计约定](DESIGN.md) · [第三方来源与许可记录](THIRD_PARTY_NOTICES.md)。
 - [推荐设计与 Embeat 参考说明](docs/EMBEAT-ADAPTATION.md)：候选融合、边界、降级规则与评测。
 - [持续集成](https://github.com/HachikoJ/tingjian/actions)：Python 语法、接口契约及前端静态服务检查。
